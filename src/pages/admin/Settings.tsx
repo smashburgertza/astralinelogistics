@@ -117,6 +117,11 @@ export default function AdminSettingsPage() {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Favicon upload state
+  const [faviconUrl, setFaviconUrl] = useState<string | null>(null);
+  const [uploadingFavicon, setUploadingFavicon] = useState(false);
+  const faviconInputRef = useRef<HTMLInputElement>(null);
 
   // Forms
   const companyForm = useForm({
@@ -146,6 +151,9 @@ export default function AdminSettingsPage() {
         companyForm.reset({ ...defaultCompany, ...settings.company } as typeof defaultCompany);
         if ((settings.company as Record<string, unknown>).logo_url) {
           setLogoUrl((settings.company as Record<string, unknown>).logo_url as string);
+        }
+        if ((settings.company as Record<string, unknown>).favicon_url) {
+          setFaviconUrl((settings.company as Record<string, unknown>).favicon_url as string);
         }
       }
       if (settings.notifications) {
@@ -233,10 +241,85 @@ export default function AdminSettingsPage() {
     }
   };
 
+  const handleFaviconUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type - favicons should be ICO, PNG, or SVG
+    const validTypes = ['image/x-icon', 'image/vnd.microsoft.icon', 'image/png', 'image/svg+xml'];
+    if (!validTypes.includes(file.type) && !file.name.endsWith('.ico')) {
+      toast.error('Please select an ICO, PNG, or SVG file');
+      return;
+    }
+
+    // Validate file size (max 500KB for favicons)
+    if (file.size > 500 * 1024) {
+      toast.error('Favicon must be less than 500KB');
+      return;
+    }
+
+    setUploadingFavicon(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `favicon.${fileExt}`;
+
+      // Upload to storage
+      const { error: uploadError } = await supabase.storage
+        .from('branding')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('branding')
+        .getPublicUrl(fileName);
+
+      setFaviconUrl(publicUrl);
+
+      // Save favicon URL to settings
+      const currentCompany = settings?.company || defaultCompany;
+      await updateSettings.mutateAsync({
+        key: 'company',
+        value: { ...currentCompany, favicon_url: publicUrl } as Record<string, unknown>,
+      });
+
+      toast.success('Favicon uploaded successfully');
+    } catch (error) {
+      console.error('Error uploading favicon:', error);
+      toast.error('Failed to upload favicon');
+    } finally {
+      setUploadingFavicon(false);
+    }
+  };
+
+  const handleRemoveFavicon = async () => {
+    try {
+      // Delete from storage
+      await supabase.storage.from('branding').remove(['favicon.ico', 'favicon.png', 'favicon.svg']);
+
+      setFaviconUrl(null);
+
+      // Remove favicon URL from settings
+      const currentCompany = settings?.company || defaultCompany;
+      const { favicon_url, ...rest } = currentCompany as Record<string, unknown>;
+      await updateSettings.mutateAsync({
+        key: 'company',
+        value: rest as Record<string, unknown>,
+      });
+
+      toast.success('Favicon removed');
+    } catch (error) {
+      console.error('Error removing favicon:', error);
+      toast.error('Failed to remove favicon');
+    }
+  };
+
   const handleSave = async (key: string, data: Record<string, unknown>) => {
-    // Preserve logo_url when saving company settings
-    if (key === 'company' && logoUrl) {
-      data = { ...data, logo_url: logoUrl };
+    // Preserve logo_url and favicon_url when saving company settings
+    if (key === 'company') {
+      if (logoUrl) data = { ...data, logo_url: logoUrl };
+      if (faviconUrl) data = { ...data, favicon_url: faviconUrl };
     }
     await updateSettings.mutateAsync({ key, value: data });
     toast.success(`${key.charAt(0).toUpperCase() + key.slice(1)} settings saved`);
@@ -283,52 +366,105 @@ export default function AdminSettingsPage() {
               <CardDescription>Manage your company information and branding</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Logo Upload Section */}
-              <div className="space-y-3">
-                <Label>Company Logo</Label>
-                <div className="flex items-center gap-4">
-                  <div className="relative h-24 w-24 rounded-lg border-2 border-dashed border-muted-foreground/25 flex items-center justify-center overflow-hidden bg-muted/50">
-                    {logoUrl ? (
-                      <img src={logoUrl} alt="Company logo" className="h-full w-full object-contain p-2" />
-                    ) : (
-                      <ImageIcon className="h-8 w-8 text-muted-foreground/50" />
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleLogoUpload}
-                      accept="image/*"
-                      className="hidden"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploadingLogo}
-                    >
-                      {uploadingLogo ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              {/* Branding Upload Section */}
+              <div className="grid gap-6 md:grid-cols-2">
+                {/* Logo Upload */}
+                <div className="space-y-3">
+                  <Label>Company Logo</Label>
+                  <div className="flex items-center gap-4">
+                    <div className="relative h-24 w-24 rounded-lg border-2 border-dashed border-muted-foreground/25 flex items-center justify-center overflow-hidden bg-muted/50">
+                      {logoUrl ? (
+                        <img src={logoUrl} alt="Company logo" className="h-full w-full object-contain p-2" />
                       ) : (
-                        <Upload className="h-4 w-4 mr-2" />
+                        <ImageIcon className="h-8 w-8 text-muted-foreground/50" />
                       )}
-                      {logoUrl ? 'Change Logo' : 'Upload Logo'}
-                    </Button>
-                    {logoUrl && (
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleLogoUpload}
+                        accept="image/*"
+                        className="hidden"
+                      />
                       <Button
                         type="button"
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
-                        className="text-destructive hover:text-destructive"
-                        onClick={handleRemoveLogo}
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploadingLogo}
                       >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Remove
+                        {uploadingLogo ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Upload className="h-4 w-4 mr-2" />
+                        )}
+                        {logoUrl ? 'Change' : 'Upload'}
                       </Button>
-                    )}
-                    <p className="text-xs text-muted-foreground">PNG, JPG or SVG. Max 2MB.</p>
+                      {logoUrl && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={handleRemoveLogo}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Remove
+                        </Button>
+                      )}
+                      <p className="text-xs text-muted-foreground">PNG, JPG or SVG. Max 2MB.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Favicon Upload */}
+                <div className="space-y-3">
+                  <Label>Favicon</Label>
+                  <div className="flex items-center gap-4">
+                    <div className="relative h-24 w-24 rounded-lg border-2 border-dashed border-muted-foreground/25 flex items-center justify-center overflow-hidden bg-muted/50">
+                      {faviconUrl ? (
+                        <img src={faviconUrl} alt="Favicon" className="h-12 w-12 object-contain" />
+                      ) : (
+                        <ImageIcon className="h-6 w-6 text-muted-foreground/50" />
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <input
+                        type="file"
+                        ref={faviconInputRef}
+                        onChange={handleFaviconUpload}
+                        accept=".ico,.png,.svg,image/x-icon,image/png,image/svg+xml"
+                        className="hidden"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => faviconInputRef.current?.click()}
+                        disabled={uploadingFavicon}
+                      >
+                        {uploadingFavicon ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Upload className="h-4 w-4 mr-2" />
+                        )}
+                        {faviconUrl ? 'Change' : 'Upload'}
+                      </Button>
+                      {faviconUrl && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={handleRemoveFavicon}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Remove
+                        </Button>
+                      )}
+                      <p className="text-xs text-muted-foreground">ICO, PNG or SVG. Max 500KB.</p>
+                    </div>
                   </div>
                 </div>
               </div>
