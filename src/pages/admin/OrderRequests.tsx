@@ -1,10 +1,36 @@
+import { useState, useMemo } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { OrderRequestTable } from '@/components/admin/OrderRequestTable';
 import { useOrderRequests } from '@/hooks/useOrderRequests';
-import { ShoppingCart, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { ShoppingCart, Clock, CheckCircle, XCircle, Filter } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+
+const STATUS_OPTIONS = [
+  { value: 'all', label: 'All Statuses' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'confirmed', label: 'Confirmed' },
+  { value: 'purchasing', label: 'Purchasing' },
+  { value: 'shipped', label: 'Shipped' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'cancelled', label: 'Cancelled' },
+];
 
 export default function AdminOrderRequestsPage() {
+  const [statusFilter, setStatusFilter] = useState('all');
   const { data: orders, isLoading } = useOrderRequests();
+
+  const filteredOrders = useMemo(() => {
+    if (!orders) return [];
+    if (statusFilter === 'all') return orders;
+    return orders.filter(o => o.status === statusFilter);
+  }, [orders, statusFilter]);
 
   const stats = {
     total: orders?.length || 0,
@@ -51,8 +77,36 @@ export default function AdminOrderRequestsPage() {
           </div>
         </div>
 
+        {/* Filters */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">Filter by:</span>
+          </div>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[180px] bg-background">
+              <SelectValue placeholder="Select status" />
+            </SelectTrigger>
+            <SelectContent className="bg-background z-50">
+              {STATUS_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {statusFilter !== 'all' && (
+            <Button variant="ghost" size="sm" onClick={() => setStatusFilter('all')}>
+              Clear
+            </Button>
+          )}
+          <span className="text-sm text-muted-foreground ml-auto">
+            Showing {filteredOrders.length} of {stats.total} orders
+          </span>
+        </div>
+
         {/* Table */}
-        <OrderRequestTable orders={orders} isLoading={isLoading} />
+        <OrderRequestTable orders={filteredOrders} isLoading={isLoading} />
       </div>
     </AdminLayout>
   );
