@@ -1,9 +1,21 @@
 export const REGIONS = {
   europe: {
     label: 'Europe',
-    countries: ['United Kingdom', 'Germany', 'France'],
-    currency: 'GBP',
+    countries: ['Germany', 'France', 'Italy', 'Spain'],
+    currency: 'EUR',
     flag: '🇪🇺',
+  },
+  uk: {
+    label: 'United Kingdom',
+    countries: ['United Kingdom'],
+    currency: 'GBP',
+    flag: '🇬🇧',
+  },
+  usa: {
+    label: 'USA',
+    countries: ['United States'],
+    currency: 'USD',
+    flag: '🇺🇸',
   },
   dubai: {
     label: 'Dubai',
