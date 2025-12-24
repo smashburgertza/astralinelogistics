@@ -5,8 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
-  Package, Users, DollarSign, TrendingUp, 
-  Plane, ArrowRight, AlertCircle, MapPin, Receipt
+  PackageSearch, UsersRound, BadgeDollarSign, TrendingUp, 
+  Plane, ArrowRight, AlertTriangle, MapPinned, ReceiptText
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { REGIONS, SHIPMENT_STATUSES, type Region, type ShipmentStatus } from '@/lib/constants';
@@ -45,7 +45,7 @@ interface DashboardStats {
   monthlyData: Array<{ month: string; shipments: number; revenue: number; expenses: number }>;
 }
 
-const CHART_COLORS = ['#D4AF37', '#1B2B4B', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#6B7280'];
+const CHART_COLORS = ['#F7BB3A', '#1F8ECE', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#6B7280'];
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<DashboardStats>({
@@ -217,28 +217,28 @@ export default function AdminDashboard() {
           title="Total Shipments"
           value={stats.totalShipments}
           subtitle={`${stats.thisMonthShipments} this month`}
-          icon={Package}
+          icon={PackageSearch}
           variant="navy"
         />
         <StatCard
           title="Active Customers"
           value={stats.activeCustomers}
           subtitle="Registered"
-          icon={Users}
+          icon={UsersRound}
           variant="primary"
         />
         <StatCard
           title="Revenue"
           value={`$${stats.revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           subtitle={`$${stats.thisMonthRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} this month`}
-          icon={DollarSign}
+          icon={BadgeDollarSign}
           variant="success"
         />
         <StatCard
           title="Total Expenses"
           value={`$${stats.totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           subtitle={`$${stats.thisMonthExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} this month`}
-          icon={Receipt}
+          icon={ReceiptText}
           variant="warning"
         />
       </div>
@@ -315,8 +315,8 @@ export default function AdminDashboard() {
                   />
                   <Bar 
                     dataKey="shipments" 
-                    fill="#1B2B4B" 
-                    radius={[4, 4, 0, 0]}
+                    fill="#1F8ECE" 
+                    radius={[6, 6, 0, 0]}
                     name="Shipments"
                   />
                 </BarChart>
@@ -437,8 +437,8 @@ export default function AdminDashboard() {
                   />
                   <Bar 
                     dataKey="shipments" 
-                    fill="#D4AF37" 
-                    radius={[0, 4, 4, 0]}
+                    fill="#F7BB3A" 
+                    radius={[0, 6, 6, 0]}
                     name="Shipments"
                   />
                 </BarChart>
@@ -471,7 +471,7 @@ export default function AdminDashboard() {
           <CardContent>
             {stats.recentShipments.length === 0 ? (
               <div className="text-center py-12">
-                <Package className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+                <PackageSearch className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
                 <p className="text-muted-foreground">No shipments yet</p>
               </div>
             ) : (
@@ -511,7 +511,7 @@ export default function AdminDashboard() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
-                  <AlertCircle className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                  <AlertTriangle className="w-5 h-5 text-orange-600 dark:text-orange-400" />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Pending Invoices</p>
@@ -540,7 +540,7 @@ export default function AdminDashboard() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                  <MapPin className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  <MapPinned className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Active Regions</p>
@@ -554,27 +554,27 @@ export default function AdminDashboard() {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-8">
-        <Button variant="outline" className="h-auto py-4 flex-col gap-2 hover:bg-primary/5 hover:border-primary" asChild>
+        <Button variant="outline" className="h-auto py-4 flex-col gap-2 hover:bg-accent/5 hover:border-accent" asChild>
           <Link to="/admin/shipments">
-            <Package className="w-6 h-6 text-primary" />
+            <PackageSearch className="w-6 h-6 text-accent" />
             <span>View Shipments</span>
           </Link>
         </Button>
-        <Button variant="outline" className="h-auto py-4 flex-col gap-2 hover:bg-primary/5 hover:border-primary" asChild>
+        <Button variant="outline" className="h-auto py-4 flex-col gap-2 hover:bg-accent/5 hover:border-accent" asChild>
           <Link to="/admin/customers">
-            <Users className="w-6 h-6 text-primary" />
+            <UsersRound className="w-6 h-6 text-accent" />
             <span>Manage Customers</span>
           </Link>
         </Button>
-        <Button variant="outline" className="h-auto py-4 flex-col gap-2 hover:bg-primary/5 hover:border-primary" asChild>
+        <Button variant="outline" className="h-auto py-4 flex-col gap-2 hover:bg-accent/5 hover:border-accent" asChild>
           <Link to="/admin/invoices">
-            <DollarSign className="w-6 h-6 text-primary" />
+            <BadgeDollarSign className="w-6 h-6 text-accent" />
             <span>View Invoices</span>
           </Link>
         </Button>
-        <Button variant="outline" className="h-auto py-4 flex-col gap-2 hover:bg-primary/5 hover:border-primary" asChild>
+        <Button variant="outline" className="h-auto py-4 flex-col gap-2 hover:bg-accent/5 hover:border-accent" asChild>
           <Link to="/admin/expenses">
-            <Receipt className="w-6 h-6 text-primary" />
+            <ReceiptText className="w-6 h-6 text-accent" />
             <span>Track Expenses</span>
           </Link>
         </Button>

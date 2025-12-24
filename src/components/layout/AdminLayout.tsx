@@ -1,9 +1,9 @@
 import { ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
-  Home, Package, Users, FileText, DollarSign, BarChart3, 
-  Settings, LogOut, Bell, Search, ChevronDown, User,
-  Truck, UserCheck, Receipt, TrendingUp
+  LayoutDashboard, PackageSearch, UsersRound, FileStack, Wallet,
+  ChartSpline, Settings2, LogOut, BellRing, Search, ChevronDown, UserCircle2,
+  Container, UserCog, ReceiptText, TrendingUp
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,22 +41,22 @@ interface AdminLayoutProps {
 }
 
 const mainNavItems = [
-  { label: 'Dashboard', href: '/admin', icon: Home },
-  { label: 'Shipments', href: '/admin/shipments', icon: Package },
-  { label: 'Customers', href: '/admin/customers', icon: Users },
-  { label: 'Invoices', href: '/admin/invoices', icon: FileText },
+  { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
+  { label: 'Shipments', href: '/admin/shipments', icon: PackageSearch },
+  { label: 'Customers', href: '/admin/customers', icon: UsersRound },
+  { label: 'Invoices', href: '/admin/invoices', icon: FileStack },
 ];
 
 const financeNavItems = [
-  { label: 'Expenses', href: '/admin/expenses', icon: DollarSign },
+  { label: 'Expenses', href: '/admin/expenses', icon: Wallet },
   { label: 'Commissions', href: '/admin/commissions', icon: TrendingUp },
-  { label: 'Reports', href: '/admin/reports', icon: BarChart3 },
+  { label: 'Reports', href: '/admin/reports', icon: ChartSpline },
 ];
 
 const managementNavItems = [
-  { label: 'Employees', href: '/admin/employees', icon: UserCheck },
-  { label: 'Agents', href: '/admin/agents', icon: Truck },
-  { label: 'Settings', href: '/admin/settings', icon: Settings },
+  { label: 'Employees', href: '/admin/employees', icon: UserCog },
+  { label: 'Agents', href: '/admin/agents', icon: Container },
+  { label: 'Settings', href: '/admin/settings', icon: Settings2 },
 ];
 
 export function AdminLayout({ children, title, subtitle }: AdminLayoutProps) {
@@ -207,11 +207,11 @@ export function AdminLayout({ children, title, subtitle }: AdminLayoutProps) {
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => navigate('/admin/profile')}>
-                  <User className="w-4 h-4 mr-2" />
+                  <UserCircle2 className="w-4 h-4 mr-2" />
                   Profile
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate('/admin/settings')}>
-                  <Settings className="w-4 h-4 mr-2" />
+                  <Settings2 className="w-4 h-4 mr-2" />
                   Settings
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -241,8 +241,8 @@ export function AdminLayout({ children, title, subtitle }: AdminLayoutProps) {
             </div>
 
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="w-5 h-5" />
+              <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-accent">
+                <BellRing className="w-5 h-5" />
                 <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full animate-pulse" />
               </Button>
             </div>
