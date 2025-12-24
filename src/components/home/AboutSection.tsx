@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { CheckCircle } from 'lucide-react';
+import { CircleCheckBig } from 'lucide-react';
 
 export function AboutSection() {
   return (
@@ -37,7 +37,7 @@ export function AboutSection() {
                 '24/7 Support',
               ].map((item, i) => (
                 <div key={i} className="flex items-center gap-3">
-                  <CheckCircle className="w-5 h-5 text-primary shrink-0" />
+                  <CircleCheckBig className="w-5 h-5 text-primary shrink-0" />
                   <span className="text-white/90 text-sm">{item}</span>
                 </div>
               ))}

@@ -1,10 +1,10 @@
 import { Link } from 'react-router-dom';
-import { Plane, Ship, Truck, Package, Shield, Clock } from 'lucide-react';
+import { PlaneTakeoff, Ship, Container, PackageCheck, ShieldCheck, Zap } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 
 const services = [
   {
-    icon: Plane,
+    icon: PlaneTakeoff,
     title: 'Air Freight',
     description: 'Fast and reliable air cargo services from major global hubs directly to Tanzania.',
     link: '/services#air-freight',
@@ -16,25 +16,25 @@ const services = [
     link: '/services#sea-freight',
   },
   {
-    icon: Truck,
+    icon: Container,
     title: 'Road Freight',
     description: 'Comprehensive ground transportation and last-mile delivery across Tanzania.',
     link: '/services#road-freight',
   },
   {
-    icon: Package,
+    icon: PackageCheck,
     title: 'Consolidation',
     description: 'Combine multiple packages into one shipment to optimize costs and efficiency.',
     link: '/services#consolidation',
   },
   {
-    icon: Shield,
+    icon: ShieldCheck,
     title: 'Customs Clearance',
     description: 'Expert handling of all customs documentation and clearance procedures.',
     link: '/services#customs',
   },
   {
-    icon: Clock,
+    icon: Zap,
     title: 'Express Delivery',
     description: 'Priority shipping options for time-sensitive cargo with guaranteed delivery.',
     link: '/services#express',
