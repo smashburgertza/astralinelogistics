@@ -1,6 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useEffect } from 'react';
 
 export interface OrderRequest {
   id: string;
@@ -31,6 +32,33 @@ export interface OrderItem {
 
 export function useCustomerOrders() {
   const { profile } = useAuth();
+  const queryClient = useQueryClient();
+
+  // Subscribe to real-time updates
+  useEffect(() => {
+    if (!profile?.email) return;
+
+    const channel = supabase
+      .channel('customer-orders-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'order_requests',
+          filter: `customer_email=eq.${profile.email}`,
+        },
+        () => {
+          // Invalidate and refetch when order changes
+          queryClient.invalidateQueries({ queryKey: ['customer-orders', profile.email] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile?.email, queryClient]);
 
   return useQuery({
     queryKey: ['customer-orders', profile?.email],
