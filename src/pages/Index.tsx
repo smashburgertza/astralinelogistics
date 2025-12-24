@@ -1,18 +1,28 @@
 import { HeroSection } from '@/components/home/HeroSection';
 import { AboutSection } from '@/components/home/AboutSection';
 import { ServicesSection } from '@/components/home/ServicesSection';
+import { ShopForMeSection } from '@/components/home/ShopForMeSection';
 import { PricingCalculator } from '@/components/home/PricingCalculator';
 import { AgentAddresses } from '@/components/home/AgentAddresses';
+import { ContactSection } from '@/components/home/ContactSection';
 import { CTASection } from '@/components/home/CTASection';
 
 const Index = () => {
   return (
-    <div>
+    <div className="scroll-smooth">
       <HeroSection />
-      <AboutSection />
-      <ServicesSection />
-      <PricingCalculator />
+      <section id="about">
+        <AboutSection />
+      </section>
+      <section id="services">
+        <ServicesSection />
+      </section>
+      <ShopForMeSection />
+      <section id="pricing">
+        <PricingCalculator />
+      </section>
       <AgentAddresses />
+      <ContactSection />
       <CTASection />
     </div>
   );

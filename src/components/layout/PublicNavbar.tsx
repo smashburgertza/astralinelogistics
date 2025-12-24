@@ -34,6 +34,45 @@ export function PublicNavbar() {
 
   const firstName = getFirstName();
 
+  const navItems = [
+    { label: 'Home', href: '/#' },
+    { label: 'Shop For Me', href: '/#shop-for-me' },
+    { label: 'Services', href: '/#services' },
+    { label: 'About Us', href: '/#about' },
+    { label: 'Contact', href: '/#contact' },
+  ];
+
+  const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    const isHashLink = href.startsWith('/#');
+    
+    if (isHashLink) {
+      e.preventDefault();
+      const targetId = href.replace('/#', '');
+      
+      if (location.pathname !== '/') {
+        navigate('/');
+        setTimeout(() => {
+          const element = document.getElementById(targetId);
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          } else if (targetId === '') {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+        }, 100);
+      } else {
+        if (targetId === '') {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+          const element = document.getElementById(targetId);
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }
+      }
+      setIsOpen(false);
+    }
+  };
+
   // Click outside handler
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -100,27 +139,16 @@ export function PublicNavbar() {
 
             {/* Desktop Navigation */}
             <div className="hidden lg:flex items-center gap-8">
-              {[
-                { label: 'Home', href: '/' },
-                { label: 'Shop For Me', href: '/shop-for-me' },
-                { label: 'Services', href: '/services' },
-                { label: 'About Us', href: '/about' },
-                { label: 'Contact', href: '/contact' },
-              ].map((item) => (
-                <Link 
+              {navItems.map((item) => (
+                <a 
                   key={item.href}
-                  to={item.href} 
-                  className={cn(
-                    "font-medium transition-colors relative group text-foreground hover:text-primary",
-                    location.pathname === item.href && "text-primary"
-                  )}
+                  href={item.href}
+                  onClick={(e) => handleNavClick(e, item.href)} 
+                  className="font-medium transition-colors relative group text-foreground hover:text-primary cursor-pointer"
                 >
                   {item.label}
-                  <span className={cn(
-                    "absolute -bottom-1 left-0 w-0 h-0.5 bg-primary transition-all duration-300 group-hover:w-full",
-                    location.pathname === item.href && "w-full"
-                  )} />
-                </Link>
+                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-primary transition-all duration-300 group-hover:w-full" />
+                </a>
               ))}
             </div>
 
@@ -184,24 +212,15 @@ export function PublicNavbar() {
           {isOpen && (
             <div ref={menuRef} className="lg:hidden absolute right-4 top-full mt-2 w-64 py-4 bg-white rounded-xl shadow-xl border border-border/50 animate-fade-in z-50">
               <div className="flex flex-col gap-1 px-2">
-                {[
-                  { label: 'Home', href: '/' },
-                  { label: 'Shop For Me', href: '/shop-for-me' },
-                  { label: 'Services', href: '/services' },
-                  { label: 'About Us', href: '/about' },
-                  { label: 'Contact', href: '/contact' },
-                ].map((item) => (
-                  <Link 
+                {navItems.map((item) => (
+                  <a 
                     key={item.href}
-                    to={item.href} 
-                    className={cn(
-                      "py-2.5 px-3 text-sm text-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors font-medium",
-                      location.pathname === item.href && "bg-primary/10 text-primary"
-                    )}
-                    onClick={() => setIsOpen(false)}
+                    href={item.href}
+                    onClick={(e) => handleNavClick(e, item.href)}
+                    className="py-2.5 px-3 text-sm text-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors font-medium cursor-pointer"
                   >
                     {item.label}
-                  </Link>
+                  </a>
                 ))}
                 <div className="pt-3 mt-2 border-t border-border px-1">
                   {user ? (
