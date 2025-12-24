@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Building2, Mail, Shield, Settings, Save, Loader2 } from 'lucide-react';
+import { Building2, Mail, Shield, Settings, Save, Loader2, Upload, Trash2, ImageIcon } from 'lucide-react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { supabase } from '@/integrations/supabase/client';
 import {
   Form,
   FormControl,
@@ -111,6 +112,11 @@ const defaultSystem = {
 export default function AdminSettingsPage() {
   const { data: settings, isLoading } = useAllSettings();
   const updateSettings = useUpdateSettings();
+  
+  // Logo upload state
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Forms
   const companyForm = useForm({
@@ -138,6 +144,9 @@ export default function AdminSettingsPage() {
     if (settings) {
       if (settings.company) {
         companyForm.reset({ ...defaultCompany, ...settings.company } as typeof defaultCompany);
+        if ((settings.company as Record<string, unknown>).logo_url) {
+          setLogoUrl((settings.company as Record<string, unknown>).logo_url as string);
+        }
       }
       if (settings.notifications) {
         notificationForm.reset({ ...defaultNotifications, ...settings.notifications } as typeof defaultNotifications);
@@ -151,7 +160,84 @@ export default function AdminSettingsPage() {
     }
   }, [settings]);
 
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Image must be less than 2MB');
+      return;
+    }
+
+    setUploadingLogo(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `company-logo.${fileExt}`;
+
+      // Upload to storage
+      const { error: uploadError } = await supabase.storage
+        .from('branding')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('branding')
+        .getPublicUrl(fileName);
+
+      setLogoUrl(publicUrl);
+
+      // Save logo URL to settings
+      const currentCompany = settings?.company || defaultCompany;
+      await updateSettings.mutateAsync({
+        key: 'company',
+        value: { ...currentCompany, logo_url: publicUrl } as Record<string, unknown>,
+      });
+
+      toast.success('Logo uploaded successfully');
+    } catch (error) {
+      console.error('Error uploading logo:', error);
+      toast.error('Failed to upload logo');
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleRemoveLogo = async () => {
+    try {
+      // Delete from storage
+      await supabase.storage.from('branding').remove(['company-logo.png', 'company-logo.jpg', 'company-logo.jpeg', 'company-logo.svg', 'company-logo.webp']);
+
+      setLogoUrl(null);
+
+      // Remove logo URL from settings
+      const currentCompany = settings?.company || defaultCompany;
+      const { logo_url, ...rest } = currentCompany as Record<string, unknown>;
+      await updateSettings.mutateAsync({
+        key: 'company',
+        value: rest as Record<string, unknown>,
+      });
+
+      toast.success('Logo removed');
+    } catch (error) {
+      console.error('Error removing logo:', error);
+      toast.error('Failed to remove logo');
+    }
+  };
+
   const handleSave = async (key: string, data: Record<string, unknown>) => {
+    // Preserve logo_url when saving company settings
+    if (key === 'company' && logoUrl) {
+      data = { ...data, logo_url: logoUrl };
+    }
     await updateSettings.mutateAsync({ key, value: data });
     toast.success(`${key.charAt(0).toUpperCase() + key.slice(1)} settings saved`);
   };
@@ -196,7 +282,57 @@ export default function AdminSettingsPage() {
               <CardTitle>Company Profile</CardTitle>
               <CardDescription>Manage your company information and branding</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-6">
+              {/* Logo Upload Section */}
+              <div className="space-y-3">
+                <Label>Company Logo</Label>
+                <div className="flex items-center gap-4">
+                  <div className="relative h-24 w-24 rounded-lg border-2 border-dashed border-muted-foreground/25 flex items-center justify-center overflow-hidden bg-muted/50">
+                    {logoUrl ? (
+                      <img src={logoUrl} alt="Company logo" className="h-full w-full object-contain p-2" />
+                    ) : (
+                      <ImageIcon className="h-8 w-8 text-muted-foreground/50" />
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleLogoUpload}
+                      accept="image/*"
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadingLogo}
+                    >
+                      {uploadingLogo ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Upload className="h-4 w-4 mr-2" />
+                      )}
+                      {logoUrl ? 'Change Logo' : 'Upload Logo'}
+                    </Button>
+                    {logoUrl && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={handleRemoveLogo}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Remove
+                      </Button>
+                    )}
+                    <p className="text-xs text-muted-foreground">PNG, JPG or SVG. Max 2MB.</p>
+                  </div>
+                </div>
+              </div>
+
               <Form {...companyForm}>
                 <form onSubmit={companyForm.handleSubmit((data) => handleSave('company', data))} className="space-y-6">
                   <div className="grid gap-4 md:grid-cols-2">
