@@ -89,7 +89,7 @@ export default {
       },
       boxShadow: {
         'gold': '0 4px 20px hsl(42 92% 60% / 0.35)',
-        'navy': '0 4px 20px hsl(197 100% 44% / 0.35)',
+        'navy': '0 4px 20px hsl(202 74% 46% / 0.35)',
       },
       keyframes: {
         "accordion-down": {
