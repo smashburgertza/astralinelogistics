@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import { Package, MapPin, Weight, Clock, User, Copy, Check, Box } from 'lucide-react';
+import { Package, MapPin, Weight, Clock, User, Copy, Check, Box, Plus, Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import {
   Sheet,
@@ -7,13 +7,24 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Shipment } from '@/hooks/useShipments';
-import { useParcels } from '@/hooks/useParcels';
+import { Parcel, useParcels, useDeleteParcel } from '@/hooks/useParcels';
 import { ShipmentStatusBadge } from './ShipmentStatusBadge';
+import { ParcelDialog } from './ParcelDialog';
 
 interface ShipmentDetailDrawerProps {
   shipment: Shipment | null;
@@ -30,7 +41,12 @@ const statusSteps = [
 
 export function ShipmentDetailDrawer({ shipment, open, onOpenChange }: ShipmentDetailDrawerProps) {
   const [copied, setCopied] = useState(false);
+  const [parcelDialogOpen, setParcelDialogOpen] = useState(false);
+  const [editingParcel, setEditingParcel] = useState<Parcel | null>(null);
+  const [deleteParcelId, setDeleteParcelId] = useState<string | null>(null);
+  
   const { data: parcels, isLoading: parcelsLoading } = useParcels(shipment?.id ?? null);
+  const deleteParcel = useDeleteParcel();
 
   const copyTrackingNumber = () => {
     if (shipment?.tracking_number) {
@@ -200,10 +216,23 @@ export function ShipmentDetailDrawer({ shipment, open, onOpenChange }: ShipmentD
               {/* Parcels */}
               <Separator />
               <div>
-                <h3 className="text-sm font-semibold text-muted-foreground mb-4 flex items-center gap-2">
-                  <Box className="h-4 w-4" />
-                  Parcels ({parcels?.length || 0})
-                </h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                    <Box className="h-4 w-4" />
+                    Parcels ({parcels?.length || 0})
+                  </h3>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setEditingParcel(null);
+                      setParcelDialogOpen(true);
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add
+                  </Button>
+                </div>
                 {parcelsLoading ? (
                   <div className="space-y-3">
                     {[1, 2].map((i) => (
@@ -215,11 +244,32 @@ export function ShipmentDetailDrawer({ shipment, open, onOpenChange }: ShipmentD
                     {parcels.map((parcel) => (
                       <div
                         key={parcel.id}
-                        className="bg-muted/50 rounded-lg p-4 space-y-2"
+                        className="bg-muted/50 rounded-lg p-4 space-y-2 group"
                       >
                         <div className="flex items-center justify-between">
                           <code className="text-sm font-mono">{parcel.barcode}</code>
-                          <Badge variant="outline">{parcel.weight_kg} kg</Badge>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">{parcel.weight_kg} kg</Badge>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => {
+                                setEditingParcel(parcel);
+                                setParcelDialogOpen(true);
+                              }}
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+                              onClick={() => setDeleteParcelId(parcel.id)}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
                         </div>
                         {parcel.description && (
                           <p className="text-sm text-muted-foreground">{parcel.description}</p>
@@ -246,6 +296,43 @@ export function ShipmentDetailDrawer({ shipment, open, onOpenChange }: ShipmentD
                 <p>Last updated: {format(new Date(shipment.updated_at), 'MMM d, yyyy h:mm a')}</p>
               </div>
             </div>
+
+            {/* Parcel Dialog */}
+            <ParcelDialog
+              open={parcelDialogOpen}
+              onOpenChange={(open) => {
+                setParcelDialogOpen(open);
+                if (!open) setEditingParcel(null);
+              }}
+              shipmentId={shipment.id}
+              parcel={editingParcel}
+            />
+
+            {/* Delete Confirmation */}
+            <AlertDialog open={!!deleteParcelId} onOpenChange={() => setDeleteParcelId(null)}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Parcel</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete this parcel? This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    onClick={() => {
+                      if (deleteParcelId && shipment) {
+                        deleteParcel.mutate({ id: deleteParcelId, shipmentId: shipment.id });
+                        setDeleteParcelId(null);
+                      }
+                    }}
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </>
         ) : (
           <div className="flex items-center justify-center h-full">
