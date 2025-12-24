@@ -40,10 +40,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { useCustomers, useCreateShipment } from '@/hooks/useShipments';
 import { useRegionPricingByRegion, calculateShipmentCost } from '@/hooks/useRegionPricing';
 import { REGIONS, CURRENCY_SYMBOLS } from '@/lib/constants';
-import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { PrintableLabels } from './PrintableLabels';
 
 // Generate a unique barcode for each parcel
 const generateBarcode = () => {
@@ -80,9 +80,17 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
+interface CompletedShipment {
+  tracking_number: string;
+  customer_name: string;
+  customer_phone?: string;
+  origin_region: string;
+  created_at: string;
+  parcels: ParcelEntry[];
+}
+
 export function ShipmentUploadForm() {
   const { user, getRegion } = useAuth();
-  const navigate = useNavigate();
   const region = getRegion();
   const regionInfo = region ? REGIONS[region] : null;
   
@@ -94,6 +102,7 @@ export function ShipmentUploadForm() {
     { id: crypto.randomUUID(), barcode: generateBarcode(), weight_kg: 0 }
   ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [completedShipment, setCompletedShipment] = useState<CompletedShipment | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -147,6 +156,13 @@ export function ShipmentUploadForm() {
     ));
   };
 
+  // Reset form for a new shipment
+  const resetForm = () => {
+    setCompletedShipment(null);
+    setParcels([{ id: crypto.randomUUID(), barcode: generateBarcode(), weight_kg: 0 }]);
+    form.reset();
+  };
+
   const onSubmit = async (values: FormValues) => {
     if (!region || totalWeight <= 0) {
       toast.error('Please add at least one parcel with weight');
@@ -157,6 +173,8 @@ export function ShipmentUploadForm() {
 
     try {
       let customerId = values.customer_id;
+      let customerName = '';
+      let customerPhone = '';
 
       // If new customer mode, create the customer first
       if (values.customer_mode === 'new' && values.customer_name) {
@@ -171,6 +189,13 @@ export function ShipmentUploadForm() {
 
         if (customerError) throw customerError;
         customerId = newCustomer.id;
+        customerName = values.customer_name.trim();
+        customerPhone = values.customer_phone?.trim() || '';
+      } else {
+        // Get existing customer name
+        const existingCustomer = customers?.find(c => c.id === customerId);
+        customerName = existingCustomer?.name || '';
+        customerPhone = existingCustomer?.phone || '';
       }
 
       // Create the shipment
@@ -192,14 +217,13 @@ export function ShipmentUploadForm() {
       if (shipmentError) throw shipmentError;
 
       // Create all parcels linked to the shipment
-      const parcelInserts = parcels
-        .filter(p => p.weight_kg > 0)
-        .map(p => ({
-          shipment_id: shipment.id,
-          barcode: p.barcode,
-          weight_kg: p.weight_kg,
-          description: p.description || null,
-        }));
+      const validParcels = parcels.filter(p => p.weight_kg > 0);
+      const parcelInserts = validParcels.map(p => ({
+        shipment_id: shipment.id,
+        barcode: p.barcode,
+        weight_kg: p.weight_kg,
+        description: p.description || null,
+      }));
 
       if (parcelInserts.length > 0) {
         const { error: parcelsError } = await supabase
@@ -209,14 +233,34 @@ export function ShipmentUploadForm() {
         if (parcelsError) throw parcelsError;
       }
 
+      // Set completed shipment to show labels
+      setCompletedShipment({
+        tracking_number: shipment.tracking_number,
+        customer_name: customerName,
+        customer_phone: customerPhone,
+        origin_region: region,
+        created_at: shipment.created_at || new Date().toISOString(),
+        parcels: validParcels,
+      });
+
       toast.success(`Shipment created with ${parcelInserts.length} parcel(s)`);
-      navigate('/agent/shipments');
     } catch (error: any) {
       toast.error(`Failed to create shipment: ${error.message}`);
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  // Show printable labels if shipment is completed
+  if (completedShipment) {
+    return (
+      <PrintableLabels
+        shipment={completedShipment}
+        parcels={completedShipment.parcels}
+        onBack={resetForm}
+      />
+    );
+  }
 
   if (!region) {
     return (
