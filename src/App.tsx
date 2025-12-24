@@ -11,6 +11,7 @@ import TrackingPage from "./pages/Tracking";
 import CustomerDashboard from "./pages/customer/Dashboard";
 import AgentDashboard from "./pages/agent/Dashboard";
 import AgentUploadPage from "./pages/agent/Upload";
+import AgentShipmentsPage from "./pages/agent/Shipments";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AdminShipmentsPage from "./pages/admin/Shipments";
 import AdminInvoicesPage from "./pages/admin/Invoices";
@@ -42,6 +43,7 @@ const App = () => (
             {/* Agent Portal */}
             <Route path="/agent" element={<AgentDashboard />} />
             <Route path="/agent/upload" element={<AgentUploadPage />} />
+            <Route path="/agent/shipments" element={<AgentShipmentsPage />} />
             
             {/* Admin Portal */}
             <Route path="/admin" element={<AdminDashboard />} />
