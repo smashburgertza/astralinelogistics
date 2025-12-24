@@ -45,6 +45,7 @@ const mainNavItems = [
   { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
   { label: 'Shipments', href: '/admin/shipments', icon: PackageSearch },
   { label: 'Customers', href: '/admin/customers', icon: UsersRound },
+  { label: 'Estimates', href: '/admin/estimates', icon: ReceiptText },
   { label: 'Invoices', href: '/admin/invoices', icon: FileStack },
   { label: 'Shop Orders', href: '/admin/orders', icon: ShoppingCart },
 ];
