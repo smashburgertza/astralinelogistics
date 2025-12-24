@@ -14,6 +14,7 @@ import CustomerShipmentsPage from "./pages/customer/Shipments";
 import CustomerInvoicesPage from "./pages/customer/Invoices";
 import CustomerTrackPage from "./pages/customer/Track";
 import CustomerOrdersPage from "./pages/customer/Orders";
+import CustomerSettingsPage from "./pages/customer/Settings";
 import AgentDashboard from "./pages/agent/Dashboard";
 import AgentUploadPage from "./pages/agent/Upload";
 import AgentShipmentsPage from "./pages/agent/Shipments";
@@ -51,6 +52,7 @@ const App = () => (
             <Route path="/customer/invoices" element={<CustomerInvoicesPage />} />
             <Route path="/customer/track" element={<CustomerTrackPage />} />
             <Route path="/customer/orders" element={<CustomerOrdersPage />} />
+            <Route path="/customer/settings" element={<CustomerSettingsPage />} />
             
             {/* Agent Portal */}
             <Route path="/agent" element={<AgentDashboard />} />
