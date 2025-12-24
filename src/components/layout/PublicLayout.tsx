@@ -1,10 +1,29 @@
-import { Outlet } from 'react-router-dom';
+import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { PublicNavbar } from './PublicNavbar';
 import { Mail, Phone, MapPin, Facebook, Twitter, Instagram, Linkedin } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import astralineLogoWhite from '@/assets/astraline-logo-white.svg';
 
+const scrollToSection = (sectionId: string, navigate: ReturnType<typeof useNavigate>, location: ReturnType<typeof useLocation>) => {
+  if (location.pathname !== '/') {
+    navigate('/');
+    setTimeout(() => {
+      const element = document.getElementById(sectionId);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
+  } else {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+};
+
 export function PublicLayout() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <PublicNavbar />
@@ -47,11 +66,11 @@ export function PublicLayout() {
             <div>
               <h4 className="font-heading font-semibold text-lg mb-6">Quick Links</h4>
               <ul className="space-y-3 text-sm">
-                <li><Link to="/about" className="text-white/70 hover:text-primary transition-colors">About Us</Link></li>
-                <li><Link to="/services" className="text-white/70 hover:text-primary transition-colors">Our Services</Link></li>
+                <li><button onClick={() => scrollToSection('about', navigate, location)} className="text-white/70 hover:text-primary transition-colors">About Us</button></li>
+                <li><button onClick={() => scrollToSection('services', navigate, location)} className="text-white/70 hover:text-primary transition-colors">Our Services</button></li>
                 <li><Link to="/tracking" className="text-white/70 hover:text-primary transition-colors">Track Shipment</Link></li>
-                <li><Link to="/faq" className="text-white/70 hover:text-primary transition-colors">FAQ</Link></li>
-                <li><Link to="/contact" className="text-white/70 hover:text-primary transition-colors">Contact Us</Link></li>
+                <li><button onClick={() => scrollToSection('shop-for-me', navigate, location)} className="text-white/70 hover:text-primary transition-colors">Shop For Me</button></li>
+                <li><button onClick={() => scrollToSection('contact', navigate, location)} className="text-white/70 hover:text-primary transition-colors">Contact Us</button></li>
                 <li><Link to="/auth" className="text-white/70 hover:text-primary transition-colors">Customer Portal</Link></li>
               </ul>
             </div>
