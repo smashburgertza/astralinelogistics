@@ -8,13 +8,20 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        default: "border-transparent bg-primary text-primary-foreground hover:bg-primary/80",
-        secondary: "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        default: "border-transparent bg-primary text-white hover:bg-[hsl(42_90%_52%)]",
+        secondary: "border-transparent bg-accent text-white hover:bg-[hsl(202_74%_38%)]",
         destructive: "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
-        outline: "text-foreground",
-        success: "border-transparent bg-success text-success-foreground",
-        warning: "border-transparent bg-warning text-warning-foreground",
-        info: "border-transparent bg-info text-info-foreground",
+        outline: "border-accent/30 text-accent bg-accent/10",
+        success: "border-transparent bg-success/15 text-success",
+        warning: "border-transparent bg-primary/15 text-[hsl(42_90%_45%)]",
+        info: "border-transparent bg-accent/15 text-accent",
+        collected: "border-transparent bg-[hsl(202_74%_50%/0.15)] text-[hsl(202_74%_46%)]",
+        in_transit: "border-transparent bg-[hsl(42_92%_60%/0.15)] text-[hsl(42_90%_45%)]",
+        arrived: "border-transparent bg-[hsl(270_60%_55%/0.15)] text-[hsl(270_60%_55%)]",
+        delivered: "border-transparent bg-success/15 text-success",
+        pending: "border-transparent bg-primary/15 text-[hsl(42_90%_45%)]",
+        paid: "border-transparent bg-success/15 text-success",
+        overdue: "border-transparent bg-destructive/15 text-destructive",
       },
     },
     defaultVariants: {
