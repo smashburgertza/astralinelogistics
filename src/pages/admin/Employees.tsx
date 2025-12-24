@@ -1,9 +1,11 @@
-import { Users, ShieldCheck, Shield } from 'lucide-react';
+import { Users, ShieldCheck, Shield, FileText } from 'lucide-react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StatCard } from '@/components/admin/StatCard';
 import { EmployeeTable } from '@/components/admin/EmployeeTable';
 import { CreateEmployeeDialog } from '@/components/admin/CreateEmployeeDialog';
+import { AuditLogTable } from '@/components/admin/AuditLogTable';
 import { useEmployees } from '@/hooks/useEmployees';
 
 export default function AdminEmployeesPage() {
@@ -34,15 +36,41 @@ export default function AdminEmployeesPage() {
           />
         </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Staff Members</CardTitle>
-            <CreateEmployeeDialog />
-          </CardHeader>
-          <CardContent>
-            <EmployeeTable />
-          </CardContent>
-        </Card>
+        <Tabs defaultValue="employees" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="employees" className="gap-2">
+              <Users className="h-4 w-4" />
+              Staff Members
+            </TabsTrigger>
+            <TabsTrigger value="audit" className="gap-2">
+              <FileText className="h-4 w-4" />
+              Audit Logs
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="employees">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Staff Members</CardTitle>
+                <CreateEmployeeDialog />
+              </CardHeader>
+              <CardContent>
+                <EmployeeTable />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="audit">
+            <Card>
+              <CardHeader>
+                <CardTitle>Activity Log</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <AuditLogTable />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </AdminLayout>
   );
