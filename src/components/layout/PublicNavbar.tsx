@@ -22,7 +22,17 @@ export function PublicNavbar() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const userName = profile?.full_name || user?.email?.split('@')[0] || 'User';
+  const getFirstName = () => {
+    if (profile?.full_name) {
+      return profile.full_name.split(' ')[0];
+    }
+    if (user?.email) {
+      return user.email.split('@')[0].split('.')[0];
+    }
+    return 'there';
+  };
+
+  const firstName = getFirstName();
 
   // Click outside handler
   useEffect(() => {
@@ -118,20 +128,28 @@ export function PublicNavbar() {
               {user ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="gap-2">
-                      <User className="w-4 h-4" />
-                      <span className="max-w-[120px] truncate">Hello, {userName}</span>
-                      <ChevronDown className="w-4 h-4" />
+                    <Button variant="ghost" className="gap-2 px-3 hover:bg-primary/10">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                        <span className="text-sm font-semibold text-primary uppercase">
+                          {firstName.charAt(0)}
+                        </span>
+                      </div>
+                      <span className="font-medium">Hi, {firstName}</span>
+                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48 bg-background border border-border shadow-lg z-50">
-                    <DropdownMenuItem onClick={() => navigate(getDashboardRoute())} className="cursor-pointer">
-                      <LayoutDashboard className="w-4 h-4 mr-2" />
+                  <DropdownMenuContent align="end" className="w-52 p-2 bg-background border border-border shadow-xl rounded-xl z-50">
+                    <div className="px-2 py-3 mb-2 border-b border-border">
+                      <p className="font-medium">{firstName}</p>
+                      <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                    </div>
+                    <DropdownMenuItem onClick={() => navigate(getDashboardRoute())} className="cursor-pointer rounded-lg py-2.5">
+                      <LayoutDashboard className="w-4 h-4 mr-3" />
                       Dashboard
                     </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-destructive focus:text-destructive">
-                      <LogOut className="w-4 h-4 mr-2" />
+                    <DropdownMenuSeparator className="my-2" />
+                    <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer rounded-lg py-2.5 text-destructive focus:text-destructive focus:bg-destructive/10">
+                      <LogOut className="w-4 h-4 mr-3" />
                       Sign Out
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -188,14 +206,22 @@ export function PublicNavbar() {
                 <div className="pt-3 mt-2 border-t border-border px-1">
                   {user ? (
                     <div className="space-y-2">
-                      <p className="text-sm font-medium text-muted-foreground px-2 py-1">
-                        Hello, {userName}
-                      </p>
+                      <div className="flex items-center gap-3 px-2 py-2">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <span className="text-sm font-semibold text-primary uppercase">
+                            {firstName.charAt(0)}
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium">Hi, {firstName}</p>
+                          <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                        </div>
+                      </div>
                       <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => { navigate(getDashboardRoute()); setIsOpen(false); }}>
                         <LayoutDashboard className="w-4 h-4 mr-2" />
                         Dashboard
                       </Button>
-                      <Button variant="ghost" size="sm" className="w-full justify-start text-destructive hover:text-destructive" onClick={() => { handleSignOut(); setIsOpen(false); }}>
+                      <Button variant="ghost" size="sm" className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => { handleSignOut(); setIsOpen(false); }}>
                         <LogOut className="w-4 h-4 mr-2" />
                         Sign Out
                       </Button>
