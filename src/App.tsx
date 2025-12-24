@@ -9,6 +9,8 @@ import Index from "./pages/Index";
 import AuthPage from "./pages/Auth";
 import TrackingPage from "./pages/Tracking";
 import CustomerDashboard from "./pages/customer/Dashboard";
+import CustomerShipmentsPage from "./pages/customer/Shipments";
+import CustomerInvoicesPage from "./pages/customer/Invoices";
 import AgentDashboard from "./pages/agent/Dashboard";
 import AgentUploadPage from "./pages/agent/Upload";
 import AgentShipmentsPage from "./pages/agent/Shipments";
@@ -40,6 +42,8 @@ const App = () => (
             
             {/* Customer Portal */}
             <Route path="/customer" element={<CustomerDashboard />} />
+            <Route path="/customer/shipments" element={<CustomerShipmentsPage />} />
+            <Route path="/customer/invoices" element={<CustomerInvoicesPage />} />
             
             {/* Agent Portal */}
             <Route path="/agent" element={<AgentDashboard />} />
