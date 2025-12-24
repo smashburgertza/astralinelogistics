@@ -1,9 +1,31 @@
 import { ShoppingAggregator } from '@/components/shopping/ShoppingAggregator';
 import { useScrollAnimation } from '@/hooks/useScrollAnimation';
 import { cn } from '@/lib/utils';
-import { Link, ShoppingCart, CreditCard, Package, Truck, CheckCircle, Globe, Shield, Clock } from 'lucide-react';
+import { Link, ShoppingCart, CreditCard, Package, Truck, CheckCircle, Globe, Shield, Clock, LucideIcon } from 'lucide-react';
+import { usePageContent, PageContent } from '@/hooks/usePageContent';
 
-const steps = [
+const iconMap: Record<string, LucideIcon> = {
+  Link: Link,
+  ShoppingCart: ShoppingCart,
+  CreditCard: CreditCard,
+  Package: Package,
+  Truck: Truck,
+  CheckCircle: CheckCircle,
+  Globe: Globe,
+  Shield: Shield,
+  Clock: Clock,
+};
+
+const colorMap: Record<string, string> = {
+  blue: 'bg-blue-500/10 text-blue-500',
+  purple: 'bg-purple-500/10 text-purple-500',
+  green: 'bg-green-500/10 text-green-500',
+  orange: 'bg-orange-500/10 text-orange-500',
+  red: 'bg-red-500/10 text-red-500',
+  emerald: 'bg-emerald-500/10 text-emerald-500',
+};
+
+const defaultSteps = [
   {
     icon: Link,
     title: 'Paste Product Links',
@@ -42,7 +64,7 @@ const steps = [
   },
 ];
 
-const features = [
+const defaultFeatures = [
   {
     icon: Globe,
     title: 'Shop From Anywhere',
@@ -65,6 +87,26 @@ export function ShopForMeSection() {
   const { ref: stepsRef, isVisible: stepsVisible } = useScrollAnimation();
   const { ref: featuresRef, isVisible: featuresVisible } = useScrollAnimation();
   const { ref: contentRef, isVisible: contentVisible } = useScrollAnimation();
+  
+  const { data } = usePageContent('shop_for_me');
+  const content = data as PageContent | undefined;
+  
+  const steps = content?.content?.steps?.length 
+    ? content.content.steps.map((s: any) => ({
+        icon: iconMap[s.icon] || Link,
+        title: s.title,
+        description: s.description,
+        color: colorMap[s.color] || 'bg-blue-500/10 text-blue-500',
+      }))
+    : defaultSteps;
+    
+  const features = content?.content?.features?.length 
+    ? content.content.features.map((f: any) => ({
+        icon: iconMap[f.icon] || Globe,
+        title: f.title,
+        description: f.description,
+      }))
+    : defaultFeatures;
 
   return (
     <section id="shop-for-me" className="section-padding bg-gradient-to-b from-background to-muted/30 overflow-hidden">
@@ -75,14 +117,13 @@ export function ShopForMeSection() {
           className={cn("text-center mb-16 scroll-animate", headerVisible && "visible")}
         >
           <span className="inline-block px-4 py-2 rounded-full bg-primary/10 text-primary font-semibold text-sm uppercase tracking-wide mb-4">
-            Shop For Me
+            {content?.subtitle || 'Shop For Me'}
           </span>
           <h2 className="font-heading text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4">
-            We Buy, We Ship, <span className="text-primary">You Receive</span>
+            {content?.title?.split(',')[0] || 'We Buy, We Ship'}, <span className="text-primary">{content?.title?.split(',')[1]?.trim() || 'You Receive'}</span>
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
-            Can&apos;t find a store that ships to Tanzania? No problem! We&apos;ll purchase items from any 
-            online store worldwide and deliver them straight to your doorstep.
+            {content?.description || "Can't find a store that ships to Tanzania? No problem! We'll purchase items from any online store worldwide and deliver them straight to your doorstep."}
           </p>
         </div>
 
