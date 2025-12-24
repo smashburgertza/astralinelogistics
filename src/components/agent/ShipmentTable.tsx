@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Table,
   TableBody,
@@ -11,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Package, Copy, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { ShipmentStatusBadge } from '@/components/admin/ShipmentStatusBadge';
+import { ShipmentDetailDrawer } from '@/components/admin/ShipmentDetailDrawer';
 import { Shipment } from '@/hooks/useShipments';
 import { REGIONS } from '@/lib/constants';
 import { toast } from 'sonner';
@@ -21,6 +23,9 @@ interface AgentShipmentTableProps {
 }
 
 export function AgentShipmentTable({ shipments, isLoading }: AgentShipmentTableProps) {
+  const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
   const copyTrackingNumber = (trackingNumber: string) => {
     navigator.clipboard.writeText(trackingNumber);
     toast.success('Tracking number copied to clipboard');
@@ -122,7 +127,15 @@ export function AgentShipmentTable({ shipments, isLoading }: AgentShipmentTableP
                   {format(new Date(shipment.created_at || ''), 'MMM d, yyyy')}
                 </TableCell>
                 <TableCell>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => {
+                      setSelectedShipment(shipment);
+                      setDrawerOpen(true);
+                    }}
+                  >
                     <Eye className="h-4 w-4" />
                   </Button>
                 </TableCell>
@@ -131,6 +144,11 @@ export function AgentShipmentTable({ shipments, isLoading }: AgentShipmentTableP
           })}
         </TableBody>
       </Table>
+      <ShipmentDetailDrawer
+        shipment={selectedShipment}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+      />
     </div>
   );
 }
