@@ -84,7 +84,7 @@ export function AdminLayout({ children, title, subtitle }: AdminLayoutProps) {
     <SidebarProvider defaultOpen={true}>
       <div className="min-h-screen flex w-full bg-muted/30">
         {/* Sidebar */}
-        <Sidebar className="border-r-0">
+        <Sidebar collapsible="icon" className="border-r-0">
           {/* Logo */}
           <SidebarHeader className="p-4 border-b border-sidebar-border">
             <Link to="/admin" className="flex items-center gap-3">
