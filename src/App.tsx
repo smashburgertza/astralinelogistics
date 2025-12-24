@@ -13,6 +13,7 @@ import AgentDashboard from "./pages/agent/Dashboard";
 import AgentUploadPage from "./pages/agent/Upload";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AdminShipmentsPage from "./pages/admin/Shipments";
+import AdminInvoicesPage from "./pages/admin/Invoices";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -44,6 +45,7 @@ const App = () => (
             {/* Admin Portal */}
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/shipments" element={<AdminShipmentsPage />} />
+            <Route path="/admin/invoices" element={<AdminInvoicesPage />} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>
