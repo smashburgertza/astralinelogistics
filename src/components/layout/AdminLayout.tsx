@@ -5,6 +5,7 @@ import {
   ChartSpline, Settings2, LogOut, BellRing, Search, ChevronDown, UserCircle2,
   Container, UserCog, ReceiptText, TrendingUp, ShoppingCart
 } from 'lucide-react';
+import astralineLogo from '@/assets/astraline-logo.svg';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -84,12 +85,13 @@ export function AdminLayout({ children, title, subtitle }: AdminLayoutProps) {
           {/* Logo */}
           <SidebarHeader className="p-4 border-b border-sidebar-border">
             <Link to="/admin" className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center font-heading font-bold text-lg text-primary-foreground shadow-gold">
+              <img 
+                src={astralineLogo} 
+                alt="Astraline" 
+                className="h-10 w-auto group-data-[collapsible=icon]:hidden"
+              />
+              <div className="hidden group-data-[collapsible=icon]:block w-10 h-10 rounded-xl bg-primary flex items-center justify-center font-heading font-bold text-lg text-primary-foreground shadow-gold">
                 A
-              </div>
-              <div className="group-data-[collapsible=icon]:hidden">
-                <span className="text-lg font-heading font-bold text-sidebar-primary-foreground">Astraline</span>
-                <span className="block text-xs text-sidebar-foreground/60">Admin Portal</span>
               </div>
             </Link>
           </SidebarHeader>
