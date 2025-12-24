@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { MapPin, Copy, Check, ArrowRight } from 'lucide-react';
+import { MapPin, Copy, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { REGIONS, type Region } from '@/lib/constants';
 import { toast } from 'sonner';
+import { useScrollAnimation } from '@/hooks/useScrollAnimation';
+import { cn } from '@/lib/utils';
 
 interface AgentAddress {
   region: Region;
@@ -20,6 +22,9 @@ interface AgentAddress {
 export function AgentAddresses() {
   const [addresses, setAddresses] = useState<AgentAddress[]>([]);
   const [copied, setCopied] = useState<string | null>(null);
+
+  const { ref: headerRef, isVisible: headerVisible } = useScrollAnimation();
+  const { ref: gridRef, isVisible: gridVisible } = useScrollAnimation();
 
   useEffect(() => {
     fetchAddresses();
@@ -44,10 +49,13 @@ export function AgentAddresses() {
   };
 
   return (
-    <section className="section-padding bg-brand-navy-dark">
+    <section className="section-padding bg-brand-navy-dark overflow-hidden">
       <div className="container mx-auto px-4">
         {/* Section Header */}
-        <div className="text-center mb-16">
+        <div 
+          ref={headerRef}
+          className={cn("text-center mb-16 scroll-animate", headerVisible && "visible")}
+        >
           <span className="inline-block px-4 py-2 rounded-full bg-primary/20 text-primary font-semibold text-sm uppercase tracking-wide mb-4">
             Global Network
           </span>
@@ -55,18 +63,22 @@ export function AgentAddresses() {
             Agent Delivery Addresses
           </h2>
           <p className="text-white/70 max-w-2xl mx-auto text-lg">
-            Send your goods to our trusted agents in these locations. We'll handle collection, consolidation, and shipping to Tanzania.
+            Send your goods to our trusted agents in these locations. We&apos;ll handle collection, consolidation, and shipping to Tanzania.
           </p>
         </div>
 
         {/* Addresses Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {addresses.map((address) => {
+        <div ref={gridRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {addresses.map((address, index) => {
             const regionInfo = REGIONS[address.region];
             return (
               <div 
                 key={address.region} 
-                className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10 hover:bg-white/10 transition-all duration-300 group"
+                className={cn(
+                  "bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10 hover:bg-white/10 transition-all duration-300 group scroll-animate-scale",
+                  gridVisible && "visible"
+                )}
+                style={{ transitionDelay: `${index * 100}ms` }}
               >
                 <div className="flex items-center gap-3 mb-4">
                   <span className="text-4xl">{regionInfo?.flag}</span>
