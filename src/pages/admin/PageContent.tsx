@@ -9,7 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Save, Eye, EyeOff, Plus, Trash2, GripVertical } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Save, Eye, EyeOff, Plus, Trash2, GripVertical, Monitor, Star, Phone, Mail, MapPin, Clock } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const sectionLabels: Record<string, string> = {
@@ -279,6 +280,20 @@ function SectionEditor({
           <Save className="h-4 w-4 mr-2" />
           {isSaving ? 'Saving...' : 'Save Changes'}
         </Button>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="outline">
+              <Monitor className="h-4 w-4 mr-2" />
+              Preview
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Preview: {sectionLabels[section.section_key]}</DialogTitle>
+            </DialogHeader>
+            <SectionLivePreview sectionKey={section.section_key} formData={formData} />
+          </DialogContent>
+        </Dialog>
         <Button variant="outline" onClick={onCancel}>Cancel</Button>
       </div>
     </div>
@@ -753,6 +768,269 @@ function ContentEditor({
             rows={10}
             className="font-mono text-sm"
           />
+        </div>
+      );
+  }
+}
+
+// Live Preview Component
+function SectionLivePreview({ sectionKey, formData }: { sectionKey: string; formData: Partial<PageContent> }) {
+  const content = formData.content || {};
+  
+  switch (sectionKey) {
+    case 'hero':
+      return (
+        <div className="bg-brand-navy rounded-lg p-8 text-white">
+          <div className="max-w-xl">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 mb-4">
+              <span className="w-2 h-2 rounded-full bg-primary" />
+              <span className="text-xs text-white/90">{formData.subtitle || 'Astraline Logistics'}</span>
+            </div>
+            <h1 className="text-3xl font-bold mb-4">{formData.title || 'Global Shipping Made Simple'}</h1>
+            <p className="text-white/80 mb-6">{formData.description || 'Your shipping description here...'}</p>
+            <div className="flex gap-3 mb-6">
+              <Button size="sm" className="bg-primary text-primary-foreground">{content.cta_primary || 'Get a Quote'}</Button>
+              <Button size="sm" variant="outline" className="border-white/30 text-white hover:bg-white/10">{content.cta_secondary || 'Track Shipment'}</Button>
+            </div>
+            {content.stats?.length > 0 && (
+              <div className="flex gap-6 pt-4 border-t border-white/10">
+                {content.stats.map((stat: any, i: number) => (
+                  <div key={i}>
+                    <p className="text-xl font-bold text-primary">{stat.value}</p>
+                    <p className="text-xs text-white/60">{stat.label}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+
+    case 'partners':
+      return (
+        <div className="bg-muted/30 rounded-lg p-8 text-center">
+          <p className="text-muted-foreground text-sm uppercase tracking-widest mb-6">
+            {formData.description || 'Trusted by leading brands & partners worldwide'}
+          </p>
+          <div className="flex flex-wrap justify-center gap-4">
+            {(content.logos || []).map((logo: any, i: number) => (
+              <div key={i} className="px-4 py-2 bg-background rounded border">
+                <span className="font-bold text-muted-foreground">{logo.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+
+    case 'about':
+      return (
+        <div className="bg-brand-navy rounded-lg p-8 text-white">
+          <div className="grid md:grid-cols-2 gap-8">
+            <div>
+              <h2 className="text-2xl font-bold mb-4">{formData.title || 'About Us'}</h2>
+              <Button size="sm" className="bg-primary text-primary-foreground">GET A QUOTE</Button>
+            </div>
+            <div className="bg-white/5 rounded-lg p-6">
+              <p className="text-white/90 mb-4">{formData.description || 'Your company description here...'}</p>
+              <div className="grid grid-cols-2 gap-3">
+                {(content.features || []).map((feature: any, i: number) => (
+                  <div key={i} className="flex items-center gap-2 text-sm">
+                    <div className="w-4 h-4 rounded-full bg-primary/20 flex items-center justify-center">
+                      <div className="w-2 h-2 rounded-full bg-primary" />
+                    </div>
+                    <span className="text-white/80">{feature.title || feature}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+
+    case 'services':
+      return (
+        <div className="bg-background rounded-lg p-8">
+          <div className="text-center mb-8">
+            <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm mb-2">
+              {formData.subtitle || 'What We Offer'}
+            </span>
+            <h2 className="text-2xl font-bold">{formData.title || 'Our Services'}</h2>
+            <p className="text-muted-foreground mt-2">{formData.description || 'Service description...'}</p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {(content.services || []).map((service: any, i: number) => (
+              <Card key={i} className="p-4">
+                <div className="w-10 h-10 rounded-lg bg-brand-navy mb-3 flex items-center justify-center text-white text-xs">
+                  {service.icon || '📦'}
+                </div>
+                <h3 className="font-semibold mb-1">{service.title}</h3>
+                <p className="text-xs text-muted-foreground">{service.description}</p>
+              </Card>
+            ))}
+          </div>
+        </div>
+      );
+
+    case 'shop_for_me':
+      return (
+        <div className="bg-gradient-to-b from-background to-muted/30 rounded-lg p-8">
+          <div className="text-center mb-8">
+            <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm mb-2">
+              {formData.subtitle || 'Shop For Me'}
+            </span>
+            <h2 className="text-2xl font-bold">{formData.title || 'We Buy, We Ship, You Receive'}</h2>
+            <p className="text-muted-foreground mt-2">{formData.description || 'Description...'}</p>
+          </div>
+          <div className="grid grid-cols-3 md:grid-cols-6 gap-3 mb-6">
+            {(content.steps || []).map((step: any, i: number) => (
+              <div key={i} className="relative bg-card border rounded-lg p-3 text-center">
+                <div className="absolute -top-2 -left-2 w-5 h-5 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-bold">
+                  {i + 1}
+                </div>
+                <div className={`w-8 h-8 mx-auto mb-2 rounded-lg bg-${step.color || 'blue'}-500/10 flex items-center justify-center`}>
+                  <span className="text-xs">📦</span>
+                </div>
+                <h4 className="text-xs font-semibold">{step.title}</h4>
+              </div>
+            ))}
+          </div>
+          <div className="bg-primary/5 border border-primary/10 rounded-xl p-6">
+            <h3 className="text-lg font-bold text-center mb-4">Why Use Shop For Me?</h3>
+            <div className="grid grid-cols-3 gap-4">
+              {(content.features || []).map((feature: any, i: number) => (
+                <div key={i} className="text-center">
+                  <div className="w-10 h-10 bg-primary/10 rounded-xl mx-auto mb-2 flex items-center justify-center">
+                    <span>✨</span>
+                  </div>
+                  <h4 className="text-sm font-semibold">{feature.title}</h4>
+                  <p className="text-xs text-muted-foreground">{feature.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+
+    case 'testimonials':
+      return (
+        <div className="bg-background rounded-lg p-8">
+          <div className="text-center mb-8">
+            <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm mb-2">
+              {formData.subtitle || 'Testimonials'}
+            </span>
+            <h2 className="text-2xl font-bold">{formData.title || 'What Our Customers Say'}</h2>
+            <p className="text-muted-foreground mt-2">{formData.description || 'Description...'}</p>
+          </div>
+          <div className="grid md:grid-cols-2 gap-4 mb-6">
+            {(content.testimonials || []).slice(0, 4).map((testimonial: any, i: number) => (
+              <Card key={i} className="p-4">
+                <div className="flex gap-1 mb-2">
+                  {[...Array(testimonial.rating || 5)].map((_, j) => (
+                    <Star key={j} className="w-4 h-4 fill-primary text-primary" />
+                  ))}
+                </div>
+                <p className="text-sm italic mb-3">"{testimonial.content}"</p>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-brand-navy text-white flex items-center justify-center text-xs">
+                    {testimonial.name?.slice(0, 2).toUpperCase() || 'NA'}
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">{testimonial.name}</p>
+                    <p className="text-xs text-muted-foreground">{testimonial.role}</p>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+          {content.stats?.length > 0 && (
+            <div className="grid grid-cols-4 gap-4 text-center">
+              {content.stats.map((stat: any, i: number) => (
+                <div key={i}>
+                  <p className="text-2xl font-bold text-primary">{stat.value}</p>
+                  <p className="text-xs text-muted-foreground">{stat.label}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+
+    case 'contact':
+      return (
+        <div className="bg-muted/30 rounded-lg p-8">
+          <div className="text-center mb-8">
+            <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm mb-2">
+              {formData.subtitle || 'Get In Touch'}
+            </span>
+            <h2 className="text-2xl font-bold">{formData.title || 'Contact Us'}</h2>
+            <p className="text-muted-foreground mt-2">{formData.description || 'Description...'}</p>
+          </div>
+          <div className="grid md:grid-cols-4 gap-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Phone className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-sm">Phone</h3>
+                <p className="text-xs text-muted-foreground">{content.phone || '+255 xxx xxx xxx'}</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Mail className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-sm">Email</h3>
+                <p className="text-xs text-muted-foreground">{content.email || 'info@example.com'}</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <MapPin className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-sm">Address</h3>
+                <p className="text-xs text-muted-foreground">{content.address || 'Location'}</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Clock className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-sm">Hours</h3>
+                <p className="text-xs text-muted-foreground">{content.hours || 'Mon-Fri'}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+
+    case 'cta':
+      return (
+        <div className="bg-primary rounded-lg p-8">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="text-center md:text-left">
+              <h2 className="text-2xl font-bold text-primary-foreground mb-2">{formData.title || 'Ready to Ship with Us?'}</h2>
+              <p className="text-primary-foreground/80">{formData.description || 'Get started today...'}</p>
+            </div>
+            <div className="flex gap-3">
+              <Button className="bg-brand-navy text-white">{content.cta_primary || 'Get Started'}</Button>
+              <Button variant="outline" className="border-primary-foreground text-primary-foreground hover:bg-primary-foreground hover:text-primary">
+                {content.cta_secondary || 'Contact Us'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      );
+
+    default:
+      return (
+        <div className="bg-muted rounded-lg p-8 text-center">
+          <p className="text-muted-foreground">Preview not available for this section type.</p>
+          <pre className="mt-4 text-left text-xs bg-background p-4 rounded overflow-auto max-h-60">
+            {JSON.stringify(formData, null, 2)}
+          </pre>
         </div>
       );
   }
