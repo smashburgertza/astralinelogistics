@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, PackageSearch, UsersRound, FileStack, Wallet,
   ChartSpline, Settings2, LogOut, BellRing, Search, ChevronDown, UserCircle2,
-  Container, UserCog, ReceiptText, TrendingUp
+  Container, UserCog, ReceiptText, TrendingUp, ShoppingCart
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,6 +45,7 @@ const mainNavItems = [
   { label: 'Shipments', href: '/admin/shipments', icon: PackageSearch },
   { label: 'Customers', href: '/admin/customers', icon: UsersRound },
   { label: 'Invoices', href: '/admin/invoices', icon: FileStack },
+  { label: 'Shop Orders', href: '/admin/orders', icon: ShoppingCart },
 ];
 
 const financeNavItems = [
