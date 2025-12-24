@@ -4,6 +4,8 @@ import { MenuIcon, XIcon, PhoneCall, MailOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
+import astralineLogo from '@/assets/astraline-logo.svg';
+import astralineLogoWhite from '@/assets/astraline-logo-white.svg';
 
 export function PublicNavbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -70,13 +72,11 @@ export function PublicNavbar() {
           <div className="flex items-center justify-between h-20">
             {/* Logo */}
             <Link to="/" className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-lg bg-brand-navy text-white flex items-center justify-center font-heading font-bold text-xl">
-                A
-              </div>
-              <div className="hidden sm:block">
-                <span className="text-xl font-heading font-bold text-brand-navy">Astraline</span>
-                <span className="block text-xs text-muted-foreground">Logistics</span>
-              </div>
+              <img 
+                src={astralineLogo} 
+                alt="Astraline Logistics" 
+                className="h-12 w-auto"
+              />
             </Link>
 
             {/* Desktop Navigation */}

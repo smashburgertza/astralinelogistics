@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom';
 import { PublicNavbar } from './PublicNavbar';
 import { Mail, Phone, MapPin, Facebook, Twitter, Instagram, Linkedin } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import astralineLogoWhite from '@/assets/astraline-logo-white.svg';
 
 export function PublicLayout() {
   return (
@@ -18,15 +19,11 @@ export function PublicLayout() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
             {/* Brand */}
             <div>
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-12 h-12 rounded-lg bg-primary flex items-center justify-center font-heading font-bold text-xl text-primary-foreground">
-                  A
-                </div>
-                <div>
-                  <span className="text-xl font-heading font-bold">Astraline</span>
-                  <span className="block text-xs text-white/60">Logistics</span>
-                </div>
-              </div>
+              <img 
+                src={astralineLogoWhite} 
+                alt="Astraline Logistics" 
+                className="h-14 w-auto mb-4"
+              />
               <p className="text-white/70 text-sm leading-relaxed mb-6">
                 Your trusted partner for air cargo logistics. We collect goods from UK, Germany, France, Dubai, China, and India, clear customs in Tanzania, and deliver to your doorstep.
               </p>
