@@ -94,7 +94,7 @@ export function ShopForMeSection() {
           <h3 className="text-2xl md:text-3xl font-bold text-center text-foreground mb-12">
             How It Works
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
             {steps.map((step, index) => (
               <div 
                 key={step.title}
@@ -102,24 +102,24 @@ export function ShopForMeSection() {
                 style={{ animationDelay: `${index * 100}ms` }}
               >
                 {/* Connection line for desktop */}
-                {index < steps.length - 1 && index !== 2 && (
-                  <div className="hidden lg:block absolute top-12 left-[60%] w-[80%] h-0.5 bg-gradient-to-r from-primary/30 to-transparent" />
+                {index < steps.length - 1 && (
+                  <div className="hidden xl:block absolute top-10 left-[60%] w-[80%] h-0.5 bg-gradient-to-r from-primary/30 to-transparent" />
                 )}
                 
-                <div className="bg-card border border-border rounded-2xl p-6 h-full transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-1">
+                <div className="bg-card border border-border rounded-xl p-4 h-full transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-1">
                   {/* Step number */}
                   <div className="absolute -top-3 -left-3 w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center font-bold text-sm shadow-lg">
                     {index + 1}
                   </div>
                   
                   {/* Icon */}
-                  <div className={cn("w-16 h-16 rounded-2xl flex items-center justify-center mb-4", step.color)}>
-                    <step.icon className="w-8 h-8" />
+                  <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center mb-3", step.color)}>
+                    <step.icon className="w-6 h-6" />
                   </div>
                   
                   {/* Content */}
-                  <h4 className="text-xl font-semibold text-foreground mb-2">{step.title}</h4>
-                  <p className="text-muted-foreground text-sm leading-relaxed">{step.description}</p>
+                  <h4 className="text-base font-semibold text-foreground mb-1">{step.title}</h4>
+                  <p className="text-muted-foreground text-xs leading-relaxed">{step.description}</p>
                 </div>
               </div>
             ))}
