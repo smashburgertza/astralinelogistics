@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Phone } from 'lucide-react';
+import { MoveRight, PhoneCall } from 'lucide-react';
 
 export function CTASection() {
   return (
@@ -20,12 +20,12 @@ export function CTASection() {
             <Button size="lg" className="bg-brand-navy text-white hover:bg-brand-navy-dark shadow-xl group" asChild>
               <Link to="/auth?mode=signup">
                 Get Started
-                <ArrowRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
+                <MoveRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
               </Link>
             </Button>
             <Button size="lg" variant="outline" className="bg-transparent border-2 border-primary-foreground text-primary-foreground hover:bg-primary-foreground hover:text-primary" asChild>
               <a href="tel:+255693300300">
-                <Phone className="w-5 h-5 mr-2" />
+                <PhoneCall className="w-5 h-5 mr-2" />
                 Call Us Now
               </a>
             </Button>

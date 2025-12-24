@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Menu, X, Phone, Mail } from 'lucide-react';
+import { Menu, X, PhoneCall, MailOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
@@ -40,16 +40,16 @@ export function PublicNavbar() {
         <div className="container mx-auto px-4 flex justify-between items-center">
           <div className="flex items-center gap-6">
             <a href="tel:+447521787777" className="flex items-center gap-2 hover:text-primary transition-colors">
-              <Phone className="w-3.5 h-3.5" />
+              <PhoneCall className="w-3.5 h-3.5" />
               <span>UK: +44 7521 787 777</span>
             </a>
             <a href="tel:+255693300300" className="flex items-center gap-2 hover:text-primary transition-colors">
-              <Phone className="w-3.5 h-3.5" />
+              <PhoneCall className="w-3.5 h-3.5" />
               <span>TZ: +255 693 300 300</span>
             </a>
           </div>
           <a href="mailto:info@astralinelogistics.com" className="flex items-center gap-2 hover:text-primary transition-colors">
-            <Mail className="w-3.5 h-3.5" />
+            <MailOpen className="w-3.5 h-3.5" />
             <span>info@astralinelogistics.com</span>
           </a>
         </div>
