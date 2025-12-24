@@ -1,8 +1,8 @@
 import { ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
-  Home, Upload, Package, Settings,
-  LogOut, Bell, ChevronDown
+  LayoutDashboard, CloudUpload, PackageSearch, Settings2,
+  LogOut, BellRing, ChevronDown
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -39,10 +39,10 @@ interface AgentLayoutProps {
 }
 
 const navItems = [
-  { label: 'Dashboard', href: '/agent', icon: Home },
-  { label: 'Upload Shipment', href: '/agent/upload', icon: Upload },
-  { label: 'My Shipments', href: '/agent/shipments', icon: Package },
-  { label: 'Settings', href: '/agent/settings', icon: Settings },
+  { label: 'Dashboard', href: '/agent', icon: LayoutDashboard },
+  { label: 'Upload Shipment', href: '/agent/upload', icon: CloudUpload },
+  { label: 'My Shipments', href: '/agent/shipments', icon: PackageSearch },
+  { label: 'Settings', href: '/agent/settings', icon: Settings2 },
 ];
 
 export function AgentLayout({ children, title, subtitle }: AgentLayoutProps) {
@@ -139,7 +139,7 @@ export function AgentLayout({ children, title, subtitle }: AgentLayoutProps) {
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => navigate('/agent/settings')}>
-                  <Settings className="w-4 h-4 mr-2" />
+                  <Settings2 className="w-4 h-4 mr-2" />
                   Settings
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -156,9 +156,9 @@ export function AgentLayout({ children, title, subtitle }: AgentLayoutProps) {
           <header className="sticky top-0 z-30 h-16 bg-background/95 backdrop-blur-md border-b border-border flex items-center px-6 gap-4">
             <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
             <div className="flex-1" />
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="w-5 h-5" />
-            </Button>
+              <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-accent">
+                <BellRing className="w-5 h-5" />
+              </Button>
           </header>
 
           <div className="px-6 py-6 border-b border-border bg-background">
