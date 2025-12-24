@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { MoveRight, Plane, Package, Globe, MapPin, ArrowDown } from 'lucide-react';
 import heroImage from '@/assets/hero-cargo.jpg';
+import { usePageContent, PageContent } from '@/hooks/usePageContent';
 
 const floatingRoutes = [
   { from: 'UK', to: 'TZ', delay: '0s' },
@@ -10,6 +11,8 @@ const floatingRoutes = [
 ];
 
 export function HeroSection() {
+  const { data } = usePageContent('hero');
+  const content = data as PageContent | undefined;
   return (
     <section className="relative min-h-screen flex items-center overflow-hidden -mt-[120px] pt-[120px]">
       {/* Background Image with Parallax Effect */}
@@ -61,11 +64,11 @@ export function HeroSection() {
 
             <h1 className="font-heading text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-white leading-[1.1] mb-6">
               <span className="block opacity-0 animate-slide-up" style={{ animationDelay: '0.1s', animationFillMode: 'forwards' }}>
-                Global Shipping
+                {content?.title?.split(' ').slice(0, 2).join(' ') || 'Global Shipping'}
               </span>
               <span className="block opacity-0 animate-slide-up" style={{ animationDelay: '0.2s', animationFillMode: 'forwards' }}>
                 <span className="relative">
-                  <span className="text-primary">Made Simple</span>
+                  <span className="text-primary">{content?.title?.split(' ').slice(2).join(' ') || 'Made Simple'}</span>
                   <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 200 12" fill="none">
                     <path d="M2 10C50 2 150 2 198 10" stroke="hsl(42 92% 60%)" strokeWidth="3" strokeLinecap="round" className="animate-draw" style={{ strokeDasharray: 200, strokeDashoffset: 200, animation: 'draw 1s ease-out 0.8s forwards' }} />
                   </svg>
@@ -74,7 +77,7 @@ export function HeroSection() {
             </h1>
 
             <p className="text-lg md:text-xl text-white/80 mb-10 max-w-xl leading-relaxed opacity-0 animate-slide-up" style={{ animationDelay: '0.3s', animationFillMode: 'forwards' }}>
-              Premium air cargo from <span className="text-white font-medium">UK, Germany, France, Dubai, China & India</span> to Tanzania. Fast customs clearance. Doorstep delivery.
+              {content?.description || 'Premium air cargo from UK, Germany, France, Dubai, China & India to Tanzania. Fast customs clearance. Doorstep delivery.'}
             </p>
 
             {/* CTA Buttons */}
@@ -82,14 +85,14 @@ export function HeroSection() {
               <Button size="xl" className="btn-gold group relative overflow-hidden" asChild>
                 <Link to="/tracking">
                   <span className="relative z-10 flex items-center">
-                    TRACK SHIPMENT
+                    {content?.content?.cta_secondary || 'TRACK SHIPMENT'}
                     <MoveRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
                   </span>
                 </Link>
               </Button>
               <Button size="xl" className="group bg-white/10 backdrop-blur-sm border-2 border-white/30 text-white hover:bg-white hover:text-brand-navy transition-all duration-300" asChild>
                 <Link to="/contact">
-                  GET FREE QUOTE
+                  {content?.content?.cta_primary || 'GET FREE QUOTE'}
                 </Link>
               </Button>
             </div>

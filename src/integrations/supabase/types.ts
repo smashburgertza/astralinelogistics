@@ -572,6 +572,42 @@ export type Database = {
         }
         Relationships: []
       }
+      page_content: {
+        Row: {
+          content: Json | null
+          description: string | null
+          id: string
+          is_visible: boolean | null
+          section_key: string
+          subtitle: string | null
+          title: string | null
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          content?: Json | null
+          description?: string | null
+          id?: string
+          is_visible?: boolean | null
+          section_key: string
+          subtitle?: string | null
+          title?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          content?: Json | null
+          description?: string | null
+          id?: string
+          is_visible?: boolean | null
+          section_key?: string
+          subtitle?: string | null
+          title?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       parcels: {
         Row: {
           barcode: string

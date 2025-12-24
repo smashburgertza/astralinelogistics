@@ -1,8 +1,9 @@
 import { Star, Quote } from 'lucide-react';
 import { useScrollAnimation } from '@/hooks/useScrollAnimation';
 import { cn } from '@/lib/utils';
+import { usePageContent, PageContent } from '@/hooks/usePageContent';
 
-const testimonials = [
+const defaultTestimonials = [
   {
     name: 'Sarah Mwangi',
     role: 'Business Owner',
@@ -38,6 +39,24 @@ const testimonials = [
 ];
 
 export function TestimonialsSection() {
+  const { data } = usePageContent('testimonials');
+  const content = data as PageContent | undefined;
+  
+  const testimonials = content?.content?.testimonials?.length 
+    ? content.content.testimonials.map((t: any) => ({
+        ...t,
+        text: t.content,
+        avatar: t.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || 'NA',
+        location: '',
+      }))
+    : defaultTestimonials;
+
+  const stats = content?.content?.stats || [
+    { value: '4.9', label: 'Average Rating' },
+    { value: '2,500+', label: 'Happy Customers' },
+    { value: '98%', label: 'Satisfaction Rate' },
+    { value: '10K+', label: 'Deliveries Made' },
+  ];
   const { ref: headerRef, isVisible: headerVisible } = useScrollAnimation();
   const { ref: gridRef, isVisible: gridVisible } = useScrollAnimation();
 
@@ -50,13 +69,13 @@ export function TestimonialsSection() {
           className={cn("text-center mb-16 scroll-animate", headerVisible && "visible")}
         >
           <span className="inline-block px-4 py-2 rounded-full bg-primary/10 text-primary font-semibold text-sm uppercase tracking-wide mb-4">
-            Testimonials
+            {content?.subtitle || 'Testimonials'}
           </span>
           <h2 className="font-heading text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4">
-            What Our <span className="text-primary">Customers</span> Say
+            {content?.title || 'What Our'} <span className="text-primary">Customers</span> Say
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
-            Don&apos;t just take our word for it. Here&apos;s what our valued customers have to say about their experience with Astraline.
+            {content?.description || "Don't just take our word for it. Here's what our valued customers have to say about their experience with Astraline."}
           </p>
         </div>
 
@@ -109,17 +128,13 @@ export function TestimonialsSection() {
           className={cn("mt-16 grid grid-cols-2 md:grid-cols-4 gap-8 scroll-animate", gridVisible && "visible")}
           style={{ transitionDelay: '400ms' }}
         >
-          {[
-            { value: '4.9', label: 'Average Rating' },
-            { value: '2,500+', label: 'Happy Customers' },
-            { value: '98%', label: 'Satisfaction Rate' },
-            { value: '10K+', label: 'Deliveries Made' },
-          ].map((stat) => (
+          {stats.map((stat: any) => (
             <div key={stat.label} className="text-center">
               <p className="text-3xl md:text-4xl font-bold text-primary mb-1">{stat.value}</p>
               <p className="text-sm text-muted-foreground">{stat.label}</p>
             </div>
           ))}
+        </div>
         </div>
       </div>
     </section>
