@@ -1,61 +1,81 @@
-import { Plane, Shield, Clock, Globe, Package, Truck } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Plane, Ship, Truck, Package, Shield, Clock } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 
 const services = [
   {
     icon: Plane,
     title: 'Air Freight',
-    description: 'Fast and reliable air cargo services from major global hubs to Tanzania.',
+    description: 'Fast and reliable air cargo services from major global hubs directly to Tanzania.',
+    link: '/services#air-freight',
   },
   {
-    icon: Shield,
-    title: 'Customs Clearance',
-    description: 'We handle all customs documentation and clearance in Tanzania.',
+    icon: Ship,
+    title: 'Sea Freight',
+    description: 'Cost-effective ocean freight solutions for larger shipments and bulk cargo.',
+    link: '/services#sea-freight',
   },
   {
-    icon: Clock,
-    title: 'Real-time Tracking',
-    description: 'Track your shipments 24/7 with our advanced tracking system.',
-  },
-  {
-    icon: Globe,
-    title: 'Global Network',
-    description: 'Trusted agents in UK, Germany, France, Dubai, China, and India.',
+    icon: Truck,
+    title: 'Road Freight',
+    description: 'Comprehensive ground transportation and last-mile delivery across Tanzania.',
+    link: '/services#road-freight',
   },
   {
     icon: Package,
     title: 'Consolidation',
-    description: 'Combine multiple packages into one shipment to save on costs.',
+    description: 'Combine multiple packages into one shipment to optimize costs and efficiency.',
+    link: '/services#consolidation',
   },
   {
-    icon: Truck,
-    title: 'Door Delivery',
-    description: 'Optional last-mile delivery anywhere in Tanzania.',
+    icon: Shield,
+    title: 'Customs Clearance',
+    description: 'Expert handling of all customs documentation and clearance procedures.',
+    link: '/services#customs',
+  },
+  {
+    icon: Clock,
+    title: 'Express Delivery',
+    description: 'Priority shipping options for time-sensitive cargo with guaranteed delivery.',
+    link: '/services#express',
   },
 ];
 
 export function ServicesSection() {
   return (
-    <section className="py-20 bg-muted/30">
+    <section className="section-padding bg-background">
       <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">Our Services</h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
-            End-to-end logistics solutions for importing goods to Tanzania.
+        {/* Section Header */}
+        <div className="text-center mb-16">
+          <span className="inline-block px-4 py-2 rounded-full bg-primary/10 text-primary font-semibold text-sm uppercase tracking-wide mb-4">
+            What We Offer
+          </span>
+          <h2 className="font-heading text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4">
+            Our Services
+          </h2>
+          <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
+            Complete logistics solutions from collection to delivery. We handle everything so you don't have to.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Services Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {services.map((service, index) => (
-            <Card key={index} className="card-hover border-0 shadow-md">
-              <CardContent className="pt-6">
-                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
-                  <service.icon className="w-6 h-6 text-primary" />
-                </div>
-                <h3 className="text-lg font-semibold mb-2">{service.title}</h3>
-                <p className="text-muted-foreground text-sm">{service.description}</p>
-              </CardContent>
-            </Card>
+            <Link key={index} to={service.link}>
+              <Card className="h-full card-hover border-0 shadow-lg group overflow-hidden">
+                <CardContent className="p-8">
+                  <div className="w-16 h-16 rounded-xl bg-brand-navy flex items-center justify-center mb-6 group-hover:bg-primary transition-colors duration-300">
+                    <service.icon className="w-8 h-8 text-white" />
+                  </div>
+                  <h3 className="font-heading text-xl font-semibold mb-3 group-hover:text-primary transition-colors">
+                    {service.title}
+                  </h3>
+                  <p className="text-muted-foreground leading-relaxed">
+                    {service.description}
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
           ))}
         </div>
       </div>
