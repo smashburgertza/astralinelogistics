@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, PackageSearch, UsersRound, FileStack, Wallet,
   ChartSpline, Settings2, LogOut, BellRing, Search, ChevronDown, UserCircle2,
-  Container, UserCog, ReceiptText, TrendingUp, ShoppingCart, FileText
+  Container, UserCog, ReceiptText, TrendingUp, ShoppingCart, FileText, User
 } from 'lucide-react';
 import astralineLogo from '@/assets/astraline-logo.svg';
 import { Button } from '@/components/ui/button';
@@ -43,6 +43,7 @@ interface AdminLayoutProps {
 
 const mainNavItems = [
   { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
+  { label: 'My Dashboard', href: '/admin/my-dashboard', icon: User },
   { label: 'Shipments', href: '/admin/shipments', icon: PackageSearch },
   { label: 'Customers', href: '/admin/customers', icon: UsersRound },
   { label: 'Estimates', href: '/admin/estimates', icon: ReceiptText },
