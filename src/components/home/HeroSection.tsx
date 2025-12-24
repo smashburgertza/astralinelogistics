@@ -2,7 +2,6 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { MoveRight, Plane, Package, Globe } from 'lucide-react';
 import heroImage from '@/assets/hero-cargo.jpg';
-import astralineLogoWhite from '@/assets/astraline-logo-white.svg';
 
 export function HeroSection() {
   return (
@@ -19,14 +18,6 @@ export function HeroSection() {
       {/* Content */}
       <div className="container mx-auto px-4 relative z-10">
         <div className="max-w-3xl">
-          {/* Logo Badge */}
-          <div className="mb-8 animate-fade-in">
-            <img 
-              src={astralineLogoWhite} 
-              alt="Astraline Logistics" 
-              className="h-16 md:h-20 w-auto"
-            />
-          </div>
 
           <h1 className="font-heading text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-white leading-tight mb-6 animate-fade-in" style={{ animationDelay: '0.1s' }}>
             LOGISTICS YOU CAN{' '}
