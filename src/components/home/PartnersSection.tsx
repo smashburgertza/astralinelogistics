@@ -1,6 +1,7 @@
 import { useScrollAnimation } from '@/hooks/useScrollAnimation';
+import { usePageContent, PageContent } from '@/hooks/usePageContent';
 
-const partners = [
+const defaultPartners = [
   { name: 'DHL', logo: 'DHL' },
   { name: 'FedEx', logo: 'FedEx' },
   { name: 'UPS', logo: 'UPS' },
@@ -11,6 +12,12 @@ const partners = [
 
 export function PartnersSection() {
   const { ref, isVisible } = useScrollAnimation();
+  const { data } = usePageContent('partners');
+  const content = data as PageContent | undefined;
+  
+  const partners = content?.content?.logos?.length 
+    ? content.content.logos.map((l: any) => ({ name: l.name, logo: l.name?.split(' ')[0] || l.name }))
+    : defaultPartners;
 
   return (
     <section className="py-16 bg-muted/30 border-y border-border/50">
@@ -20,7 +27,7 @@ export function PartnersSection() {
           className={`scroll-animate ${isVisible ? 'visible' : ''}`}
         >
           <p className="text-center text-muted-foreground mb-8 text-sm uppercase tracking-widest font-medium">
-            Trusted by leading brands & partners worldwide
+            {content?.description || 'Trusted by leading brands & partners worldwide'}
           </p>
           
           <div className="flex flex-wrap justify-center items-center gap-8 md:gap-12 lg:gap-16">

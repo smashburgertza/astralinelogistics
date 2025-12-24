@@ -3,9 +3,12 @@ import { Button } from '@/components/ui/button';
 import { MoveRight, PhoneCall } from 'lucide-react';
 import { useScrollAnimation } from '@/hooks/useScrollAnimation';
 import { cn } from '@/lib/utils';
+import { usePageContent, PageContent } from '@/hooks/usePageContent';
 
 export function CTASection() {
   const { ref, isVisible } = useScrollAnimation();
+  const { data } = usePageContent('cta');
+  const content = data as PageContent | undefined;
 
   return (
     <section className="section-padding bg-primary overflow-hidden">
@@ -19,10 +22,10 @@ export function CTASection() {
         >
           <div className="text-center lg:text-left">
             <h2 className="font-heading text-3xl md:text-4xl font-bold text-primary-foreground mb-4">
-              Ready to Ship with Us?
+              {content?.title || 'Ready to Ship with Us?'}
             </h2>
             <p className="text-primary-foreground/80 text-lg max-w-xl">
-              Get started today and experience hassle-free logistics from anywhere in the world to Tanzania.
+              {content?.description || 'Get started today and experience hassle-free logistics from anywhere in the world to Tanzania.'}
             </p>
           </div>
           
