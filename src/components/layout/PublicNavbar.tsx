@@ -16,6 +16,7 @@ import astralineLogoWhite from '@/assets/astraline-logo-white.svg';
 
 export function PublicNavbar() {
   const [isOpen, setIsOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState('');
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const { user, profile, isAdmin, isAgent, signOut } = useAuth();
@@ -35,12 +36,49 @@ export function PublicNavbar() {
   const firstName = getFirstName();
 
   const navItems = [
-    { label: 'Home', href: '/#' },
-    { label: 'Shop For Me', href: '/#shop-for-me' },
-    { label: 'Services', href: '/#services' },
-    { label: 'About Us', href: '/#about' },
-    { label: 'Contact', href: '/#contact' },
+    { label: 'Home', href: '/#', sectionId: '' },
+    { label: 'Shop For Me', href: '/#shop-for-me', sectionId: 'shop-for-me' },
+    { label: 'Services', href: '/#services', sectionId: 'services' },
+    { label: 'About Us', href: '/#about', sectionId: 'about' },
+    { label: 'Contact', href: '/#contact', sectionId: 'contact' },
   ];
+
+  // Track active section on scroll
+  useEffect(() => {
+    if (location.pathname !== '/') {
+      setActiveSection('');
+      return;
+    }
+
+    const sectionIds = ['contact', 'shop-for-me', 'services', 'about'];
+    
+    const handleScroll = () => {
+      const scrollPosition = window.scrollY + 150;
+      
+      // Check if at top of page
+      if (window.scrollY < 100) {
+        setActiveSection('');
+        return;
+      }
+
+      // Find which section is currently in view
+      for (const id of sectionIds) {
+        const element = document.getElementById(id);
+        if (element) {
+          const { offsetTop, offsetHeight } = element;
+          if (scrollPosition >= offsetTop && scrollPosition < offsetTop + offsetHeight) {
+            setActiveSection(id);
+            return;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll(); // Initial check
+    
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [location.pathname]);
 
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
     const isHashLink = href.startsWith('/#');
@@ -71,6 +109,11 @@ export function PublicNavbar() {
       }
       setIsOpen(false);
     }
+  };
+
+  const isActiveNav = (sectionId: string) => {
+    if (location.pathname !== '/') return false;
+    return activeSection === sectionId;
   };
 
   // Click outside handler
@@ -144,10 +187,16 @@ export function PublicNavbar() {
                   key={item.href}
                   href={item.href}
                   onClick={(e) => handleNavClick(e, item.href)} 
-                  className="font-medium transition-colors relative group text-foreground hover:text-primary cursor-pointer"
+                  className={cn(
+                    "font-medium transition-colors relative group cursor-pointer",
+                    isActiveNav(item.sectionId) ? "text-primary" : "text-foreground hover:text-primary"
+                  )}
                 >
                   {item.label}
-                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-primary transition-all duration-300 group-hover:w-full" />
+                  <span className={cn(
+                    "absolute -bottom-1 left-0 h-0.5 bg-primary transition-all duration-300",
+                    isActiveNav(item.sectionId) ? "w-full" : "w-0 group-hover:w-full"
+                  )} />
                 </a>
               ))}
             </div>
@@ -217,7 +266,12 @@ export function PublicNavbar() {
                     key={item.href}
                     href={item.href}
                     onClick={(e) => handleNavClick(e, item.href)}
-                    className="py-2.5 px-3 text-sm text-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors font-medium cursor-pointer"
+                    className={cn(
+                      "py-2.5 px-3 text-sm rounded-lg transition-colors font-medium cursor-pointer",
+                      isActiveNav(item.sectionId) 
+                        ? "bg-primary/10 text-primary" 
+                        : "text-foreground hover:text-primary hover:bg-muted/50"
+                    )}
                   >
                     {item.label}
                   </a>

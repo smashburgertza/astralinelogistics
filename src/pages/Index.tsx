@@ -3,6 +3,7 @@ import { AboutSection } from '@/components/home/AboutSection';
 import { ServicesSection } from '@/components/home/ServicesSection';
 import { ShopForMeSection } from '@/components/home/ShopForMeSection';
 import { PricingCalculator } from '@/components/home/PricingCalculator';
+import { TestimonialsSection } from '@/components/home/TestimonialsSection';
 import { AgentAddresses } from '@/components/home/AgentAddresses';
 import { ContactSection } from '@/components/home/ContactSection';
 import { CTASection } from '@/components/home/CTASection';
@@ -21,6 +22,7 @@ const Index = () => {
       <section id="pricing">
         <PricingCalculator />
       </section>
+      <TestimonialsSection />
       <AgentAddresses />
       <ContactSection />
       <CTASection />
