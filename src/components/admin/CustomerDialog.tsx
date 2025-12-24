@@ -7,8 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Plus, Pencil } from 'lucide-react';
-import { useCreateCustomer, useUpdateCustomer, Customer } from '@/hooks/useCustomers';
+import { Switch } from '@/components/ui/switch';
+import { Plus } from 'lucide-react';
+import { useCreateCustomer, useUpdateCustomer, useCreateCustomerWithAuth, Customer } from '@/hooks/useCustomers';
 
 const customerSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
@@ -17,6 +18,16 @@ const customerSchema = z.object({
   company_name: z.string().max(200).optional().or(z.literal('')),
   address: z.string().max(500).optional().or(z.literal('')),
   notes: z.string().max(1000).optional().or(z.literal('')),
+  createLogin: z.boolean(),
+  password: z.string().optional(),
+}).refine((data) => {
+  if (data.createLogin) {
+    return data.email && data.email.length > 0 && data.password && data.password.length >= 6;
+  }
+  return true;
+}, {
+  message: 'Email and password (min 6 chars) required for login credentials',
+  path: ['password'],
 });
 
 type CustomerFormData = z.infer<typeof customerSchema>;
@@ -29,6 +40,7 @@ interface CustomerDialogProps {
 export function CustomerDialog({ customer, trigger }: CustomerDialogProps) {
   const [open, setOpen] = useState(false);
   const createCustomer = useCreateCustomer();
+  const createCustomerWithAuth = useCreateCustomerWithAuth();
   const updateCustomer = useUpdateCustomer();
   const isEditing = !!customer;
 
@@ -41,8 +53,12 @@ export function CustomerDialog({ customer, trigger }: CustomerDialogProps) {
       company_name: '',
       address: '',
       notes: '',
+      createLogin: false,
+      password: '',
     },
   });
+
+  const createLogin = form.watch('createLogin');
 
   useEffect(() => {
     if (customer && open) {
@@ -53,6 +69,8 @@ export function CustomerDialog({ customer, trigger }: CustomerDialogProps) {
         company_name: customer.company_name || '',
         address: customer.address || '',
         notes: customer.notes || '',
+        createLogin: false,
+        password: '',
       });
     } else if (!customer && open) {
       form.reset({
@@ -62,31 +80,49 @@ export function CustomerDialog({ customer, trigger }: CustomerDialogProps) {
         company_name: '',
         address: '',
         notes: '',
+        createLogin: false,
+        password: '',
       });
     }
   }, [customer, open, form]);
 
   const onSubmit = async (data: CustomerFormData) => {
-    const payload = {
-      name: data.name,
-      email: data.email || null,
-      phone: data.phone || null,
-      company_name: data.company_name || null,
-      address: data.address || null,
-      notes: data.notes || null,
-    };
-
     if (isEditing) {
-      await updateCustomer.mutateAsync({ id: customer.id, ...payload });
+      await updateCustomer.mutateAsync({
+        id: customer.id,
+        name: data.name,
+        email: data.email || null,
+        phone: data.phone || null,
+        company_name: data.company_name || null,
+        address: data.address || null,
+        notes: data.notes || null,
+      });
+    } else if (data.createLogin && data.email && data.password) {
+      await createCustomerWithAuth.mutateAsync({
+        name: data.name,
+        email: data.email,
+        password: data.password,
+        phone: data.phone || null,
+        company_name: data.company_name || null,
+        address: data.address || null,
+        notes: data.notes || null,
+      });
     } else {
-      await createCustomer.mutateAsync(payload);
+      await createCustomer.mutateAsync({
+        name: data.name,
+        email: data.email || null,
+        phone: data.phone || null,
+        company_name: data.company_name || null,
+        address: data.address || null,
+        notes: data.notes || null,
+      });
     }
 
     form.reset();
     setOpen(false);
   };
 
-  const isPending = createCustomer.isPending || updateCustomer.isPending;
+  const isPending = createCustomer.isPending || updateCustomer.isPending || createCustomerWithAuth.isPending;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -98,7 +134,7 @@ export function CustomerDialog({ customer, trigger }: CustomerDialogProps) {
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit Customer' : 'Add New Customer'}</DialogTitle>
         </DialogHeader>
@@ -124,7 +160,7 @@ export function CustomerDialog({ customer, trigger }: CustomerDialogProps) {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>Email {createLogin && '*'}</FormLabel>
                     <FormControl>
                       <Input type="email" placeholder="email@example.com" {...field} />
                     </FormControl>
@@ -189,6 +225,44 @@ export function CustomerDialog({ customer, trigger }: CustomerDialogProps) {
                 </FormItem>
               )}
             />
+
+            {!isEditing && (
+              <>
+                <FormField
+                  control={form.control}
+                  name="createLogin"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                      <div className="space-y-0.5">
+                        <FormLabel>Create Login Credentials</FormLabel>
+                        <p className="text-sm text-muted-foreground">
+                          Allow customer to access the portal
+                        </p>
+                      </div>
+                      <FormControl>
+                        <Switch checked={field.value} onCheckedChange={field.onChange} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                {createLogin && (
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Password *</FormLabel>
+                        <FormControl>
+                          <Input type="password" placeholder="Min 6 characters" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+              </>
+            )}
 
             <div className="flex justify-end gap-3 pt-4">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>

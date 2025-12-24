@@ -3,6 +3,7 @@ import { AdminLayout } from '@/components/layout/AdminLayout';
 import { CustomerFilters } from '@/components/admin/CustomerFilters';
 import { CustomerTable } from '@/components/admin/CustomerTable';
 import { CustomerDialog } from '@/components/admin/CustomerDialog';
+import { BulkCustomerImport } from '@/components/admin/BulkCustomerImport';
 import { useCustomersList } from '@/hooks/useCustomers';
 import { useDebounce } from '@/hooks/useDebounce';
 
@@ -24,8 +25,9 @@ export default function AdminCustomersPage() {
   return (
     <AdminLayout title="Customer Management" subtitle="Manage your customer database">
       <div className="space-y-6">
-        {/* Header with Action */}
-        <div className="flex justify-end">
+        {/* Header with Actions */}
+        <div className="flex justify-end gap-3">
+          <BulkCustomerImport />
           <CustomerDialog />
         </div>
 

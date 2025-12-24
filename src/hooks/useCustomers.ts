@@ -100,6 +100,97 @@ export function useCreateCustomer() {
   });
 }
 
+export function useCreateCustomerWithAuth() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: {
+      name: string;
+      email: string;
+      password: string;
+      phone?: string | null;
+      company_name?: string | null;
+      address?: string | null;
+      notes?: string | null;
+    }) => {
+      // Create user via auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`,
+          data: { full_name: data.name },
+        },
+      });
+
+      if (authError) throw authError;
+      if (!authData.user) throw new Error('Failed to create user');
+
+      // Update the profile that was auto-created
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          full_name: data.name,
+          phone: data.phone || null,
+          company_name: data.company_name || null,
+          address: data.address || null,
+        })
+        .eq('id', authData.user.id);
+
+      if (profileError) {
+        console.error('Profile update error:', profileError);
+      }
+
+      // Create the customer record linked to the user
+      const { data: customer, error: customerError } = await supabase
+        .from('customers')
+        .insert({
+          name: data.name,
+          email: data.email,
+          phone: data.phone || null,
+          company_name: data.company_name || null,
+          address: data.address || null,
+          notes: data.notes || null,
+          user_id: authData.user.id,
+        })
+        .select()
+        .single();
+
+      if (customerError) throw customerError;
+      return customer;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      toast.success('Customer created with login credentials');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to create customer');
+    },
+  });
+}
+
+export function useBulkCreateCustomers() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (customers: TablesInsert<'customers'>[]) => {
+      const { data, error } = await supabase
+        .from('customers')
+        .insert(customers)
+        .select();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      toast.success(`${data.length} customers imported successfully`);
+    },
+    onError: (error) => {
+      toast.error(`Failed to import customers: ${error.message}`);
+    },
+  });
+}
+
 export function useUpdateCustomer() {
   const queryClient = useQueryClient();
 
