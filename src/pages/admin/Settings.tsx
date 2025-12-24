@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Building2, Mail, Shield, Settings, Save } from 'lucide-react';
+import { Building2, Mail, Shield, Settings, Save, Loader2 } from 'lucide-react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Form,
   FormControl,
@@ -28,30 +29,29 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
+import { useAllSettings, useUpdateSettings } from '@/hooks/useSettings';
 
-// Company Settings Schema
+// Schemas
 const companySchema = z.object({
   company_name: z.string().min(1, 'Company name is required'),
   email: z.string().email('Invalid email'),
   phone: z.string().optional(),
   address: z.string().optional(),
-  website: z.string().url().optional().or(z.literal('')),
+  website: z.string().optional(),
   tax_id: z.string().optional(),
   currency: z.string().min(1, 'Currency is required'),
   timezone: z.string().min(1, 'Timezone is required'),
 });
 
-// Notification Settings Schema
 const notificationSchema = z.object({
   email_notifications: z.boolean(),
   shipment_updates: z.boolean(),
   invoice_reminders: z.boolean(),
   order_alerts: z.boolean(),
   weekly_reports: z.boolean(),
-  admin_email: z.string().email().optional().or(z.literal('')),
+  admin_email: z.string().optional(),
 });
 
-// Security Settings Schema  
 const securitySchema = z.object({
   session_timeout: z.string(),
   password_min_length: z.string(),
@@ -61,7 +61,6 @@ const securitySchema = z.object({
   max_login_attempts: z.string(),
 });
 
-// System Settings Schema
 const systemSchema = z.object({
   invoice_prefix: z.string().min(1, 'Invoice prefix is required'),
   estimate_prefix: z.string().min(1, 'Estimate prefix is required'),
@@ -71,71 +70,102 @@ const systemSchema = z.object({
   date_format: z.string(),
 });
 
-export default function AdminSettingsPage() {
-  const [isSaving, setIsSaving] = useState(false);
+const defaultCompany = {
+  company_name: 'Astraline Cargo',
+  email: 'info@astraline.com',
+  phone: '',
+  address: '',
+  website: '',
+  tax_id: '',
+  currency: 'USD',
+  timezone: 'Asia/Dubai',
+};
 
-  // Company Form
+const defaultNotifications = {
+  email_notifications: true,
+  shipment_updates: true,
+  invoice_reminders: true,
+  order_alerts: true,
+  weekly_reports: false,
+  admin_email: '',
+};
+
+const defaultSecurity = {
+  session_timeout: '30',
+  password_min_length: '8',
+  require_uppercase: true,
+  require_numbers: true,
+  require_special_chars: false,
+  max_login_attempts: '5',
+};
+
+const defaultSystem = {
+  invoice_prefix: 'INV',
+  estimate_prefix: 'EST',
+  tracking_prefix: 'AST',
+  default_due_days: '30',
+  auto_archive_days: '90',
+  date_format: 'MMM d, yyyy',
+};
+
+export default function AdminSettingsPage() {
+  const { data: settings, isLoading } = useAllSettings();
+  const updateSettings = useUpdateSettings();
+
+  // Forms
   const companyForm = useForm({
     resolver: zodResolver(companySchema),
-    defaultValues: {
-      company_name: 'Astraline Cargo',
-      email: 'info@astraline.com',
-      phone: '+1 234 567 8900',
-      address: '123 Logistics Way, Dubai, UAE',
-      website: 'https://astraline.com',
-      tax_id: 'TAX-12345678',
-      currency: 'USD',
-      timezone: 'Asia/Dubai',
-    },
+    defaultValues: defaultCompany,
   });
 
-  // Notification Form
   const notificationForm = useForm({
     resolver: zodResolver(notificationSchema),
-    defaultValues: {
-      email_notifications: true,
-      shipment_updates: true,
-      invoice_reminders: true,
-      order_alerts: true,
-      weekly_reports: false,
-      admin_email: '',
-    },
+    defaultValues: defaultNotifications,
   });
 
-  // Security Form
   const securityForm = useForm({
     resolver: zodResolver(securitySchema),
-    defaultValues: {
-      session_timeout: '30',
-      password_min_length: '8',
-      require_uppercase: true,
-      require_numbers: true,
-      require_special_chars: false,
-      max_login_attempts: '5',
-    },
+    defaultValues: defaultSecurity,
   });
 
-  // System Form
   const systemForm = useForm({
     resolver: zodResolver(systemSchema),
-    defaultValues: {
-      invoice_prefix: 'INV',
-      estimate_prefix: 'EST',
-      tracking_prefix: 'AST',
-      default_due_days: '30',
-      auto_archive_days: '90',
-      date_format: 'MMM d, yyyy',
-    },
+    defaultValues: defaultSystem,
   });
 
-  const handleSave = async (section: string, data: any) => {
-    setIsSaving(true);
-    // Simulate API call - in production, save to database
-    await new Promise(resolve => setTimeout(resolve, 500));
-    console.log(`Saving ${section}:`, data);
-    toast.success(`${section} settings saved successfully`);
-    setIsSaving(false);
+  // Load settings into forms when data is available
+  useEffect(() => {
+    if (settings) {
+      if (settings.company) {
+        companyForm.reset({ ...defaultCompany, ...settings.company } as typeof defaultCompany);
+      }
+      if (settings.notifications) {
+        notificationForm.reset({ ...defaultNotifications, ...settings.notifications } as typeof defaultNotifications);
+      }
+      if (settings.security) {
+        securityForm.reset({ ...defaultSecurity, ...settings.security } as typeof defaultSecurity);
+      }
+      if (settings.system) {
+        systemForm.reset({ ...defaultSystem, ...settings.system } as typeof defaultSystem);
+      }
+    }
+  }, [settings]);
+
+  const handleSave = async (key: string, data: Record<string, unknown>) => {
+    await updateSettings.mutateAsync({ key, value: data });
+    toast.success(`${key.charAt(0).toUpperCase() + key.slice(1)} settings saved`);
   };
+
+  if (isLoading) {
+    return (
+      <AdminLayout title="Settings" subtitle="Configure your system preferences">
+        <div className="space-y-6">
+          <Skeleton className="h-10 w-96" />
+          <Skeleton className="h-[400px] w-full" />
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout title="Settings" subtitle="Configure your system preferences">
@@ -164,13 +194,11 @@ export default function AdminSettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Company Profile</CardTitle>
-              <CardDescription>
-                Manage your company information and branding
-              </CardDescription>
+              <CardDescription>Manage your company information and branding</CardDescription>
             </CardHeader>
             <CardContent>
               <Form {...companyForm}>
-                <form onSubmit={companyForm.handleSubmit((data) => handleSave('Company', data))} className="space-y-6">
+                <form onSubmit={companyForm.handleSubmit((data) => handleSave('company', data))} className="space-y-6">
                   <div className="grid gap-4 md:grid-cols-2">
                     <FormField
                       control={companyForm.control}
@@ -243,7 +271,7 @@ export default function AdminSettingsPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Default Currency</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select currency" />
@@ -282,7 +310,7 @@ export default function AdminSettingsPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Timezone</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger className="max-w-xs">
                               <SelectValue placeholder="Select timezone" />
@@ -304,8 +332,8 @@ export default function AdminSettingsPage() {
                     )}
                   />
                   <div className="flex justify-end">
-                    <Button type="submit" disabled={isSaving}>
-                      <Save className="h-4 w-4 mr-2" />
+                    <Button type="submit" disabled={updateSettings.isPending}>
+                      {updateSettings.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                       Save Changes
                     </Button>
                   </div>
@@ -320,99 +348,36 @@ export default function AdminSettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Email & Notifications</CardTitle>
-              <CardDescription>
-                Configure email and notification preferences
-              </CardDescription>
+              <CardDescription>Configure email and notification preferences</CardDescription>
             </CardHeader>
             <CardContent>
               <Form {...notificationForm}>
-                <form onSubmit={notificationForm.handleSubmit((data) => handleSave('Notification', data))} className="space-y-6">
+                <form onSubmit={notificationForm.handleSubmit((data) => handleSave('notifications', data))} className="space-y-6">
                   <div className="space-y-4">
-                    <FormField
-                      control={notificationForm.control}
-                      name="email_notifications"
-                      render={({ field }) => (
-                        <FormItem className="flex items-center justify-between rounded-lg border p-4">
-                          <div className="space-y-0.5">
-                            <FormLabel className="text-base">Email Notifications</FormLabel>
-                            <FormDescription>
-                              Enable or disable all email notifications
-                            </FormDescription>
-                          </div>
-                          <FormControl>
-                            <Switch checked={field.value} onCheckedChange={field.onChange} />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={notificationForm.control}
-                      name="shipment_updates"
-                      render={({ field }) => (
-                        <FormItem className="flex items-center justify-between rounded-lg border p-4">
-                          <div className="space-y-0.5">
-                            <FormLabel className="text-base">Shipment Updates</FormLabel>
-                            <FormDescription>
-                              Notify when shipment status changes
-                            </FormDescription>
-                          </div>
-                          <FormControl>
-                            <Switch checked={field.value} onCheckedChange={field.onChange} />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={notificationForm.control}
-                      name="invoice_reminders"
-                      render={({ field }) => (
-                        <FormItem className="flex items-center justify-between rounded-lg border p-4">
-                          <div className="space-y-0.5">
-                            <FormLabel className="text-base">Invoice Reminders</FormLabel>
-                            <FormDescription>
-                              Send reminders for pending invoices
-                            </FormDescription>
-                          </div>
-                          <FormControl>
-                            <Switch checked={field.value} onCheckedChange={field.onChange} />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={notificationForm.control}
-                      name="order_alerts"
-                      render={({ field }) => (
-                        <FormItem className="flex items-center justify-between rounded-lg border p-4">
-                          <div className="space-y-0.5">
-                            <FormLabel className="text-base">New Order Alerts</FormLabel>
-                            <FormDescription>
-                              Get notified when new orders are placed
-                            </FormDescription>
-                          </div>
-                          <FormControl>
-                            <Switch checked={field.value} onCheckedChange={field.onChange} />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={notificationForm.control}
-                      name="weekly_reports"
-                      render={({ field }) => (
-                        <FormItem className="flex items-center justify-between rounded-lg border p-4">
-                          <div className="space-y-0.5">
-                            <FormLabel className="text-base">Weekly Reports</FormLabel>
-                            <FormDescription>
-                              Receive weekly summary reports via email
-                            </FormDescription>
-                          </div>
-                          <FormControl>
-                            <Switch checked={field.value} onCheckedChange={field.onChange} />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
+                    {[
+                      { name: 'email_notifications' as const, label: 'Email Notifications', desc: 'Enable or disable all email notifications' },
+                      { name: 'shipment_updates' as const, label: 'Shipment Updates', desc: 'Notify when shipment status changes' },
+                      { name: 'invoice_reminders' as const, label: 'Invoice Reminders', desc: 'Send reminders for pending invoices' },
+                      { name: 'order_alerts' as const, label: 'New Order Alerts', desc: 'Get notified when new orders are placed' },
+                      { name: 'weekly_reports' as const, label: 'Weekly Reports', desc: 'Receive weekly summary reports via email' },
+                    ].map((item) => (
+                      <FormField
+                        key={item.name}
+                        control={notificationForm.control}
+                        name={item.name}
+                        render={({ field }) => (
+                          <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-0.5">
+                              <FormLabel className="text-base">{item.label}</FormLabel>
+                              <FormDescription>{item.desc}</FormDescription>
+                            </div>
+                            <FormControl>
+                              <Switch checked={field.value} onCheckedChange={field.onChange} />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    ))}
                   </div>
                   <FormField
                     control={notificationForm.control}
@@ -423,16 +388,14 @@ export default function AdminSettingsPage() {
                         <FormControl>
                           <Input type="email" placeholder="admin@company.com" className="max-w-md" {...field} />
                         </FormControl>
-                        <FormDescription>
-                          Override email for admin notifications (optional)
-                        </FormDescription>
+                        <FormDescription>Override email for admin notifications (optional)</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                   <div className="flex justify-end">
-                    <Button type="submit" disabled={isSaving}>
-                      <Save className="h-4 w-4 mr-2" />
+                    <Button type="submit" disabled={updateSettings.isPending}>
+                      {updateSettings.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                       Save Changes
                     </Button>
                   </div>
@@ -447,13 +410,11 @@ export default function AdminSettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Security & Access</CardTitle>
-              <CardDescription>
-                Configure security policies and access controls
-              </CardDescription>
+              <CardDescription>Configure security policies and access controls</CardDescription>
             </CardHeader>
             <CardContent>
               <Form {...securityForm}>
-                <form onSubmit={securityForm.handleSubmit((data) => handleSave('Security', data))} className="space-y-6">
+                <form onSubmit={securityForm.handleSubmit((data) => handleSave('security', data))} className="space-y-6">
                   <div className="grid gap-4 md:grid-cols-2">
                     <FormField
                       control={securityForm.control}
@@ -461,7 +422,7 @@ export default function AdminSettingsPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Session Timeout (minutes)</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select timeout" />
@@ -485,7 +446,7 @@ export default function AdminSettingsPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Max Login Attempts</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select limit" />
@@ -511,7 +472,7 @@ export default function AdminSettingsPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Minimum Password Length</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger className="max-w-xs">
                                 <SelectValue placeholder="Select length" />
@@ -528,62 +489,33 @@ export default function AdminSettingsPage() {
                         </FormItem>
                       )}
                     />
-                    <FormField
-                      control={securityForm.control}
-                      name="require_uppercase"
-                      render={({ field }) => (
-                        <FormItem className="flex items-center justify-between rounded-lg border p-4">
-                          <div className="space-y-0.5">
-                            <FormLabel className="text-base">Require Uppercase</FormLabel>
-                            <FormDescription>
-                              Passwords must contain uppercase letters
-                            </FormDescription>
-                          </div>
-                          <FormControl>
-                            <Switch checked={field.value} onCheckedChange={field.onChange} />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={securityForm.control}
-                      name="require_numbers"
-                      render={({ field }) => (
-                        <FormItem className="flex items-center justify-between rounded-lg border p-4">
-                          <div className="space-y-0.5">
-                            <FormLabel className="text-base">Require Numbers</FormLabel>
-                            <FormDescription>
-                              Passwords must contain numbers
-                            </FormDescription>
-                          </div>
-                          <FormControl>
-                            <Switch checked={field.value} onCheckedChange={field.onChange} />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={securityForm.control}
-                      name="require_special_chars"
-                      render={({ field }) => (
-                        <FormItem className="flex items-center justify-between rounded-lg border p-4">
-                          <div className="space-y-0.5">
-                            <FormLabel className="text-base">Require Special Characters</FormLabel>
-                            <FormDescription>
-                              Passwords must contain special characters (!@#$%...)
-                            </FormDescription>
-                          </div>
-                          <FormControl>
-                            <Switch checked={field.value} onCheckedChange={field.onChange} />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
+                    {[
+                      { name: 'require_uppercase' as const, label: 'Require Uppercase', desc: 'Passwords must contain uppercase letters' },
+                      { name: 'require_numbers' as const, label: 'Require Numbers', desc: 'Passwords must contain numbers' },
+                      { name: 'require_special_chars' as const, label: 'Require Special Characters', desc: 'Passwords must contain special characters (!@#$%...)' },
+                    ].map((item) => (
+                      <FormField
+                        key={item.name}
+                        control={securityForm.control}
+                        name={item.name}
+                        render={({ field }) => (
+                          <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-0.5">
+                              <FormLabel className="text-base">{item.label}</FormLabel>
+                              <FormDescription>{item.desc}</FormDescription>
+                            </div>
+                            <FormControl>
+                              <Switch checked={field.value} onCheckedChange={field.onChange} />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    ))}
                   </div>
 
                   <div className="flex justify-end">
-                    <Button type="submit" disabled={isSaving}>
-                      <Save className="h-4 w-4 mr-2" />
+                    <Button type="submit" disabled={updateSettings.isPending}>
+                      {updateSettings.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                       Save Changes
                     </Button>
                   </div>
@@ -598,13 +530,11 @@ export default function AdminSettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>System Preferences</CardTitle>
-              <CardDescription>
-                Configure system defaults and document numbering
-              </CardDescription>
+              <CardDescription>Configure system defaults and document numbering</CardDescription>
             </CardHeader>
             <CardContent>
               <Form {...systemForm}>
-                <form onSubmit={systemForm.handleSubmit((data) => handleSave('System', data))} className="space-y-6">
+                <form onSubmit={systemForm.handleSubmit((data) => handleSave('system', data))} className="space-y-6">
                   <div className="space-y-4">
                     <Label className="text-base font-medium">Document Prefixes</Label>
                     <div className="grid gap-4 md:grid-cols-3">
@@ -660,7 +590,7 @@ export default function AdminSettingsPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Default Payment Terms (days)</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select days" />
@@ -684,7 +614,7 @@ export default function AdminSettingsPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Auto-Archive After (days)</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select days" />
@@ -710,7 +640,7 @@ export default function AdminSettingsPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Date Format</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger className="max-w-xs">
                               <SelectValue placeholder="Select format" />
@@ -729,8 +659,8 @@ export default function AdminSettingsPage() {
                   />
 
                   <div className="flex justify-end">
-                    <Button type="submit" disabled={isSaving}>
-                      <Save className="h-4 w-4 mr-2" />
+                    <Button type="submit" disabled={updateSettings.isPending}>
+                      {updateSettings.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                       Save Changes
                     </Button>
                   </div>
