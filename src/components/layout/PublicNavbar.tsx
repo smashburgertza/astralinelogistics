@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Menu, X, PhoneCall, MailOpen } from 'lucide-react';
+import { MenuIcon, XIcon, PhoneCall, MailOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
@@ -148,12 +148,16 @@ export function PublicNavbar() {
             {/* Mobile Menu Button */}
             <button
               className={cn(
-                "lg:hidden p-2 rounded-lg transition-colors",
-                scrolled || !isHome ? "text-foreground hover:bg-muted" : "text-white hover:bg-white/10"
+                "lg:hidden p-2.5 rounded-xl border-2 transition-all duration-200",
+                scrolled || !isHome 
+                  ? "text-foreground border-border hover:bg-muted hover:border-primary/30" 
+                  : "text-white border-white/30 hover:bg-white/10 hover:border-white/50",
+                isOpen && "bg-primary border-primary text-primary-foreground hover:bg-primary/90"
               )}
               onClick={() => setIsOpen(!isOpen)}
+              aria-label={isOpen ? "Close menu" : "Open menu"}
             >
-              {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              {isOpen ? <XIcon className="w-5 h-5" /> : <MenuIcon className="w-5 h-5" />}
             </button>
           </div>
 
