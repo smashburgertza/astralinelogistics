@@ -869,7 +869,7 @@ export type Database = {
       is_admin_or_employee: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      agent_region: "europe" | "dubai" | "china" | "india"
+      agent_region: "europe" | "dubai" | "china" | "india" | "usa" | "uk"
       app_role: "super_admin" | "employee" | "agent" | "customer"
       shipment_status: "collected" | "in_transit" | "arrived" | "delivered"
     }
@@ -999,7 +999,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      agent_region: ["europe", "dubai", "china", "india"],
+      agent_region: ["europe", "dubai", "china", "india", "usa", "uk"],
       app_role: ["super_admin", "employee", "agent", "customer"],
       shipment_status: ["collected", "in_transit", "arrived", "delivered"],
     },

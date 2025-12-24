@@ -1,12 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { Region } from '@/lib/constants';
 
 export interface Agent {
   id: string;
   user_id: string;
   role: 'agent';
-  region: 'europe' | 'dubai' | 'china' | 'india' | null;
+  region: Region | null;
   created_at: string;
   profile: {
     id: string;
@@ -69,7 +70,7 @@ export function useCreateAgent() {
       password: string; 
       fullName: string;
       phone?: string;
-      region: 'europe' | 'dubai' | 'china' | 'india';
+      region: Region;
     }) => {
       // First, create the user via Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -130,7 +131,7 @@ export function useUpdateAgentRegion() {
       region 
     }: { 
       userId: string; 
-      region: 'europe' | 'dubai' | 'china' | 'india';
+      region: Region;
     }) => {
       const { error } = await supabase
         .from('user_roles')
