@@ -3,18 +3,26 @@ import { Button } from '@/components/ui/button';
 import { CircleCheckBig } from 'lucide-react';
 import { useScrollAnimation } from '@/hooks/useScrollAnimation';
 import { cn } from '@/lib/utils';
+import { usePageContent, PageContent } from '@/hooks/usePageContent';
+
+const defaultFeatures = [
+  'Safe & Secure Delivery',
+  'Real-time Tracking',
+  'Customs Clearance',
+  '24/7 Support',
+];
 
 export function AboutSection() {
   const { ref: sectionRef, isVisible } = useScrollAnimation();
   const { ref: leftRef, isVisible: leftVisible } = useScrollAnimation();
   const { ref: rightRef, isVisible: rightVisible } = useScrollAnimation();
-
-  const features = [
-    'Safe & Secure Delivery',
-    'Real-time Tracking',
-    'Customs Clearance',
-    '24/7 Support',
-  ];
+  
+  const { data } = usePageContent('about');
+  const content = data as PageContent | undefined;
+  
+  const features = content?.content?.features?.length 
+    ? content.content.features.map((f: any) => f.title || f)
+    : defaultFeatures;
 
   return (
     <section ref={sectionRef} className="section-padding bg-brand-navy overflow-hidden">
@@ -26,7 +34,7 @@ export function AboutSection() {
             className={cn("scroll-animate-left", leftVisible && "visible")}
           >
             <h2 className="font-heading text-3xl md:text-4xl lg:text-5xl font-bold text-white leading-tight mb-6">
-              ALL THE PACKAGES ARE DELIVERED TO YOUR DOORSTEP{' '}
+              {content?.title || "ALL THE PACKAGES ARE DELIVERED TO YOUR DOORSTEP"}{' '}
               <span className="text-primary">SAFELY AND SECURELY</span>{' '}
               WITHOUT EVEN SLIGHT DAMAGE TO YOUR PACKAGE.
             </h2>
@@ -46,10 +54,10 @@ export function AboutSection() {
             style={{ transitionDelay: '150ms' }}
           >
             <p className="text-white/90 leading-relaxed mb-6">
-              Astraline Logistics provides a complete package of logistics services from purchasing, collecting, packing, shipping, clearing and delivery. We have been in the shipping industry for more than 5 years. Our experience puts us on top of the list in the market.
+              {content?.description || "Astraline Logistics provides a complete package of logistics services from purchasing, collecting, packing, shipping, clearing and delivery. We have been in the shipping industry for more than 5 years. Our experience puts us on top of the list in the market."}
             </p>
             <p className="text-white/80 leading-relaxed mb-8">
-              For every order there is one successful delivery. Astraline Logistics do not put any of our customer&apos;s package at risk of getting lost. Every customer is given special attention with our customer care team. We listen and handle every problem reported to us. We are able to adapt and always catch up with new advancement in technology to serve you better.
+              For every order there is one successful delivery. Astraline Logistics do not put any of our customer&apos;s package at risk of getting lost. Every customer is given special attention with our customer care team.
             </p>
             
             <div className="grid sm:grid-cols-2 gap-4">

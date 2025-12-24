@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useScrollAnimation } from '@/hooks/useScrollAnimation';
 import { cn } from '@/lib/utils';
 import { z } from 'zod';
+import { usePageContent, PageContent } from '@/hooks/usePageContent';
 
 const contactSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(100, 'Name must be less than 100 characters'),
@@ -18,7 +19,7 @@ const contactSchema = z.object({
   message: z.string().trim().min(1, 'Message is required').max(2000, 'Message must be less than 2000 characters'),
 });
 
-const contactInfo = [
+const defaultContactInfo = [
   {
     icon: Phone,
     title: 'Phone',
@@ -56,6 +57,33 @@ export function ContactSection() {
   const { ref: headerRef, isVisible: headerVisible } = useScrollAnimation();
   const { ref: leftRef, isVisible: leftVisible } = useScrollAnimation();
   const { ref: rightRef, isVisible: rightVisible } = useScrollAnimation();
+  
+  const { data } = usePageContent('contact');
+  const pageContent = data as PageContent | undefined;
+  
+  // Build contact info from CMS or use defaults
+  const contactInfo = pageContent?.content?.phone ? [
+    {
+      icon: Phone,
+      title: 'Phone',
+      details: [pageContent.content.phone],
+    },
+    {
+      icon: Mail,
+      title: 'Email',
+      details: [pageContent.content.email || 'info@astralinelogistics.com'],
+    },
+    {
+      icon: MapPin,
+      title: 'Address',
+      details: [pageContent.content.address || 'Dar es Salaam, Tanzania'],
+    },
+    {
+      icon: Clock,
+      title: 'Business Hours',
+      details: [pageContent.content.hours || 'Mon - Sat: 8:00 AM - 6:00 PM'],
+    },
+  ] : defaultContactInfo;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -120,13 +148,13 @@ export function ContactSection() {
           className={cn("text-center mb-16 scroll-animate", headerVisible && "visible")}
         >
           <span className="inline-block px-4 py-2 rounded-full bg-primary/10 text-primary font-semibold text-sm uppercase tracking-wide mb-4">
-            Get In Touch
+            {pageContent?.subtitle || 'Get In Touch'}
           </span>
           <h2 className="font-heading text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4">
-            Contact <span className="text-primary">Us</span>
+            {pageContent?.title || 'Contact'} <span className="text-primary">Us</span>
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
-            Have questions about our services? Need a quote? We&apos;re here to help.
+            {pageContent?.description || "Have questions about our services? Need a quote? We're here to help."}
           </p>
         </div>
 

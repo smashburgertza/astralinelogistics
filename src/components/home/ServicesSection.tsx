@@ -1,10 +1,24 @@
 import { Link } from 'react-router-dom';
-import { PlaneTakeoff, Ship, Container, PackageCheck, ShieldCheck, Zap } from 'lucide-react';
+import { PlaneTakeoff, Ship, Container, PackageCheck, ShieldCheck, Zap, LucideIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useScrollAnimation } from '@/hooks/useScrollAnimation';
 import { cn } from '@/lib/utils';
+import { usePageContent, PageContent } from '@/hooks/usePageContent';
 
-const services = [
+const iconMap: Record<string, LucideIcon> = {
+  Plane: PlaneTakeoff,
+  PlaneTakeoff: PlaneTakeoff,
+  Ship: Ship,
+  Container: Container,
+  PackageCheck: PackageCheck,
+  ShieldCheck: ShieldCheck,
+  Zap: Zap,
+  Warehouse: Container,
+  Truck: Container,
+  Package: PackageCheck,
+};
+
+const defaultServices = [
   {
     icon: PlaneTakeoff,
     title: 'Air Freight',
@@ -46,6 +60,18 @@ const services = [
 export function ServicesSection() {
   const { ref: headerRef, isVisible: headerVisible } = useScrollAnimation();
   const { ref: gridRef, isVisible: gridVisible } = useScrollAnimation();
+  
+  const { data } = usePageContent('services');
+  const content = data as PageContent | undefined;
+  
+  const services = content?.content?.services?.length 
+    ? content.content.services.map((s: any) => ({
+        icon: iconMap[s.icon] || PackageCheck,
+        title: s.title,
+        description: s.description,
+        link: `/services#${s.title?.toLowerCase().replace(/\s+/g, '-')}`,
+      }))
+    : defaultServices;
 
   return (
     <section className="section-padding bg-background overflow-hidden">
@@ -56,13 +82,13 @@ export function ServicesSection() {
           className={cn("text-center mb-16 scroll-animate", headerVisible && "visible")}
         >
           <span className="inline-block px-4 py-2 rounded-full bg-primary/10 text-primary font-semibold text-sm uppercase tracking-wide mb-4">
-            What We Offer
+            {content?.subtitle || 'What We Offer'}
           </span>
           <h2 className="font-heading text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4">
-            Our Services
+            {content?.title || 'Our Services'}
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
-            Complete logistics solutions from collection to delivery. We handle everything so you don&apos;t have to.
+            {content?.description || "Complete logistics solutions from collection to delivery. We handle everything so you don't have to."}
           </p>
         </div>
 
