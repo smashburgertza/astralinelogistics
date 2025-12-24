@@ -7,20 +7,11 @@ import { cn } from '@/lib/utils';
 
 export function PublicNavbar() {
   const [isOpen, setIsOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const { user, isAdmin, isAgent, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 20);
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
 
   // Click outside handler
   useEffect(() => {
@@ -51,8 +42,6 @@ export function PublicNavbar() {
     navigate('/');
   };
 
-  const isHome = location.pathname === '/';
-
   return (
     <>
       {/* Top Bar */}
@@ -76,31 +65,17 @@ export function PublicNavbar() {
       </div>
 
       {/* Main Navigation */}
-      <nav className={cn(
-        "sticky top-0 z-50 transition-all duration-300",
-        scrolled || !isHome 
-          ? "bg-white shadow-lg" 
-          : "bg-transparent"
-      )}>
+      <nav className="sticky top-0 z-50 bg-white shadow-lg transition-all duration-300">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-20">
             {/* Logo */}
             <Link to="/" className="flex items-center gap-3">
-              <div className={cn(
-                "w-12 h-12 rounded-lg flex items-center justify-center font-heading font-bold text-xl transition-colors",
-                scrolled || !isHome ? "bg-brand-navy text-white" : "bg-primary text-primary-foreground"
-              )}>
+              <div className="w-12 h-12 rounded-lg bg-brand-navy text-white flex items-center justify-center font-heading font-bold text-xl">
                 A
               </div>
               <div className="hidden sm:block">
-                <span className={cn(
-                  "text-xl font-heading font-bold transition-colors",
-                  scrolled || !isHome ? "text-brand-navy" : "text-white"
-                )}>Astraline</span>
-                <span className={cn(
-                  "block text-xs transition-colors",
-                  scrolled || !isHome ? "text-muted-foreground" : "text-white/70"
-                )}>Logistics</span>
+                <span className="text-xl font-heading font-bold text-brand-navy">Astraline</span>
+                <span className="block text-xs text-muted-foreground">Logistics</span>
               </div>
             </Link>
 
@@ -109,7 +84,6 @@ export function PublicNavbar() {
               {[
                 { label: 'Home', href: '/' },
                 { label: 'Shop For Me', href: '/shop-for-me' },
-                { label: 'Track Shipment', href: '/tracking' },
                 { label: 'Services', href: '/services' },
                 { label: 'About Us', href: '/about' },
                 { label: 'Contact', href: '/contact' },
@@ -118,10 +92,7 @@ export function PublicNavbar() {
                   key={item.href}
                   to={item.href} 
                   className={cn(
-                    "font-medium transition-colors relative group",
-                    scrolled || !isHome 
-                      ? "text-foreground hover:text-primary" 
-                      : "text-white hover:text-primary",
+                    "font-medium transition-colors relative group text-foreground hover:text-primary",
                     location.pathname === item.href && "text-primary"
                   )}
                 >
@@ -138,11 +109,7 @@ export function PublicNavbar() {
             <div className="hidden lg:flex items-center gap-3">
               {user ? (
                 <>
-                  <Button 
-                    variant={scrolled || !isHome ? "outline" : "ghost"}
-                    className={!scrolled && isHome ? "text-white border-white hover:bg-white/10" : ""}
-                    onClick={() => navigate(getDashboardRoute())}
-                  >
+                  <Button variant="outline" onClick={() => navigate(getDashboardRoute())}>
                     Dashboard
                   </Button>
                   <Button variant="default" onClick={handleSignOut}>
@@ -151,11 +118,7 @@ export function PublicNavbar() {
                 </>
               ) : (
                 <>
-                  <Button 
-                    variant={scrolled || !isHome ? "outline" : "ghost"}
-                    className={!scrolled && isHome ? "text-white border-white hover:bg-white/10" : ""}
-                    asChild
-                  >
+                  <Button variant="outline" asChild>
                     <Link to="/auth">Sign In</Link>
                   </Button>
                   <Button asChild>
@@ -169,10 +132,7 @@ export function PublicNavbar() {
             <button
               ref={buttonRef}
               className={cn(
-                "lg:hidden p-2.5 rounded-xl border-2 transition-all duration-200",
-                scrolled || !isHome 
-                  ? "text-foreground border-border hover:bg-muted hover:border-primary/30" 
-                  : "text-white border-white/30 hover:bg-white/10 hover:border-white/50",
+                "lg:hidden p-2.5 rounded-xl border-2 transition-all duration-200 text-foreground border-border hover:bg-muted hover:border-primary/30",
                 isOpen && "bg-primary border-primary text-primary-foreground hover:bg-primary/90"
               )}
               onClick={() => setIsOpen(!isOpen)}
@@ -189,7 +149,6 @@ export function PublicNavbar() {
                 {[
                   { label: 'Home', href: '/' },
                   { label: 'Shop For Me', href: '/shop-for-me' },
-                  { label: 'Track Shipment', href: '/tracking' },
                   { label: 'Services', href: '/services' },
                   { label: 'About Us', href: '/about' },
                   { label: 'Contact', href: '/contact' },
