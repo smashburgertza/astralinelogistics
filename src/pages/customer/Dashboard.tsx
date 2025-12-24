@@ -11,6 +11,7 @@ import { useCustomerStats, useCustomerShipments, useCustomerInvoices } from '@/h
 import { SHIPMENT_STATUSES, REGIONS } from '@/lib/constants';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
+import { NotificationsList } from '@/components/customer/NotificationsList';
 
 export default function CustomerDashboard() {
   const navigate = useNavigate();
@@ -146,8 +147,11 @@ export default function CustomerDashboard() {
           </CardContent>
         </Card>
 
-        {/* Quick Track & Invoices */}
+        {/* Notifications, Quick Track & Invoices */}
         <div className="space-y-6">
+          {/* Notifications */}
+          <NotificationsList />
+
           {/* Quick Track */}
           <Card className="shadow-lg border-0">
             <CardHeader>
