@@ -88,8 +88,8 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       boxShadow: {
-        'gold': '0 4px 20px hsl(40 92% 55% / 0.35)',
-        'navy': '0 4px 20px hsl(210 70% 25% / 0.35)',
+        'gold': '0 4px 20px hsl(42 92% 60% / 0.35)',
+        'navy': '0 4px 20px hsl(197 100% 44% / 0.35)',
       },
       keyframes: {
         "accordion-down": {
