@@ -9,10 +9,11 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Package, Copy, Eye } from 'lucide-react';
+import { Package, Copy, Eye, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 import { ShipmentStatusBadge } from '@/components/admin/ShipmentStatusBadge';
 import { ShipmentDetailDrawer } from '@/components/admin/ShipmentDetailDrawer';
+import { EditShipmentDialog } from './EditShipmentDialog';
 import { Shipment } from '@/hooks/useShipments';
 import { REGIONS } from '@/lib/constants';
 import { toast } from 'sonner';
@@ -25,6 +26,8 @@ interface AgentShipmentTableProps {
 export function AgentShipmentTable({ shipments, isLoading }: AgentShipmentTableProps) {
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingShipment, setEditingShipment] = useState<Shipment | null>(null);
 
   const copyTrackingNumber = (trackingNumber: string) => {
     navigator.clipboard.writeText(trackingNumber);
@@ -84,7 +87,7 @@ export function AgentShipmentTable({ shipments, isLoading }: AgentShipmentTableP
             <TableHead className="font-semibold">Weight</TableHead>
             <TableHead className="font-semibold">Status</TableHead>
             <TableHead className="font-semibold">Date</TableHead>
-            <TableHead className="w-[50px]"></TableHead>
+            <TableHead className="w-[100px]"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -127,17 +130,34 @@ export function AgentShipmentTable({ shipments, isLoading }: AgentShipmentTableP
                   {format(new Date(shipment.created_at || ''), 'MMM d, yyyy')}
                 </TableCell>
                 <TableCell>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => {
-                      setSelectedShipment(shipment);
-                      setDrawerOpen(true);
-                    }}
-                  >
-                    <Eye className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    {shipment.status === 'collected' && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => {
+                          setEditingShipment(shipment);
+                          setEditDialogOpen(true);
+                        }}
+                        title="Edit shipment"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => {
+                        setSelectedShipment(shipment);
+                        setDrawerOpen(true);
+                      }}
+                      title="View details"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             );
@@ -148,6 +168,14 @@ export function AgentShipmentTable({ shipments, isLoading }: AgentShipmentTableP
         shipment={selectedShipment}
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
+      />
+      <EditShipmentDialog
+        shipment={editingShipment}
+        open={editDialogOpen}
+        onOpenChange={(open) => {
+          setEditDialogOpen(open);
+          if (!open) setEditingShipment(null);
+        }}
       />
     </div>
   );

@@ -1,7 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables } from '@/integrations/supabase/types';
 import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
 
 export type Shipment = Tables<'shipments'> & {
   customers?: Tables<'customers'> | null;
@@ -76,5 +77,43 @@ export function useAgentShipmentStats() {
       return stats;
     },
     enabled: !!region,
+  });
+}
+
+export function useUpdateAgentShipment() {
+  const queryClient = useQueryClient();
+  const { getRegion } = useAuth();
+  const region = getRegion();
+
+  return useMutation({
+    mutationFn: async (data: {
+      id: string;
+      customer_id: string;
+      total_weight_kg: number;
+      description: string | null;
+      warehouse_location: string | null;
+    }) => {
+      const { error } = await supabase
+        .from('shipments')
+        .update({
+          customer_id: data.customer_id,
+          total_weight_kg: data.total_weight_kg,
+          description: data.description,
+          warehouse_location: data.warehouse_location,
+        })
+        .eq('id', data.id)
+        .eq('origin_region', region!)
+        .eq('status', 'collected'); // Only allow editing collected shipments
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agent-shipments'] });
+      queryClient.invalidateQueries({ queryKey: ['agent-shipment-stats'] });
+      toast.success('Shipment updated successfully');
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to update shipment: ' + error.message);
+    },
   });
 }
