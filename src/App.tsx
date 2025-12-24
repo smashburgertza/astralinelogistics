@@ -11,6 +11,7 @@ import TrackingPage from "./pages/Tracking";
 import CustomerDashboard from "./pages/customer/Dashboard";
 import AgentDashboard from "./pages/agent/Dashboard";
 import AdminDashboard from "./pages/admin/Dashboard";
+import AdminShipmentsPage from "./pages/admin/Shipments";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -40,6 +41,7 @@ const App = () => (
             
             {/* Admin Portal */}
             <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/shipments" element={<AdminShipmentsPage />} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>
