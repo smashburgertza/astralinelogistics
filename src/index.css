@@ -6,13 +6,13 @@
 
 @layer base {
   :root {
-    /* Astraline brand colors - matching the live site */
-    --brand-gold: 40 92% 55%;
-    --brand-gold-light: 40 95% 62%;
-    --brand-gold-dark: 40 90% 48%;
-    --brand-navy: 210 70% 25%;
-    --brand-navy-dark: 210 75% 18%;
-    --brand-navy-light: 210 65% 35%;
+    /* Astraline brand colors */
+    --brand-gold: 42 92% 60%;
+    --brand-gold-light: 42 95% 68%;
+    --brand-gold-dark: 42 90% 52%;
+    --brand-navy: 197 100% 44%;
+    --brand-navy-dark: 197 100% 35%;
+    --brand-navy-light: 197 90% 55%;
     
     /* Core colors */
     --background: 0 0% 100%;
@@ -24,16 +24,16 @@
     --popover: 0 0% 100%;
     --popover-foreground: 210 25% 15%;
 
-    --primary: 40 92% 55%;
-    --primary-foreground: 210 70% 18%;
+    --primary: 42 92% 60%;
+    --primary-foreground: 197 100% 20%;
 
-    --secondary: 210 20% 96%;
+    --secondary: 197 20% 96%;
     --secondary-foreground: 210 25% 15%;
 
-    --muted: 210 20% 96%;
-    --muted-foreground: 210 15% 45%;
+    --muted: 197 20% 96%;
+    --muted-foreground: 197 15% 45%;
 
-    --accent: 210 70% 25%;
+    --accent: 197 100% 44%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -42,63 +42,63 @@
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 40 92% 55%;
-    --warning-foreground: 210 70% 18%;
+    --warning: 42 92% 60%;
+    --warning-foreground: 197 100% 20%;
 
-    --info: 210 70% 50%;
+    --info: 197 100% 50%;
     --info-foreground: 0 0% 100%;
 
-    --border: 210 20% 88%;
-    --input: 210 20% 88%;
-    --ring: 40 92% 55%;
+    --border: 197 20% 88%;
+    --input: 197 20% 88%;
+    --ring: 42 92% 60%;
 
     --radius: 0.5rem;
 
     /* Dashboard specific */
-    --sidebar-background: 210 70% 18%;
-    --sidebar-foreground: 210 15% 85%;
-    --sidebar-primary: 40 92% 55%;
-    --sidebar-primary-foreground: 210 70% 18%;
-    --sidebar-accent: 210 65% 25%;
-    --sidebar-accent-foreground: 210 15% 85%;
-    --sidebar-border: 210 60% 25%;
-    --sidebar-ring: 40 92% 55%;
+    --sidebar-background: 197 100% 25%;
+    --sidebar-foreground: 197 15% 90%;
+    --sidebar-primary: 42 92% 60%;
+    --sidebar-primary-foreground: 197 100% 20%;
+    --sidebar-accent: 197 90% 35%;
+    --sidebar-accent-foreground: 197 15% 90%;
+    --sidebar-border: 197 80% 35%;
+    --sidebar-ring: 42 92% 60%;
 
     /* Status colors */
-    --status-collected: 210 70% 50%;
-    --status-in-transit: 40 92% 55%;
+    --status-collected: 197 100% 50%;
+    --status-in-transit: 42 92% 60%;
     --status-arrived: 270 60% 55%;
     --status-delivered: 142 71% 45%;
 
     /* Hero section */
-    --hero-overlay: 210 70% 25%;
+    --hero-overlay: 197 100% 30%;
   }
 
   .dark {
-    --background: 210 70% 8%;
-    --foreground: 210 15% 95%;
+    --background: 197 80% 8%;
+    --foreground: 197 15% 95%;
 
-    --card: 210 65% 12%;
-    --card-foreground: 210 15% 95%;
+    --card: 197 65% 12%;
+    --card-foreground: 197 15% 95%;
 
-    --popover: 210 65% 12%;
-    --popover-foreground: 210 15% 95%;
+    --popover: 197 65% 12%;
+    --popover-foreground: 197 15% 95%;
 
-    --primary: 40 92% 55%;
-    --primary-foreground: 210 70% 10%;
+    --primary: 42 92% 60%;
+    --primary-foreground: 197 100% 10%;
 
-    --secondary: 210 50% 18%;
-    --secondary-foreground: 210 15% 95%;
+    --secondary: 197 50% 18%;
+    --secondary-foreground: 197 15% 95%;
 
-    --muted: 210 50% 18%;
-    --muted-foreground: 210 15% 60%;
+    --muted: 197 50% 18%;
+    --muted-foreground: 197 15% 60%;
 
-    --accent: 210 50% 22%;
-    --accent-foreground: 40 92% 60%;
+    --accent: 197 50% 22%;
+    --accent-foreground: 42 92% 65%;
 
-    --border: 210 50% 22%;
-    --input: 210 50% 22%;
-    --ring: 40 92% 55%;
+    --border: 197 50% 22%;
+    --input: 197 50% 22%;
+    --ring: 42 92% 60%;
   }
 }
 
@@ -125,15 +125,15 @@
 
   .gradient-text {
     @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(135deg, hsl(40 92% 55%), hsl(40 95% 65%));
+    background-image: linear-gradient(135deg, hsl(42 92% 60%), hsl(42 95% 70%));
   }
 
   .navy-gradient {
-    background: linear-gradient(135deg, hsl(210 70% 25%) 0%, hsl(210 75% 18%) 100%);
+    background: linear-gradient(135deg, hsl(197 100% 44%) 0%, hsl(197 100% 35%) 100%);
   }
 
   .gold-gradient {
-    background: linear-gradient(135deg, hsl(40 92% 55%) 0%, hsl(40 95% 65%) 100%);
+    background: linear-gradient(135deg, hsl(42 92% 60%) 0%, hsl(42 95% 70%) 100%);
   }
 
   .status-badge {
@@ -173,11 +173,11 @@
   }
 
   .btn-gold {
-    @apply bg-primary text-primary-foreground font-semibold px-8 py-3 rounded-lg hover:bg-[hsl(40_90%_48%)] transition-all duration-300 shadow-lg hover:shadow-xl;
+    @apply bg-primary text-primary-foreground font-semibold px-8 py-3 rounded-lg hover:bg-[hsl(42_90%_52%)] transition-all duration-300 shadow-lg hover:shadow-xl;
   }
 
   .btn-outline-white {
-    @apply bg-transparent text-white border-2 border-white font-semibold px-8 py-3 rounded-lg hover:bg-white hover:text-[hsl(210_70%_25%)] transition-all duration-300;
+    @apply bg-transparent text-white border-2 border-white font-semibold px-8 py-3 rounded-lg hover:bg-white hover:text-[hsl(197_100%_44%)] transition-all duration-300;
   }
 }
 
@@ -235,8 +235,8 @@
   }
 
   @keyframes pulseGlow {
-    0%, 100% { box-shadow: 0 0 20px hsl(40 92% 55% / 0.3); }
-    50% { box-shadow: 0 0 40px hsl(40 92% 55% / 0.6); }
+    0%, 100% { box-shadow: 0 0 20px hsl(42 92% 60% / 0.3); }
+    50% { box-shadow: 0 0 40px hsl(42 92% 60% / 0.6); }
   }
 
   .text-shadow {
