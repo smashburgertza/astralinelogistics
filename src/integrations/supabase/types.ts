@@ -477,6 +477,101 @@ export type Database = {
           },
         ]
       }
+      order_items: {
+        Row: {
+          created_at: string
+          currency: string | null
+          estimated_weight_kg: number | null
+          id: string
+          order_request_id: string | null
+          product_name: string | null
+          product_price: number | null
+          product_url: string
+          quantity: number
+          subtotal: number | null
+        }
+        Insert: {
+          created_at?: string
+          currency?: string | null
+          estimated_weight_kg?: number | null
+          id?: string
+          order_request_id?: string | null
+          product_name?: string | null
+          product_price?: number | null
+          product_url: string
+          quantity?: number
+          subtotal?: number | null
+        }
+        Update: {
+          created_at?: string
+          currency?: string | null
+          estimated_weight_kg?: number | null
+          id?: string
+          order_request_id?: string | null
+          product_name?: string | null
+          product_price?: number | null
+          product_url?: string
+          quantity?: number
+          subtotal?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_request_id_fkey"
+            columns: ["order_request_id"]
+            isOneToOne: false
+            referencedRelation: "order_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_requests: {
+        Row: {
+          created_at: string
+          customer_address: string
+          customer_email: string
+          customer_name: string
+          customer_phone: string
+          estimated_shipping_cost: number
+          grand_total: number
+          handling_fee: number
+          id: string
+          notes: string | null
+          status: string
+          total_product_cost: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_address: string
+          customer_email: string
+          customer_name: string
+          customer_phone: string
+          estimated_shipping_cost?: number
+          grand_total?: number
+          handling_fee?: number
+          id?: string
+          notes?: string | null
+          status?: string
+          total_product_cost?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_address?: string
+          customer_email?: string
+          customer_name?: string
+          customer_phone?: string
+          estimated_shipping_cost?: number
+          grand_total?: number
+          handling_fee?: number
+          id?: string
+          notes?: string | null
+          status?: string
+          total_product_cost?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       parcels: {
         Row: {
           barcode: string

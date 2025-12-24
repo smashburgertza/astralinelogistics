@@ -8,6 +8,7 @@ import { PublicLayout } from "@/components/layout/PublicLayout";
 import Index from "./pages/Index";
 import AuthPage from "./pages/Auth";
 import TrackingPage from "./pages/Tracking";
+import ShopForMe from "./pages/ShopForMe";
 import CustomerDashboard from "./pages/customer/Dashboard";
 import CustomerShipmentsPage from "./pages/customer/Shipments";
 import CustomerInvoicesPage from "./pages/customer/Invoices";
@@ -35,6 +36,7 @@ const App = () => (
             <Route element={<PublicLayout />}>
               <Route path="/" element={<Index />} />
               <Route path="/tracking" element={<TrackingPage />} />
+              <Route path="/shop-for-me" element={<ShopForMe />} />
             </Route>
             
             {/* Auth */}

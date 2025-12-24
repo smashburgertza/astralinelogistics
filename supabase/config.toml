@@ -1,1 +1,4 @@
 project_id = "ebujihquakvxdlfhtwep"
+
+[functions.fetch-product-info]
+verify_jwt = false
