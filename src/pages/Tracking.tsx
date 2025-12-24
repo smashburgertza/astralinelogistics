@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Package, MapPin, Weight, Calendar, ArrowLeft } from 'lucide-react';
+import { SearchCheck, PackageSearch, MapPinned, Scale, CalendarClock, MoveLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -57,14 +57,14 @@ export default function TrackingPage() {
         <Card className="max-w-xl mx-auto mb-8">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Package className="w-5 h-5 text-primary" />
+              <PackageSearch className="w-5 h-5 text-primary" />
               Shipment Tracking
             </CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleTrack} className="flex gap-3">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <SearchCheck className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   placeholder="Enter tracking number (e.g., AST241224ABC123)"
                   className="pl-10"
@@ -116,7 +116,7 @@ export default function TrackingPage() {
           <Card className="max-w-xl mx-auto">
             <CardContent className="p-8 text-center">
               <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
-                <Package className="w-8 h-8 text-muted-foreground" />
+                <PackageSearch className="w-8 h-8 text-muted-foreground" />
               </div>
               <h3 className="text-lg font-semibold mb-2">Shipment Not Found</h3>
               <p className="text-muted-foreground mb-4">
@@ -124,7 +124,7 @@ export default function TrackingPage() {
                 <span className="font-mono font-medium text-foreground">{searchedTracking}</span>
               </p>
               <Button variant="outline" onClick={handleReset}>
-                <ArrowLeft className="w-4 h-4 mr-2" />
+                <MoveLeft className="w-4 h-4 mr-2" />
                 Try Another Number
               </Button>
             </CardContent>
@@ -150,7 +150,7 @@ export default function TrackingPage() {
                       {shipment.status?.replace('_', ' ').toUpperCase()}
                     </Badge>
                     <Button variant="outline" size="sm" onClick={handleReset}>
-                      <ArrowLeft className="w-4 h-4 mr-2" />
+                      <MoveLeft className="w-4 h-4 mr-2" />
                       New Search
                     </Button>
                   </div>
@@ -160,28 +160,28 @@ export default function TrackingPage() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="p-4 bg-muted/50 rounded-lg">
                     <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                      <MapPin className="w-4 h-4" />
+                      <MapPinned className="w-4 h-4" />
                       <span className="text-xs">Origin</span>
                     </div>
                     <p className="font-semibold">{regionLabels[shipment.origin_region]}</p>
                   </div>
                   <div className="p-4 bg-muted/50 rounded-lg">
                     <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                      <Weight className="w-4 h-4" />
+                      <Scale className="w-4 h-4" />
                       <span className="text-xs">Total Weight</span>
                     </div>
                     <p className="font-semibold">{shipment.total_weight_kg} kg</p>
                   </div>
                   <div className="p-4 bg-muted/50 rounded-lg">
                     <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                      <Package className="w-4 h-4" />
+                      <PackageSearch className="w-4 h-4" />
                       <span className="text-xs">Parcels</span>
                     </div>
                     <p className="font-semibold">{shipment.parcels.length}</p>
                   </div>
                   <div className="p-4 bg-muted/50 rounded-lg">
                     <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                      <Calendar className="w-4 h-4" />
+                      <CalendarClock className="w-4 h-4" />
                       <span className="text-xs">Created</span>
                     </div>
                     <p className="font-semibold">
