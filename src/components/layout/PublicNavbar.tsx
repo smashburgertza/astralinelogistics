@@ -1,7 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { MenuIcon, XIcon, PhoneCall, MailOpen } from 'lucide-react';
+import { MenuIcon, XIcon, PhoneCall, MailOpen, User, LayoutDashboard, LogOut, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import astralineLogo from '@/assets/astraline-logo.svg';
@@ -11,9 +18,11 @@ export function PublicNavbar() {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const { user, isAdmin, isAgent, signOut } = useAuth();
+  const { user, profile, isAdmin, isAgent, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const userName = profile?.full_name || user?.email?.split('@')[0] || 'User';
 
   // Click outside handler
   useEffect(() => {
@@ -105,17 +114,28 @@ export function PublicNavbar() {
               ))}
             </div>
 
-            {/* Auth Buttons */}
             <div className="hidden lg:flex items-center gap-3">
               {user ? (
-                <>
-                  <Button variant="outline" onClick={() => navigate(getDashboardRoute())}>
-                    Dashboard
-                  </Button>
-                  <Button variant="default" onClick={handleSignOut}>
-                    Sign Out
-                  </Button>
-                </>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="gap-2">
+                      <User className="w-4 h-4" />
+                      <span className="max-w-[120px] truncate">Hello, {userName}</span>
+                      <ChevronDown className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48 bg-background border border-border shadow-lg z-50">
+                    <DropdownMenuItem onClick={() => navigate(getDashboardRoute())} className="cursor-pointer">
+                      <LayoutDashboard className="w-4 h-4 mr-2" />
+                      Dashboard
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-destructive focus:text-destructive">
+                      <LogOut className="w-4 h-4 mr-2" />
+                      Sign Out
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               ) : (
                 <>
                   <Button variant="outline" asChild>
@@ -165,16 +185,21 @@ export function PublicNavbar() {
                     {item.label}
                   </Link>
                 ))}
-                <div className="pt-3 mt-2 border-t border-border flex flex-col gap-2 px-1">
+                <div className="pt-3 mt-2 border-t border-border px-1">
                   {user ? (
-                    <>
-                      <Button variant="outline" size="sm" onClick={() => { navigate(getDashboardRoute()); setIsOpen(false); }}>
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-muted-foreground px-2 py-1">
+                        Hello, {userName}
+                      </p>
+                      <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => { navigate(getDashboardRoute()); setIsOpen(false); }}>
+                        <LayoutDashboard className="w-4 h-4 mr-2" />
                         Dashboard
                       </Button>
-                      <Button size="sm" onClick={() => { handleSignOut(); setIsOpen(false); }}>
+                      <Button variant="ghost" size="sm" className="w-full justify-start text-destructive hover:text-destructive" onClick={() => { handleSignOut(); setIsOpen(false); }}>
+                        <LogOut className="w-4 h-4 mr-2" />
                         Sign Out
                       </Button>
-                    </>
+                    </div>
                   ) : (
                     <>
                       <Button variant="outline" size="sm" asChild>
