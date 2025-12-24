@@ -10,9 +10,9 @@
     --brand-gold: 42 92% 60%;
     --brand-gold-light: 42 95% 68%;
     --brand-gold-dark: 42 90% 52%;
-    --brand-navy: 197 100% 44%;
-    --brand-navy-dark: 197 100% 35%;
-    --brand-navy-light: 197 90% 55%;
+    --brand-navy: 202 74% 46%;
+    --brand-navy-dark: 202 74% 38%;
+    --brand-navy-light: 202 70% 56%;
     
     /* Core colors */
     --background: 0 0% 100%;
@@ -27,13 +27,13 @@
     --primary: 42 92% 60%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 197 20% 96%;
+    --secondary: 202 20% 96%;
     --secondary-foreground: 210 25% 15%;
 
-    --muted: 197 20% 96%;
-    --muted-foreground: 197 15% 45%;
+    --muted: 202 20% 96%;
+    --muted-foreground: 202 15% 45%;
 
-    --accent: 197 100% 44%;
+    --accent: 202 74% 46%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -45,59 +45,59 @@
     --warning: 42 92% 60%;
     --warning-foreground: 0 0% 100%;
 
-    --info: 197 100% 50%;
+    --info: 202 74% 50%;
     --info-foreground: 0 0% 100%;
 
-    --border: 197 20% 88%;
-    --input: 197 20% 88%;
+    --border: 202 20% 88%;
+    --input: 202 20% 88%;
     --ring: 42 92% 60%;
 
     --radius: 0.5rem;
 
     /* Dashboard specific */
-    --sidebar-background: 197 100% 25%;
-    --sidebar-foreground: 197 15% 90%;
+    --sidebar-background: 202 74% 28%;
+    --sidebar-foreground: 202 15% 90%;
     --sidebar-primary: 42 92% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 197 90% 35%;
-    --sidebar-accent-foreground: 197 15% 90%;
-    --sidebar-border: 197 80% 35%;
+    --sidebar-accent: 202 70% 38%;
+    --sidebar-accent-foreground: 202 15% 90%;
+    --sidebar-border: 202 65% 38%;
     --sidebar-ring: 42 92% 60%;
 
     /* Status colors */
-    --status-collected: 197 100% 50%;
+    --status-collected: 202 74% 50%;
     --status-in-transit: 42 92% 60%;
     --status-arrived: 270 60% 55%;
     --status-delivered: 142 71% 45%;
 
     /* Hero section */
-    --hero-overlay: 197 100% 30%;
+    --hero-overlay: 202 74% 32%;
   }
 
   .dark {
-    --background: 197 80% 8%;
-    --foreground: 197 15% 95%;
+    --background: 202 70% 8%;
+    --foreground: 202 15% 95%;
 
-    --card: 197 65% 12%;
-    --card-foreground: 197 15% 95%;
+    --card: 202 65% 12%;
+    --card-foreground: 202 15% 95%;
 
-    --popover: 197 65% 12%;
-    --popover-foreground: 197 15% 95%;
+    --popover: 202 65% 12%;
+    --popover-foreground: 202 15% 95%;
 
     --primary: 42 92% 60%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 197 50% 18%;
-    --secondary-foreground: 197 15% 95%;
+    --secondary: 202 50% 18%;
+    --secondary-foreground: 202 15% 95%;
 
-    --muted: 197 50% 18%;
-    --muted-foreground: 197 15% 60%;
+    --muted: 202 50% 18%;
+    --muted-foreground: 202 15% 60%;
 
-    --accent: 197 50% 22%;
+    --accent: 202 50% 22%;
     --accent-foreground: 42 92% 65%;
 
-    --border: 197 50% 22%;
-    --input: 197 50% 22%;
+    --border: 202 50% 22%;
+    --input: 202 50% 22%;
     --ring: 42 92% 60%;
   }
 }
@@ -129,7 +129,7 @@
   }
 
   .navy-gradient {
-    background: linear-gradient(135deg, hsl(197 100% 44%) 0%, hsl(197 100% 35%) 100%);
+    background: linear-gradient(135deg, hsl(202 74% 46%) 0%, hsl(202 74% 38%) 100%);
   }
 
   .gold-gradient {
@@ -177,7 +177,7 @@
   }
 
   .btn-outline-white {
-    @apply bg-transparent text-white border-2 border-white font-semibold px-8 py-3 rounded-lg hover:bg-white hover:text-[hsl(197_100%_44%)] transition-all duration-300;
+    @apply bg-transparent text-white border-2 border-white font-semibold px-8 py-3 rounded-lg hover:bg-white hover:text-[hsl(202_74%_46%)] transition-all duration-300;
   }
 }
 
