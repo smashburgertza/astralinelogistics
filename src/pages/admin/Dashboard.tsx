@@ -6,31 +6,62 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
   Package, Users, DollarSign, TrendingUp, 
-  Plane, ArrowRight, Clock, CheckCircle,
-  AlertCircle, MapPin
+  Plane, ArrowRight, AlertCircle, MapPin, Receipt
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { REGIONS, SHIPMENT_STATUSES, type Region, type ShipmentStatus } from '@/lib/constants';
-import { format } from 'date-fns';
+import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { Link } from 'react-router-dom';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  LineChart,
+  Line,
+  Legend,
+} from 'recharts';
+import { EXPENSE_CATEGORIES } from '@/hooks/useExpenses';
 
 interface DashboardStats {
   totalShipments: number;
+  thisMonthShipments: number;
   activeCustomers: number;
   revenue: number;
+  thisMonthRevenue: number;
   pendingInvoices: number;
+  totalExpenses: number;
+  thisMonthExpenses: number;
   shipmentsByRegion: Record<string, number>;
+  shipmentsByStatus: Record<string, number>;
+  expensesByCategory: Record<string, number>;
   recentShipments: any[];
+  monthlyData: Array<{ month: string; shipments: number; revenue: number; expenses: number }>;
 }
+
+const CHART_COLORS = ['#D4AF37', '#1B2B4B', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#6B7280'];
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<DashboardStats>({
     totalShipments: 0,
+    thisMonthShipments: 0,
     activeCustomers: 0,
     revenue: 0,
+    thisMonthRevenue: 0,
     pendingInvoices: 0,
+    totalExpenses: 0,
+    thisMonthExpenses: 0,
     shipmentsByRegion: {},
+    shipmentsByStatus: {},
+    expensesByCategory: {},
     recentShipments: [],
+    monthlyData: [],
   });
   const [loading, setLoading] = useState(true);
 
@@ -40,31 +71,109 @@ export default function AdminDashboard() {
 
   const fetchStats = async () => {
     try {
-      // Fetch counts
-      const [shipmentsRes, customersRes, invoicesRes] = await Promise.all([
-        supabase.from('shipments').select('id, origin_region, status, tracking_number, total_weight_kg, created_at', { count: 'exact' }),
+      const now = new Date();
+      const thisMonthStart = startOfMonth(now);
+      const thisMonthEnd = endOfMonth(now);
+
+      // Fetch all data in parallel
+      const [shipmentsRes, customersRes, invoicesRes, expensesRes] = await Promise.all([
+        supabase.from('shipments').select('id, origin_region, status, tracking_number, total_weight_kg, created_at'),
         supabase.from('customers').select('id', { count: 'exact' }),
-        supabase.from('invoices').select('amount, status'),
+        supabase.from('invoices').select('amount, status, paid_at, created_at'),
+        supabase.from('expenses').select('amount, category, created_at'),
       ]);
 
       const shipments = shipmentsRes.data || [];
-      const pendingInvoices = (invoicesRes.data || []).filter(i => i.status === 'pending');
-      const paidInvoices = (invoicesRes.data || []).filter(i => i.status === 'paid');
-      const revenue = paidInvoices.reduce((sum, i) => sum + Number(i.amount), 0);
+      const invoices = invoicesRes.data || [];
+      const expenses = expensesRes.data || [];
 
-      // Calculate shipments by region
+      // This month filters
+      const thisMonthShipments = shipments.filter(s => {
+        const date = new Date(s.created_at || '');
+        return date >= thisMonthStart && date <= thisMonthEnd;
+      });
+
+      const paidInvoices = invoices.filter(i => i.status === 'paid');
+      const pendingInvoices = invoices.filter(i => i.status === 'pending');
+      
+      const thisMonthPaidInvoices = paidInvoices.filter(i => {
+        const date = new Date(i.paid_at || i.created_at || '');
+        return date >= thisMonthStart && date <= thisMonthEnd;
+      });
+
+      const thisMonthExpenses = expenses.filter(e => {
+        const date = new Date(e.created_at || '');
+        return date >= thisMonthStart && date <= thisMonthEnd;
+      });
+
+      // Calculate totals
+      const revenue = paidInvoices.reduce((sum, i) => sum + Number(i.amount), 0);
+      const thisMonthRevenueAmount = thisMonthPaidInvoices.reduce((sum, i) => sum + Number(i.amount), 0);
+      const totalExpensesAmount = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+      const thisMonthExpensesAmount = thisMonthExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+
+      // Shipments by region
       const shipmentsByRegion: Record<string, number> = {};
       shipments.forEach((s: any) => {
         shipmentsByRegion[s.origin_region] = (shipmentsByRegion[s.origin_region] || 0) + 1;
       });
 
+      // Shipments by status
+      const shipmentsByStatus: Record<string, number> = {};
+      shipments.forEach((s: any) => {
+        shipmentsByStatus[s.status] = (shipmentsByStatus[s.status] || 0) + 1;
+      });
+
+      // Expenses by category
+      const expensesByCategory: Record<string, number> = {};
+      expenses.forEach((e: any) => {
+        expensesByCategory[e.category] = (expensesByCategory[e.category] || 0) + Number(e.amount);
+      });
+
+      // Monthly data for last 6 months
+      const monthlyData = [];
+      for (let i = 5; i >= 0; i--) {
+        const monthDate = subMonths(now, i);
+        const monthStart = startOfMonth(monthDate);
+        const monthEnd = endOfMonth(monthDate);
+
+        const monthShipments = shipments.filter(s => {
+          const date = new Date(s.created_at || '');
+          return date >= monthStart && date <= monthEnd;
+        }).length;
+
+        const monthRevenue = paidInvoices.filter(inv => {
+          const date = new Date(inv.paid_at || inv.created_at || '');
+          return date >= monthStart && date <= monthEnd;
+        }).reduce((sum, i) => sum + Number(i.amount), 0);
+
+        const monthExpenses = expenses.filter(e => {
+          const date = new Date(e.created_at || '');
+          return date >= monthStart && date <= monthEnd;
+        }).reduce((sum, e) => sum + Number(e.amount), 0);
+
+        monthlyData.push({
+          month: format(monthDate, 'MMM'),
+          shipments: monthShipments,
+          revenue: monthRevenue,
+          expenses: monthExpenses,
+        });
+      }
+
       setStats({
-        totalShipments: shipmentsRes.count || 0,
+        totalShipments: shipments.length,
+        thisMonthShipments: thisMonthShipments.length,
         activeCustomers: customersRes.count || 0,
         revenue,
+        thisMonthRevenue: thisMonthRevenueAmount,
         pendingInvoices: pendingInvoices.length,
+        totalExpenses: totalExpensesAmount,
+        thisMonthExpenses: thisMonthExpensesAmount,
         shipmentsByRegion,
+        shipmentsByStatus,
+        expensesByCategory,
         recentShipments: shipments.slice(0, 5),
+        monthlyData,
       });
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -82,6 +191,24 @@ export default function AdminDashboard() {
     );
   };
 
+  // Prepare chart data
+  const statusChartData = Object.entries(stats.shipmentsByStatus).map(([key, value]) => ({
+    name: SHIPMENT_STATUSES[key as ShipmentStatus]?.label || key,
+    value,
+  }));
+
+  const expenseChartData = Object.entries(stats.expensesByCategory)
+    .filter(([_, value]) => value > 0)
+    .map(([key, value]) => ({
+      name: EXPENSE_CATEGORIES.find(c => c.value === key)?.label || key,
+      value,
+    }));
+
+  const regionChartData = Object.entries(stats.shipmentsByRegion).map(([key, value]) => ({
+    name: REGIONS[key as Region]?.label || key,
+    shipments: value,
+  }));
+
   return (
     <AdminLayout title="Dashboard" subtitle="Welcome back! Here's what's happening with your logistics.">
       {/* Stats Grid */}
@@ -89,10 +216,9 @@ export default function AdminDashboard() {
         <StatCard
           title="Total Shipments"
           value={stats.totalShipments}
-          subtitle="This month"
+          subtitle={`${stats.thisMonthShipments} this month`}
           icon={Package}
           variant="navy"
-          trend={{ value: 12, isPositive: true }}
         />
         <StatCard
           title="Active Customers"
@@ -100,23 +226,230 @@ export default function AdminDashboard() {
           subtitle="Registered"
           icon={Users}
           variant="primary"
-          trend={{ value: 8, isPositive: true }}
         />
         <StatCard
           title="Revenue"
-          value={`$${stats.revenue.toLocaleString()}`}
-          subtitle="This month"
+          value={`$${stats.revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          subtitle={`$${stats.thisMonthRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} this month`}
           icon={DollarSign}
           variant="success"
-          trend={{ value: 24, isPositive: true }}
         />
         <StatCard
-          title="Pending Invoices"
-          value={stats.pendingInvoices}
-          subtitle="Awaiting payment"
-          icon={AlertCircle}
+          title="Total Expenses"
+          value={`$${stats.totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          subtitle={`$${stats.thisMonthExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} this month`}
+          icon={Receipt}
           variant="warning"
         />
+      </div>
+
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {/* Revenue & Expenses Trend */}
+        <Card className="shadow-lg border-0">
+          <CardHeader>
+            <CardTitle className="font-heading text-lg">Revenue & Expenses Trend</CardTitle>
+            <CardDescription>Last 6 months performance</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {stats.monthlyData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={280}>
+                <LineChart data={stats.monthlyData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="month" className="text-xs" />
+                  <YAxis className="text-xs" tickFormatter={(value) => `$${value}`} />
+                  <Tooltip 
+                    formatter={(value: number) => [`$${value.toFixed(2)}`, '']}
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))', 
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px'
+                    }}
+                  />
+                  <Legend />
+                  <Line 
+                    type="monotone" 
+                    dataKey="revenue" 
+                    stroke="#10B981" 
+                    strokeWidth={2}
+                    dot={{ fill: '#10B981' }}
+                    name="Revenue"
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="expenses" 
+                    stroke="#F59E0B" 
+                    strokeWidth={2}
+                    dot={{ fill: '#F59E0B' }}
+                    name="Expenses"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[280px] flex items-center justify-center text-muted-foreground">
+                No data available
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Shipments by Month */}
+        <Card className="shadow-lg border-0">
+          <CardHeader>
+            <CardTitle className="font-heading text-lg">Monthly Shipments</CardTitle>
+            <CardDescription>Shipment volume over time</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {stats.monthlyData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={stats.monthlyData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="month" className="text-xs" />
+                  <YAxis className="text-xs" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))', 
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px'
+                    }}
+                  />
+                  <Bar 
+                    dataKey="shipments" 
+                    fill="#1B2B4B" 
+                    radius={[4, 4, 0, 0]}
+                    name="Shipments"
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[280px] flex items-center justify-center text-muted-foreground">
+                No data available
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Second Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        {/* Shipments by Status */}
+        <Card className="shadow-lg border-0">
+          <CardHeader>
+            <CardTitle className="font-heading text-lg">Shipment Status</CardTitle>
+            <CardDescription>Current distribution</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {statusChartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie
+                    data={statusChartData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={80}
+                    paddingAngle={2}
+                    dataKey="value"
+                  >
+                    {statusChartData.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))', 
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px'
+                    }}
+                  />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[220px] flex items-center justify-center text-muted-foreground">
+                No shipments yet
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Expenses by Category */}
+        <Card className="shadow-lg border-0">
+          <CardHeader>
+            <CardTitle className="font-heading text-lg">Expenses Breakdown</CardTitle>
+            <CardDescription>By category</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {expenseChartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie
+                    data={expenseChartData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={80}
+                    paddingAngle={2}
+                    dataKey="value"
+                  >
+                    {expenseChartData.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    formatter={(value: number) => [`$${value.toFixed(2)}`, '']}
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))', 
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px'
+                    }}
+                  />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[220px] flex items-center justify-center text-muted-foreground">
+                No expenses yet
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Shipments by Region */}
+        <Card className="shadow-lg border-0">
+          <CardHeader>
+            <CardTitle className="font-heading text-lg">By Region</CardTitle>
+            <CardDescription>Shipment origins</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {regionChartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={regionChartData} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis type="number" className="text-xs" />
+                  <YAxis dataKey="name" type="category" className="text-xs" width={60} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))', 
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px'
+                    }}
+                  />
+                  <Bar 
+                    dataKey="shipments" 
+                    fill="#D4AF37" 
+                    radius={[0, 4, 4, 0]}
+                    name="Shipments"
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[220px] flex items-center justify-center text-muted-foreground">
+                No data yet
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Main Content Grid */}
@@ -140,9 +473,6 @@ export default function AdminDashboard() {
               <div className="text-center py-12">
                 <Package className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
                 <p className="text-muted-foreground">No shipments yet</p>
-                <Button className="mt-4" asChild>
-                  <Link to="/admin/shipments/new">Create First Shipment</Link>
-                </Button>
               </div>
             ) : (
               <div className="space-y-4">
@@ -171,45 +501,53 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        {/* Shipments by Region */}
+        {/* Quick Stats */}
         <Card className="shadow-lg border-0">
           <CardHeader>
-            <CardTitle className="font-heading text-lg">Shipments by Region</CardTitle>
-            <CardDescription>Distribution across origins</CardDescription>
+            <CardTitle className="font-heading text-lg">Quick Stats</CardTitle>
+            <CardDescription>Key metrics at a glance</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {Object.entries(REGIONS).map(([key, region]) => {
-                const count = stats.shipmentsByRegion[key] || 0;
-                const total = stats.totalShipments || 1;
-                const percentage = Math.round((count / total) * 100) || 0;
-
-                return (
-                  <div key={key} className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">{region.flag}</span>
-                        <span className="font-medium">{region.label}</span>
-                      </div>
-                      <span className="text-muted-foreground">{count}</span>
-                    </div>
-                    <div className="h-2 rounded-full bg-muted overflow-hidden">
-                      <div 
-                        className="h-full bg-gradient-to-r from-brand-navy to-primary rounded-full transition-all duration-500"
-                        style={{ width: `${percentage}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+          <CardContent className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                  <AlertCircle className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Pending Invoices</p>
+                  <p className="text-xl font-bold">{stats.pendingInvoices}</p>
+                </div>
+              </div>
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/admin/invoices">View</Link>
+              </Button>
             </div>
 
-            {stats.totalShipments === 0 && (
-              <div className="text-center py-8">
-                <MapPin className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
-                <p className="text-sm text-muted-foreground">No data yet</p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                  <TrendingUp className="w-5 h-5 text-green-600 dark:text-green-400" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Net Profit (Est.)</p>
+                  <p className="text-xl font-bold">
+                    ${(stats.revenue - stats.totalExpenses).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
               </div>
-            )}
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                  <MapPin className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Active Regions</p>
+                  <p className="text-xl font-bold">{Object.keys(stats.shipmentsByRegion).length}</p>
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -217,27 +555,27 @@ export default function AdminDashboard() {
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-8">
         <Button variant="outline" className="h-auto py-4 flex-col gap-2 hover:bg-primary/5 hover:border-primary" asChild>
-          <Link to="/admin/shipments/new">
+          <Link to="/admin/shipments">
             <Package className="w-6 h-6 text-primary" />
-            <span>New Shipment</span>
+            <span>View Shipments</span>
           </Link>
         </Button>
         <Button variant="outline" className="h-auto py-4 flex-col gap-2 hover:bg-primary/5 hover:border-primary" asChild>
-          <Link to="/admin/customers/new">
+          <Link to="/admin/customers">
             <Users className="w-6 h-6 text-primary" />
-            <span>Add Customer</span>
+            <span>Manage Customers</span>
           </Link>
         </Button>
         <Button variant="outline" className="h-auto py-4 flex-col gap-2 hover:bg-primary/5 hover:border-primary" asChild>
-          <Link to="/admin/invoices/new">
+          <Link to="/admin/invoices">
             <DollarSign className="w-6 h-6 text-primary" />
-            <span>Create Invoice</span>
+            <span>View Invoices</span>
           </Link>
         </Button>
         <Button variant="outline" className="h-auto py-4 flex-col gap-2 hover:bg-primary/5 hover:border-primary" asChild>
-          <Link to="/admin/reports">
-            <TrendingUp className="w-6 h-6 text-primary" />
-            <span>View Reports</span>
+          <Link to="/admin/expenses">
+            <Receipt className="w-6 h-6 text-primary" />
+            <span>Track Expenses</span>
           </Link>
         </Button>
       </div>
