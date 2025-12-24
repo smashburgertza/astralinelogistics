@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import { Package, MapPin, Weight, Clock, User, Copy, Check, Box, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Package, MapPin, Weight, Clock, User, Copy, Check, Box, Plus, Pencil, Trash2, DollarSign } from 'lucide-react';
 import { useState } from 'react';
 import {
   Sheet,
@@ -23,8 +23,10 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Shipment } from '@/hooks/useShipments';
 import { Parcel, useParcels, useDeleteParcel } from '@/hooks/useParcels';
+import { Expense, EXPENSE_CATEGORIES, useExpensesByShipment, useDeleteExpense } from '@/hooks/useExpenses';
 import { ShipmentStatusBadge } from './ShipmentStatusBadge';
 import { ParcelDialog } from './ParcelDialog';
+import { ExpenseDialog } from './ExpenseDialog';
 
 interface ShipmentDetailDrawerProps {
   shipment: Shipment | null;
@@ -44,9 +46,20 @@ export function ShipmentDetailDrawer({ shipment, open, onOpenChange }: ShipmentD
   const [parcelDialogOpen, setParcelDialogOpen] = useState(false);
   const [editingParcel, setEditingParcel] = useState<Parcel | null>(null);
   const [deleteParcelId, setDeleteParcelId] = useState<string | null>(null);
+  const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [deleteExpenseId, setDeleteExpenseId] = useState<string | null>(null);
   
   const { data: parcels, isLoading: parcelsLoading } = useParcels(shipment?.id ?? null);
+  const { data: expenses, isLoading: expensesLoading } = useExpensesByShipment(shipment?.id ?? null);
   const deleteParcel = useDeleteParcel();
+  const deleteExpense = useDeleteExpense();
+
+  const getCategoryLabel = (value: string) => {
+    return EXPENSE_CATEGORIES.find(c => c.value === value)?.label || value;
+  };
+
+  const totalExpenses = expenses?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
 
   const copyTrackingNumber = () => {
     if (shipment?.tracking_number) {
@@ -289,6 +302,87 @@ export function ShipmentDetailDrawer({ shipment, open, onOpenChange }: ShipmentD
                 )}
               </div>
 
+              {/* Expenses */}
+              <Separator />
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                    <DollarSign className="h-4 w-4" />
+                    Expenses ({expenses?.length || 0})
+                    {totalExpenses > 0 && (
+                      <Badge variant="secondary" className="ml-2">
+                        ${totalExpenses.toFixed(2)}
+                      </Badge>
+                    )}
+                  </h3>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setEditingExpense(null);
+                      setExpenseDialogOpen(true);
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add
+                  </Button>
+                </div>
+                {expensesLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2].map((i) => (
+                      <Skeleton key={i} className="h-16 w-full" />
+                    ))}
+                  </div>
+                ) : expenses && expenses.length > 0 ? (
+                  <div className="space-y-3">
+                    {expenses.map((expense) => (
+                      <div
+                        key={expense.id}
+                        className="bg-muted/50 rounded-lg p-4 space-y-1 group"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">{getCategoryLabel(expense.category)}</span>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">
+                              {expense.currency} {Number(expense.amount).toFixed(2)}
+                            </Badge>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => {
+                                setEditingExpense(expense);
+                                setExpenseDialogOpen(true);
+                              }}
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+                              onClick={() => setDeleteExpenseId(expense.id)}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                        {expense.description && (
+                          <p className="text-sm text-muted-foreground">{expense.description}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          {format(new Date(expense.created_at || ''), 'MMM d, yyyy')}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No expenses recorded for this shipment
+                  </p>
+                )}
+              </div>
+
               {/* Dates */}
               <Separator />
               <div className="text-xs text-muted-foreground space-y-1">
@@ -308,7 +402,18 @@ export function ShipmentDetailDrawer({ shipment, open, onOpenChange }: ShipmentD
               parcel={editingParcel}
             />
 
-            {/* Delete Confirmation */}
+            {/* Expense Dialog */}
+            <ExpenseDialog
+              open={expenseDialogOpen}
+              onOpenChange={(open) => {
+                setExpenseDialogOpen(open);
+                if (!open) setEditingExpense(null);
+              }}
+              shipmentId={shipment.id}
+              expense={editingExpense}
+            />
+
+            {/* Delete Parcel Confirmation */}
             <AlertDialog open={!!deleteParcelId} onOpenChange={() => setDeleteParcelId(null)}>
               <AlertDialogContent>
                 <AlertDialogHeader>
@@ -325,6 +430,32 @@ export function ShipmentDetailDrawer({ shipment, open, onOpenChange }: ShipmentD
                       if (deleteParcelId && shipment) {
                         deleteParcel.mutate({ id: deleteParcelId, shipmentId: shipment.id });
                         setDeleteParcelId(null);
+                      }
+                    }}
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Delete Expense Confirmation */}
+            <AlertDialog open={!!deleteExpenseId} onOpenChange={() => setDeleteExpenseId(null)}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Expense</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete this expense? This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    onClick={() => {
+                      if (deleteExpenseId && shipment) {
+                        deleteExpense.mutate({ id: deleteExpenseId, shipmentId: shipment.id });
+                        setDeleteExpenseId(null);
                       }
                     }}
                   >
