@@ -20,6 +20,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { MoreHorizontal, Package, Plane, MapPin, CheckCircle, Eye, Copy } from 'lucide-react';
 import { format } from 'date-fns';
 import { ShipmentStatusBadge } from './ShipmentStatusBadge';
+import { ShipmentDetailDrawer } from './ShipmentDetailDrawer';
 import { Shipment, useUpdateShipmentStatus } from '@/hooks/useShipments';
 import { REGIONS, SHIPMENT_STATUSES } from '@/lib/constants';
 import { toast } from 'sonner';
@@ -31,6 +32,8 @@ interface ShipmentTableProps {
 
 export function ShipmentTable({ shipments, isLoading }: ShipmentTableProps) {
   const updateStatus = useUpdateShipmentStatus();
+  const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const copyTrackingNumber = (trackingNumber: string) => {
     navigator.clipboard.writeText(trackingNumber);
@@ -150,7 +153,12 @@ export function ShipmentTable({ shipments, isLoading }: ShipmentTableProps) {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48">
                       <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setSelectedShipment(shipment);
+                          setDrawerOpen(true);
+                        }}
+                      >
                         <Eye className="h-4 w-4 mr-2" />
                         View Details
                       </DropdownMenuItem>
@@ -189,6 +197,11 @@ export function ShipmentTable({ shipments, isLoading }: ShipmentTableProps) {
           })}
         </TableBody>
       </Table>
+      <ShipmentDetailDrawer
+        shipment={selectedShipment}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+      />
     </div>
   );
 }
