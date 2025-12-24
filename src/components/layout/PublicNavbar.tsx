@@ -108,10 +108,10 @@ export function PublicNavbar() {
             <div className="hidden lg:flex items-center gap-8">
               {[
                 { label: 'Home', href: '/' },
-                { label: 'About Us', href: '/about' },
-                { label: 'Services', href: '/services' },
+                { label: 'Shop For Me', href: '/shop-for-me' },
                 { label: 'Track Shipment', href: '/tracking' },
-                { label: 'FAQ', href: '/faq' },
+                { label: 'Services', href: '/services' },
+                { label: 'About Us', href: '/about' },
                 { label: 'Contact', href: '/contact' },
               ].map((item) => (
                 <Link 
@@ -188,10 +188,10 @@ export function PublicNavbar() {
               <div className="flex flex-col gap-1 px-2">
                 {[
                   { label: 'Home', href: '/' },
-                  { label: 'About Us', href: '/about' },
-                  { label: 'Services', href: '/services' },
+                  { label: 'Shop For Me', href: '/shop-for-me' },
                   { label: 'Track Shipment', href: '/tracking' },
-                  { label: 'FAQ', href: '/faq' },
+                  { label: 'Services', href: '/services' },
+                  { label: 'About Us', href: '/about' },
                   { label: 'Contact', href: '/contact' },
                 ].map((item) => (
                   <Link 

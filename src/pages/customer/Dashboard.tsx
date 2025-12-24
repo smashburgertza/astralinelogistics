@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Package, FileText, CreditCard, MapPin, ArrowRight, Plane, Clock, CheckCircle, Search } from 'lucide-react';
+import { Package, FileText, CreditCard, MapPin, ArrowRight, Plane, Clock, CheckCircle, Search, ShoppingCart } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCustomerStats, useCustomerShipments, useCustomerInvoices } from '@/hooks/useCustomerPortal';
 import { SHIPMENT_STATUSES, REGIONS } from '@/lib/constants';
@@ -223,6 +223,23 @@ export default function CustomerDashboard() {
                   ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          {/* Shop For Me Card */}
+          <Card className="shadow-lg border-0 bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">
+                  <ShoppingCart className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="font-medium">Shop For Me</p>
+                  <Link to="/shop-for-me" className="text-white/80 hover:text-white hover:underline text-sm">
+                    Paste links, we'll buy & ship →
+                  </Link>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
