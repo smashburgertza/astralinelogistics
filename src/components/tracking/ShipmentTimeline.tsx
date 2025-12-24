@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle, Package, Plane, MapPin, Truck } from 'lucide-react';
+import { CircleCheckBig, CircleDashed, PackageCheck, PlaneTakeoff, MapPinned, TruckIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 
@@ -35,28 +35,28 @@ export function ShipmentTimeline({
       status: 'collected',
       label: 'Collected',
       description: 'Package picked up from sender',
-      icon: Package,
+      icon: PackageCheck,
       timestamp: collectedAt,
     },
     {
       status: 'in_transit',
       label: 'In Transit',
       description: 'Shipment on the way to destination',
-      icon: Plane,
+      icon: PlaneTakeoff,
       timestamp: inTransitAt,
     },
     {
       status: 'arrived',
       label: 'Arrived',
       description: 'Arrived at local facility',
-      icon: MapPin,
+      icon: MapPinned,
       timestamp: arrivedAt,
     },
     {
       status: 'delivered',
       label: 'Delivered',
       description: 'Successfully delivered',
-      icon: Truck,
+      icon: TruckIcon,
       timestamp: deliveredAt,
     },
   ];
@@ -93,10 +93,10 @@ export function ShipmentTimeline({
                 isCurrent ? (
                   <Icon className="w-5 h-5" />
                 ) : (
-                  <CheckCircle2 className="w-5 h-5" />
+                  <CircleCheckBig className="w-5 h-5" />
                 )
               ) : (
-                <Circle className="w-5 h-5" />
+                <CircleDashed className="w-5 h-5" />
               )}
             </div>
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Calculator, Package, ArrowRight } from 'lucide-react';
+import { Calculator, PackageSearch, MoveRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -108,7 +108,7 @@ export function PricingCalculator() {
               <div className="space-y-2">
                 <Label htmlFor="weight" className="text-sm font-medium">Weight (kg)</Label>
                 <div className="relative">
-                  <Package className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                  <PackageSearch className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <Input
                     id="weight"
                     type="number"
@@ -144,7 +144,7 @@ export function PricingCalculator() {
               <Button className="w-full h-12 text-base btn-gold group" asChild>
                 <a href="/auth?mode=signup">
                   Request Full Quote
-                  <ArrowRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
+                  <MoveRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
                 </a>
               </Button>
               
