@@ -12,6 +12,7 @@ import ShopForMe from "./pages/ShopForMe";
 import CustomerDashboard from "./pages/customer/Dashboard";
 import CustomerShipmentsPage from "./pages/customer/Shipments";
 import CustomerInvoicesPage from "./pages/customer/Invoices";
+import CustomerTrackPage from "./pages/customer/Track";
 import AgentDashboard from "./pages/agent/Dashboard";
 import AgentUploadPage from "./pages/agent/Upload";
 import AgentShipmentsPage from "./pages/agent/Shipments";
@@ -47,6 +48,7 @@ const App = () => (
             <Route path="/customer" element={<CustomerDashboard />} />
             <Route path="/customer/shipments" element={<CustomerShipmentsPage />} />
             <Route path="/customer/invoices" element={<CustomerInvoicesPage />} />
+            <Route path="/customer/track" element={<CustomerTrackPage />} />
             
             {/* Agent Portal */}
             <Route path="/agent" element={<AgentDashboard />} />
