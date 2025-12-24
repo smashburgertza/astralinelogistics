@@ -20,13 +20,17 @@ const Index = () => {
       <section id="services">
         <ServicesSection />
       </section>
-      <ShopForMeSection />
+      <section id="shop-for-me">
+        <ShopForMeSection />
+      </section>
       <section id="pricing">
         <PricingCalculator />
       </section>
       <TestimonialsSection />
       <AgentAddresses />
-      <ContactSection />
+      <section id="contact">
+        <ContactSection />
+      </section>
       <CTASection />
     </div>
   );

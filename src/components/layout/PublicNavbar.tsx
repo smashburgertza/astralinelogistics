@@ -37,10 +37,10 @@ export function PublicNavbar() {
 
   const navItems = [
     { label: 'Home', href: '/#', sectionId: '' },
-    { label: 'Shop For Me', href: '/#shop-for-me', sectionId: 'shop-for-me' },
-    { label: 'Services', href: '/#services', sectionId: 'services' },
     { label: 'About Us', href: '/#about', sectionId: 'about' },
-    { label: 'Contact', href: '/#contact', sectionId: 'contact' },
+    { label: 'Services', href: '/#services', sectionId: 'services' },
+    { label: 'Shop For Me', href: '/#shop-for-me', sectionId: 'shop-for-me' },
+    { label: 'Contact Us', href: '/#contact', sectionId: 'contact' },
   ];
 
   // Track active section on scroll
