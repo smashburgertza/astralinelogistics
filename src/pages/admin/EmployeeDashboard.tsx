@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { StatCard } from '@/components/admin/StatCard';
+import { EmployeeExpensesClarification } from '@/components/admin/EmployeeExpensesClarification';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -274,6 +275,13 @@ export default function EmployeeDashboard() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Expenses Needing Clarification */}
+      {user?.id && (
+        <div className="mb-8">
+          <EmployeeExpensesClarification userId={user.id} />
+        </div>
+      )}
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
