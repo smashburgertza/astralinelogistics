@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MoreHorizontal, Package, Plane, MapPin, CheckCircle, Eye, Copy } from 'lucide-react';
 import { format } from 'date-fns';
@@ -28,9 +29,16 @@ import { toast } from 'sonner';
 interface ShipmentTableProps {
   shipments: Shipment[] | undefined;
   isLoading: boolean;
+  selectedIds: string[];
+  onSelectionChange: (ids: string[]) => void;
 }
 
-export function ShipmentTable({ shipments, isLoading }: ShipmentTableProps) {
+export function ShipmentTable({ 
+  shipments, 
+  isLoading, 
+  selectedIds, 
+  onSelectionChange 
+}: ShipmentTableProps) {
   const updateStatus = useUpdateShipmentStatus();
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -40,12 +48,32 @@ export function ShipmentTable({ shipments, isLoading }: ShipmentTableProps) {
     toast.success('Tracking number copied to clipboard');
   };
 
+  const handleSelectAll = (checked: boolean) => {
+    if (checked && shipments) {
+      onSelectionChange(shipments.map(s => s.id));
+    } else {
+      onSelectionChange([]);
+    }
+  };
+
+  const handleSelectOne = (id: string, checked: boolean) => {
+    if (checked) {
+      onSelectionChange([...selectedIds, id]);
+    } else {
+      onSelectionChange(selectedIds.filter(i => i !== id));
+    }
+  };
+
+  const allSelected = shipments && shipments.length > 0 && selectedIds.length === shipments.length;
+  const someSelected = selectedIds.length > 0 && !allSelected;
+
   if (isLoading) {
     return (
       <div className="rounded-lg border bg-card">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
+              <TableHead className="w-[50px]"></TableHead>
               <TableHead>Tracking #</TableHead>
               <TableHead>Customer</TableHead>
               <TableHead>Origin</TableHead>
@@ -58,6 +86,7 @@ export function ShipmentTable({ shipments, isLoading }: ShipmentTableProps) {
           <TableBody>
             {[...Array(5)].map((_, i) => (
               <TableRow key={i}>
+                <TableCell><Skeleton className="h-4 w-4" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-28" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-20" /></TableCell>
@@ -90,6 +119,18 @@ export function ShipmentTable({ shipments, isLoading }: ShipmentTableProps) {
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/50 hover:bg-muted/50">
+            <TableHead className="w-[50px]">
+              <Checkbox
+                checked={allSelected}
+                ref={(el) => {
+                  if (el) {
+                    (el as any).indeterminate = someSelected;
+                  }
+                }}
+                onCheckedChange={handleSelectAll}
+                aria-label="Select all"
+              />
+            </TableHead>
             <TableHead className="font-semibold">Tracking #</TableHead>
             <TableHead className="font-semibold">Customer</TableHead>
             <TableHead className="font-semibold">Origin</TableHead>
@@ -102,8 +143,20 @@ export function ShipmentTable({ shipments, isLoading }: ShipmentTableProps) {
         <TableBody>
           {shipments.map((shipment) => {
             const region = REGIONS[shipment.origin_region as keyof typeof REGIONS];
+            const isSelected = selectedIds.includes(shipment.id);
+            
             return (
-              <TableRow key={shipment.id} className="group">
+              <TableRow 
+                key={shipment.id} 
+                className={`group ${isSelected ? 'bg-primary/5' : ''}`}
+              >
+                <TableCell>
+                  <Checkbox
+                    checked={isSelected}
+                    onCheckedChange={(checked) => handleSelectOne(shipment.id, !!checked)}
+                    aria-label={`Select shipment ${shipment.tracking_number}`}
+                  />
+                </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <code className="font-mono text-sm font-medium text-brand-gold">

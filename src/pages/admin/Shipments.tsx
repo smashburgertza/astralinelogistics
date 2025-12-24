@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { ShipmentFilters } from '@/components/admin/ShipmentFilters';
 import { ShipmentTable } from '@/components/admin/ShipmentTable';
+import { BulkActionsBar } from '@/components/admin/BulkActionsBar';
 import { CreateShipmentDialog } from '@/components/admin/CreateShipmentDialog';
 import { useShipments } from '@/hooks/useShipments';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -10,6 +11,7 @@ export default function AdminShipmentsPage() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
   const [region, setRegion] = useState('all');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const debouncedSearch = useDebounce(search, 300);
 
@@ -25,6 +27,10 @@ export default function AdminShipmentsPage() {
     setSearch('');
     setStatus('all');
     setRegion('all');
+  };
+
+  const clearSelection = () => {
+    setSelectedIds([]);
   };
 
   return (
@@ -46,6 +52,13 @@ export default function AdminShipmentsPage() {
           onClear={clearFilters}
         />
 
+        {/* Bulk Actions Bar */}
+        <BulkActionsBar
+          selectedCount={selectedIds.length}
+          selectedIds={selectedIds}
+          onClearSelection={clearSelection}
+        />
+
         {/* Stats Summary */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[
@@ -64,7 +77,12 @@ export default function AdminShipmentsPage() {
         </div>
 
         {/* Table */}
-        <ShipmentTable shipments={shipments} isLoading={isLoading} />
+        <ShipmentTable 
+          shipments={shipments} 
+          isLoading={isLoading}
+          selectedIds={selectedIds}
+          onSelectionChange={setSelectedIds}
+        />
       </div>
     </AdminLayout>
   );

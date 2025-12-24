@@ -136,6 +136,42 @@ export function useUpdateShipmentStatus() {
   });
 }
 
+export function useBulkUpdateShipmentStatus() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ ids, status }: { ids: string[]; status: string }) => {
+      const statusTimestamps: Record<string, string> = {
+        collected: 'collected_at',
+        in_transit: 'in_transit_at',
+        arrived: 'arrived_at',
+        delivered: 'delivered_at',
+      };
+
+      const updates: TablesUpdate<'shipments'> = {
+        status: status as any,
+        [statusTimestamps[status]]: new Date().toISOString(),
+      };
+
+      const { error } = await supabase
+        .from('shipments')
+        .update(updates)
+        .in('id', ids);
+
+      if (error) throw error;
+      return { count: ids.length };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['shipments'] });
+      queryClient.invalidateQueries({ queryKey: ['agent-shipments'] });
+      toast.success(`${data.count} shipment(s) updated successfully`);
+    },
+    onError: (error) => {
+      toast.error(`Failed to update shipments: ${error.message}`);
+    },
+  });
+}
+
 export function useCustomers() {
   return useQuery({
     queryKey: ['customers'],
