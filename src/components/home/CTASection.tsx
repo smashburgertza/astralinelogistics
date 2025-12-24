@@ -1,12 +1,22 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { MoveRight, PhoneCall } from 'lucide-react';
+import { useScrollAnimation } from '@/hooks/useScrollAnimation';
+import { cn } from '@/lib/utils';
 
 export function CTASection() {
+  const { ref, isVisible } = useScrollAnimation();
+
   return (
-    <section className="section-padding bg-primary">
+    <section className="section-padding bg-primary overflow-hidden">
       <div className="container mx-auto px-4">
-        <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
+        <div 
+          ref={ref}
+          className={cn(
+            "flex flex-col lg:flex-row items-center justify-between gap-8 scroll-animate",
+            isVisible && "visible"
+          )}
+        >
           <div className="text-center lg:text-left">
             <h2 className="font-heading text-3xl md:text-4xl font-bold text-primary-foreground mb-4">
               Ready to Ship with Us?
@@ -16,7 +26,10 @@ export function CTASection() {
             </p>
           </div>
           
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div 
+            className={cn("flex flex-col sm:flex-row gap-4 scroll-animate", isVisible && "visible")}
+            style={{ transitionDelay: '200ms' }}
+          >
             <Button size="lg" className="bg-brand-navy text-white hover:bg-brand-navy-dark shadow-xl group" asChild>
               <Link to="/auth?mode=signup">
                 Get Started

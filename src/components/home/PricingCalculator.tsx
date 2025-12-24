@@ -6,6 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { REGIONS, CURRENCY_SYMBOLS, type Region } from '@/lib/constants';
+import { useScrollAnimation } from '@/hooks/useScrollAnimation';
+import { cn } from '@/lib/utils';
 
 interface RegionPricing {
   region: Region;
@@ -19,6 +21,9 @@ export function PricingCalculator() {
   const [weight, setWeight] = useState<string>('');
   const [pricing, setPricing] = useState<RegionPricing[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const { ref: leftRef, isVisible: leftVisible } = useScrollAnimation();
+  const { ref: rightRef, isVisible: rightVisible } = useScrollAnimation();
 
   useEffect(() => {
     fetchPricing();
@@ -45,11 +50,14 @@ export function PricingCalculator() {
   const symbol = CURRENCY_SYMBOLS[currency] || '$';
 
   return (
-    <section className="section-padding bg-muted/50">
+    <section className="section-padding bg-muted/50 overflow-hidden">
       <div className="container mx-auto px-4">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           {/* Left Content */}
-          <div>
+          <div
+            ref={leftRef}
+            className={cn("scroll-animate-left", leftVisible && "visible")}
+          >
             <span className="inline-block px-4 py-2 rounded-full bg-primary/10 text-primary font-semibold text-sm uppercase tracking-wide mb-4">
               Pricing
             </span>
@@ -62,11 +70,17 @@ export function PricingCalculator() {
             </p>
             
             <div className="grid grid-cols-2 gap-6">
-              <div className="p-4 bg-white rounded-xl shadow-sm">
+              <div 
+                className={cn("p-4 bg-white rounded-xl shadow-sm scroll-animate", leftVisible && "visible")}
+                style={{ transitionDelay: '200ms' }}
+              >
                 <p className="text-3xl font-bold text-brand-navy mb-1">6</p>
                 <p className="text-sm text-muted-foreground">Origin Countries</p>
               </div>
-              <div className="p-4 bg-white rounded-xl shadow-sm">
+              <div 
+                className={cn("p-4 bg-white rounded-xl shadow-sm scroll-animate", leftVisible && "visible")}
+                style={{ transitionDelay: '300ms' }}
+              >
                 <p className="text-3xl font-bold text-brand-navy mb-1">5+</p>
                 <p className="text-sm text-muted-foreground">Years Experience</p>
               </div>
@@ -74,7 +88,14 @@ export function PricingCalculator() {
           </div>
 
           {/* Calculator Card */}
-          <div className="bg-white rounded-2xl shadow-2xl p-8 border border-border/50">
+          <div 
+            ref={rightRef}
+            className={cn(
+              "bg-white rounded-2xl shadow-2xl p-8 border border-border/50 scroll-animate-right",
+              rightVisible && "visible"
+            )}
+            style={{ transitionDelay: '150ms' }}
+          >
             <div className="flex items-center gap-3 mb-6">
               <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center">
                 <Calculator className="w-6 h-6 text-primary-foreground" />
