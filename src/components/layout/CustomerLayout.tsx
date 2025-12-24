@@ -2,7 +2,7 @@ import { ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, PackageSearch, MapPinned, FileStack, CreditCard,
-  LogOut, BellRing, ChevronDown, UserCircle2, Settings2
+  LogOut, BellRing, ChevronDown, UserCircle2, Settings2, ShoppingBag
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -41,6 +41,7 @@ const navItems = [
   { label: 'Dashboard', href: '/customer', icon: LayoutDashboard },
   { label: 'My Shipments', href: '/customer/shipments', icon: PackageSearch },
   { label: 'Track Shipment', href: '/customer/track', icon: MapPinned },
+  { label: 'Shop For Me', href: '/shop-for-me', icon: ShoppingBag },
   { label: 'Invoices', href: '/customer/invoices', icon: FileStack },
   { label: 'Payments', href: '/customer/payments', icon: CreditCard },
   { label: 'Settings', href: '/customer/settings', icon: Settings2 },
