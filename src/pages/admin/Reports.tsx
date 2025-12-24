@@ -1,15 +1,16 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format, subMonths, startOfMonth, endOfMonth, eachMonthOfInterval, parseISO } from 'date-fns';
-import { BarChart3, TrendingUp, Users, Package, DollarSign, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { BarChart3, TrendingUp, Users, Package, DollarSign, ArrowUpRight, ArrowDownRight, Wallet, TrendingDown, Scale } from 'lucide-react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
+import { EXPENSE_CATEGORIES } from '@/hooks/useExpenses';
 import {
   AreaChart, Area, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
+  Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ComposedChart
 } from 'recharts';
 
 const CHART_COLORS = {
@@ -61,11 +62,24 @@ export default function ReportsPage() {
     },
   });
 
-  const isLoading = shipmentsLoading || invoicesLoading || customersLoading;
+  // Fetch expenses data for P&L
+  const { data: expenses, isLoading: expensesLoading } = useQuery({
+    queryKey: ['reports-expenses'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('expenses')
+        .select('id, amount, category, created_at')
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return data;
+    },
+  });
 
-  // Calculate monthly data for charts
+  const isLoading = shipmentsLoading || invoicesLoading || customersLoading || expensesLoading;
+
+  // Calculate monthly data for charts including P&L
   const monthlyData = useMemo(() => {
-    if (!shipments || !invoices || !customers) return [];
+    if (!shipments || !invoices || !customers || !expenses) return [];
 
     const now = new Date();
     const sixMonthsAgo = subMonths(now, 5);
@@ -93,6 +107,11 @@ export default function ReportsPage() {
         return date >= monthStart && date <= monthEnd;
       });
 
+      const monthExpenses = expenses.filter((e) => {
+        const date = parseISO(e.created_at || '');
+        return date >= monthStart && date <= monthEnd;
+      });
+
       const revenue = monthInvoices
         .filter((i) => i.status === 'paid')
         .reduce((sum, i) => sum + (i.amount || 0), 0);
@@ -101,6 +120,9 @@ export default function ReportsPage() {
         .filter((i) => i.status === 'pending')
         .reduce((sum, i) => sum + (i.amount || 0), 0);
 
+      const totalExpenses = monthExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+      const netProfit = revenue - totalExpenses;
+
       return {
         month: format(month, 'MMM'),
         fullMonth: format(month, 'MMMM yyyy'),
@@ -108,11 +130,29 @@ export default function ReportsPage() {
         weight: monthShipments.reduce((sum, s) => sum + (s.total_weight_kg || 0), 0),
         revenue,
         pending,
+        expenses: totalExpenses,
+        netProfit,
         customers: monthCustomers.length,
         delivered: monthShipments.filter((s) => s.status === 'delivered').length,
       };
     });
-  }, [shipments, invoices, customers]);
+  }, [shipments, invoices, customers, expenses]);
+
+  // Expenses by category for P&L breakdown
+  const expensesByCategory = useMemo(() => {
+    if (!expenses) return [];
+    const categoryCounts: Record<string, number> = {};
+    expenses.forEach((e) => {
+      const category = e.category || 'other';
+      categoryCounts[category] = (categoryCounts[category] || 0) + (e.amount || 0);
+    });
+    return Object.entries(categoryCounts)
+      .map(([key, value]) => ({
+        name: EXPENSE_CATEGORIES.find(c => c.value === key)?.label || key.charAt(0).toUpperCase() + key.slice(1),
+        value,
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [expenses]);
 
   // Status distribution for pie chart
   const statusDistribution = useMemo(() => {
@@ -142,12 +182,15 @@ export default function ReportsPage() {
     }));
   }, [shipments]);
 
-  // Summary stats
+  // Summary stats including P&L
   const stats = useMemo(() => {
     const totalShipments = shipments?.length || 0;
     const totalRevenue = invoices?.filter((i) => i.status === 'paid').reduce((sum, i) => sum + (i.amount || 0), 0) || 0;
+    const totalExpenses = expenses?.reduce((sum, e) => sum + (e.amount || 0), 0) || 0;
     const totalCustomers = customers?.length || 0;
     const totalWeight = shipments?.reduce((sum, s) => sum + (s.total_weight_kg || 0), 0) || 0;
+    const netProfit = totalRevenue - totalExpenses;
+    const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
 
     // Calculate growth (comparing last 2 months)
     const currentMonth = monthlyData[monthlyData.length - 1];
@@ -162,17 +205,24 @@ export default function ReportsPage() {
     const customerGrowth = previousMonth?.customers
       ? ((currentMonth?.customers - previousMonth.customers) / previousMonth.customers) * 100
       : 0;
+    const profitGrowth = previousMonth?.netProfit
+      ? ((currentMonth?.netProfit - previousMonth.netProfit) / Math.abs(previousMonth.netProfit)) * 100
+      : 0;
 
     return {
       totalShipments,
       totalRevenue,
+      totalExpenses,
+      netProfit,
+      profitMargin,
       totalCustomers,
       totalWeight,
       shipmentGrowth,
       revenueGrowth,
       customerGrowth,
+      profitGrowth,
     };
-  }, [shipments, invoices, customers, monthlyData]);
+  }, [shipments, invoices, customers, expenses, monthlyData]);
 
   if (isLoading) {
     return (
@@ -270,13 +320,195 @@ export default function ReportsPage() {
         </div>
 
         {/* Charts Tabs */}
-        <Tabs defaultValue="shipments" className="space-y-4">
+        <Tabs defaultValue="pnl" className="space-y-4">
           <TabsList>
+            <TabsTrigger value="pnl">P&L Report</TabsTrigger>
             <TabsTrigger value="shipments">Shipments</TabsTrigger>
             <TabsTrigger value="revenue">Revenue</TabsTrigger>
             <TabsTrigger value="customers">Customers</TabsTrigger>
             <TabsTrigger value="distribution">Distribution</TabsTrigger>
           </TabsList>
+
+          {/* P&L Tab */}
+          <TabsContent value="pnl" className="space-y-4">
+            {/* P&L Summary Cards */}
+            <div className="grid gap-4 md:grid-cols-4">
+              <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/20 dark:to-emerald-900/10 border-emerald-200 dark:border-emerald-800">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Total Revenue</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-emerald-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">${stats.totalRevenue.toLocaleString()}</div>
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400">From paid invoices</p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gradient-to-br from-red-50 to-red-100/50 dark:from-red-950/20 dark:to-red-900/10 border-red-200 dark:border-red-800">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-red-700 dark:text-red-300">Total Expenses</CardTitle>
+                  <Wallet className="h-4 w-4 text-red-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-red-700 dark:text-red-300">${stats.totalExpenses.toLocaleString()}</div>
+                  <p className="text-xs text-red-600 dark:text-red-400">All recorded expenses</p>
+                </CardContent>
+              </Card>
+
+              <Card className={`bg-gradient-to-br ${stats.netProfit >= 0 ? 'from-blue-50 to-blue-100/50 dark:from-blue-950/20 dark:to-blue-900/10 border-blue-200 dark:border-blue-800' : 'from-orange-50 to-orange-100/50 dark:from-orange-950/20 dark:to-orange-900/10 border-orange-200 dark:border-orange-800'}`}>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className={`text-sm font-medium ${stats.netProfit >= 0 ? 'text-blue-700 dark:text-blue-300' : 'text-orange-700 dark:text-orange-300'}`}>
+                    Net {stats.netProfit >= 0 ? 'Profit' : 'Loss'}
+                  </CardTitle>
+                  {stats.netProfit >= 0 ? <TrendingUp className="h-4 w-4 text-blue-600" /> : <TrendingDown className="h-4 w-4 text-orange-600" />}
+                </CardHeader>
+                <CardContent>
+                  <div className={`text-2xl font-bold ${stats.netProfit >= 0 ? 'text-blue-700 dark:text-blue-300' : 'text-orange-700 dark:text-orange-300'}`}>
+                    ${Math.abs(stats.netProfit).toLocaleString()}
+                  </div>
+                  <div className="flex items-center text-xs">
+                    {stats.profitGrowth >= 0 ? (
+                      <ArrowUpRight className="h-3 w-3 text-green-500 mr-1" />
+                    ) : (
+                      <ArrowDownRight className="h-3 w-3 text-red-500 mr-1" />
+                    )}
+                    <span className={stats.profitGrowth >= 0 ? 'text-green-500' : 'text-red-500'}>
+                      {Math.abs(stats.profitGrowth).toFixed(1)}%
+                    </span>
+                    <span className="text-muted-foreground ml-1">vs last month</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gradient-to-br from-purple-50 to-purple-100/50 dark:from-purple-950/20 dark:to-purple-900/10 border-purple-200 dark:border-purple-800">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-purple-700 dark:text-purple-300">Profit Margin</CardTitle>
+                  <Scale className="h-4 w-4 text-purple-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-purple-700 dark:text-purple-300">{stats.profitMargin.toFixed(1)}%</div>
+                  <p className="text-xs text-purple-600 dark:text-purple-400">Revenue retained</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* P&L Charts */}
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Card className="lg:col-span-2">
+                <CardHeader>
+                  <CardTitle>Revenue vs Expenses Trend</CardTitle>
+                  <CardDescription>Monthly comparison with net profit line</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[350px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart data={monthlyData}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                        <XAxis dataKey="month" className="text-xs" />
+                        <YAxis className="text-xs" tickFormatter={(value) => `$${value}`} />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'hsl(var(--background))',
+                            border: '1px solid hsl(var(--border))',
+                            borderRadius: '8px',
+                          }}
+                          formatter={(value: number) => [`$${value.toLocaleString()}`, '']}
+                        />
+                        <Legend />
+                        <Bar dataKey="revenue" name="Revenue" fill="#10B981" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="expenses" name="Expenses" fill="#EF4444" radius={[4, 4, 0, 0]} />
+                        <Line 
+                          type="monotone" 
+                          dataKey="netProfit" 
+                          name="Net Profit" 
+                          stroke="#3B82F6" 
+                          strokeWidth={3}
+                          dot={{ fill: '#3B82F6', strokeWidth: 2, r: 4 }}
+                        />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Expense Breakdown</CardTitle>
+                  <CardDescription>By category</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[300px]">
+                    {expensesByCategory.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={expensesByCategory}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={100}
+                            paddingAngle={2}
+                            dataKey="value"
+                            label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                            labelLine={false}
+                          >
+                            {expensesByCategory.map((_, index) => (
+                              <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: 'hsl(var(--background))',
+                              border: '1px solid hsl(var(--border))',
+                              borderRadius: '8px',
+                            }}
+                            formatter={(value: number) => [`$${value.toLocaleString()}`, '']}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-muted-foreground">
+                        No expense data yet
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Expense Details</CardTitle>
+                  <CardDescription>Top expense categories</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {expensesByCategory.slice(0, 6).map((category, index) => (
+                      <div key={category.name} className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div 
+                            className="w-3 h-3 rounded-full" 
+                            style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }}
+                          />
+                          <span className="text-sm font-medium">{category.name}</span>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold">${category.value.toLocaleString()}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {stats.totalExpenses > 0 ? ((category.value / stats.totalExpenses) * 100).toFixed(1) : 0}%
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                    {expensesByCategory.length === 0 && (
+                      <div className="text-center text-muted-foreground py-8">
+                        No expense data yet
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
 
           {/* Shipments Tab */}
           <TabsContent value="shipments" className="space-y-4">
