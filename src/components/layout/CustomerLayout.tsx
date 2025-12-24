@@ -1,8 +1,8 @@
 import { ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
-  Home, Package, MapPin, FileText, CreditCard,
-  LogOut, Bell, ChevronDown, User, Settings
+  LayoutDashboard, PackageSearch, MapPinned, FileStack, CreditCard,
+  LogOut, BellRing, ChevronDown, UserCircle2, Settings2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -38,12 +38,12 @@ interface CustomerLayoutProps {
 }
 
 const navItems = [
-  { label: 'Dashboard', href: '/customer', icon: Home },
-  { label: 'My Shipments', href: '/customer/shipments', icon: Package },
-  { label: 'Track Shipment', href: '/customer/track', icon: MapPin },
-  { label: 'Invoices', href: '/customer/invoices', icon: FileText },
+  { label: 'Dashboard', href: '/customer', icon: LayoutDashboard },
+  { label: 'My Shipments', href: '/customer/shipments', icon: PackageSearch },
+  { label: 'Track Shipment', href: '/customer/track', icon: MapPinned },
+  { label: 'Invoices', href: '/customer/invoices', icon: FileStack },
   { label: 'Payments', href: '/customer/payments', icon: CreditCard },
-  { label: 'Settings', href: '/customer/settings', icon: Settings },
+  { label: 'Settings', href: '/customer/settings', icon: Settings2 },
 ];
 
 export function CustomerLayout({ children, title, subtitle }: CustomerLayoutProps) {
@@ -129,7 +129,7 @@ export function CustomerLayout({ children, title, subtitle }: CustomerLayoutProp
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => navigate('/customer/settings')}>
-                  <Settings className="w-4 h-4 mr-2" />
+                  <Settings2 className="w-4 h-4 mr-2" />
                   Settings
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -146,9 +146,9 @@ export function CustomerLayout({ children, title, subtitle }: CustomerLayoutProp
           <header className="sticky top-0 z-30 h-16 bg-background/95 backdrop-blur-md border-b border-border flex items-center px-6 gap-4">
             <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
             <div className="flex-1" />
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="w-5 h-5" />
-            </Button>
+              <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-accent">
+                <BellRing className="w-5 h-5" />
+              </Button>
           </header>
 
           <div className="px-6 py-6 border-b border-border bg-background">
