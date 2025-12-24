@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { MenuIcon, XIcon, PhoneCall, MailOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,8 @@ import { cn } from '@/lib/utils';
 export function PublicNavbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const { user, isAdmin, isAgent, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -19,6 +21,24 @@ export function PublicNavbar() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // Click outside handler
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        isOpen &&
+        menuRef.current &&
+        buttonRef.current &&
+        !menuRef.current.contains(event.target as Node) &&
+        !buttonRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
 
   const getDashboardRoute = () => {
     if (isAdmin()) return '/admin';
@@ -147,6 +167,7 @@ export function PublicNavbar() {
 
             {/* Mobile Menu Button */}
             <button
+              ref={buttonRef}
               className={cn(
                 "lg:hidden p-2.5 rounded-xl border-2 transition-all duration-200",
                 scrolled || !isHome 
@@ -163,7 +184,7 @@ export function PublicNavbar() {
 
           {/* Mobile Menu */}
           {isOpen && (
-            <div className="lg:hidden absolute right-4 top-full mt-2 w-64 py-4 bg-white rounded-xl shadow-xl border border-border/50 animate-fade-in z-50">
+            <div ref={menuRef} className="lg:hidden absolute right-4 top-full mt-2 w-64 py-4 bg-white rounded-xl shadow-xl border border-border/50 animate-fade-in z-50">
               <div className="flex flex-col gap-1 px-2">
                 {[
                   { label: 'Home', href: '/' },
