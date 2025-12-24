@@ -10,6 +10,7 @@ import AuthPage from "./pages/Auth";
 import TrackingPage from "./pages/Tracking";
 import CustomerDashboard from "./pages/customer/Dashboard";
 import AgentDashboard from "./pages/agent/Dashboard";
+import AgentUploadPage from "./pages/agent/Upload";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AdminShipmentsPage from "./pages/admin/Shipments";
 import NotFound from "./pages/NotFound";
@@ -38,6 +39,7 @@ const App = () => (
             
             {/* Agent Portal */}
             <Route path="/agent" element={<AgentDashboard />} />
+            <Route path="/agent/upload" element={<AgentUploadPage />} />
             
             {/* Admin Portal */}
             <Route path="/admin" element={<AdminDashboard />} />
