@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useEffect } from 'react';
+import { toast } from '@/hooks/use-toast';
 
 export interface OrderRequest {
   id: string;
@@ -43,13 +44,20 @@ export function useCustomerOrders() {
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'UPDATE',
           schema: 'public',
           table: 'order_requests',
           filter: `customer_email=eq.${profile.email}`,
         },
-        () => {
-          // Invalidate and refetch when order changes
+        (payload) => {
+          const newStatus = (payload.new as { status: string }).status;
+          const orderId = (payload.new as { id: string }).id;
+          
+          toast({
+            title: 'Order Updated',
+            description: `Order #${orderId.slice(0, 8).toUpperCase()} status changed to "${newStatus}"`,
+          });
+          
           queryClient.invalidateQueries({ queryKey: ['customer-orders', profile.email] });
         }
       )
