@@ -14,7 +14,8 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['Open Sans', 'system-ui', 'sans-serif'],
+        heading: ['Poppins', 'system-ui', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -23,10 +24,12 @@ export default {
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         brand: {
-          DEFAULT: "hsl(var(--brand))",
-          light: "hsl(var(--brand-light))",
-          dark: "hsl(var(--brand-dark))",
-          muted: "hsl(var(--brand-muted))",
+          gold: "hsl(var(--brand-gold))",
+          "gold-light": "hsl(var(--brand-gold-light))",
+          "gold-dark": "hsl(var(--brand-gold-dark))",
+          navy: "hsl(var(--brand-navy))",
+          "navy-dark": "hsl(var(--brand-navy-dark))",
+          "navy-light": "hsl(var(--brand-navy-light))",
         },
         primary: {
           DEFAULT: "hsl(var(--primary))",
@@ -85,7 +88,8 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       boxShadow: {
-        'brand': 'var(--shadow-brand)',
+        'gold': '0 4px 20px hsl(40 92% 55% / 0.35)',
+        'navy': '0 4px 20px hsl(210 70% 25% / 0.35)',
       },
       keyframes: {
         "accordion-down": {
@@ -96,15 +100,10 @@ export default {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
-        "pulse-slow": {
-          "0%, 100%": { opacity: "1" },
-          "50%": { opacity: "0.5" },
-        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        "pulse-slow": "pulse-slow 2s ease-in-out infinite",
       },
     },
   },

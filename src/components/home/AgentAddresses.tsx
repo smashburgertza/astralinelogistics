@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { MapPin, Phone, Mail, Copy, Check } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { MapPin, Copy, Check, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { REGIONS, type Region } from '@/lib/constants';
@@ -45,63 +44,72 @@ export function AgentAddresses() {
   };
 
   return (
-    <section className="py-20">
+    <section className="section-padding bg-brand-navy-dark">
       <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">Agent Delivery Addresses</h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
-            Send your goods to our agents in these locations. We'll handle the rest.
+        {/* Section Header */}
+        <div className="text-center mb-16">
+          <span className="inline-block px-4 py-2 rounded-full bg-primary/20 text-primary font-semibold text-sm uppercase tracking-wide mb-4">
+            Global Network
+          </span>
+          <h2 className="font-heading text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-4">
+            Agent Delivery Addresses
+          </h2>
+          <p className="text-white/70 max-w-2xl mx-auto text-lg">
+            Send your goods to our trusted agents in these locations. We'll handle collection, consolidation, and shipping to Tanzania.
           </p>
         </div>
 
+        {/* Addresses Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {addresses.map((address) => {
             const regionInfo = REGIONS[address.region];
             return (
-              <Card key={address.region} className="card-hover">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <span className="text-2xl">{regionInfo?.flag}</span>
+              <div 
+                key={address.region} 
+                className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10 hover:bg-white/10 transition-all duration-300 group"
+              >
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="text-4xl">{regionInfo?.flag}</span>
+                  <h3 className="font-heading text-lg font-semibold text-white">
                     {regionInfo?.label || address.region}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-start gap-2 text-sm">
-                    <MapPin className="w-4 h-4 mt-0.5 text-primary shrink-0" />
-                    <div>
-                      <p>{address.address_line1}</p>
-                      {address.address_line2 && <p>{address.address_line2}</p>}
-                      <p>{address.city} {address.postal_code}</p>
-                      <p>{address.country}</p>
-                    </div>
-                  </div>
-                  
-                  {address.contact_name && (
-                    <p className="text-sm text-muted-foreground">
-                      Contact: {address.contact_name}
-                    </p>
-                  )}
+                  </h3>
+                </div>
 
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="w-full"
-                    onClick={() => copyAddress(address)}
-                  >
-                    {copied === address.region ? (
-                      <>
-                        <Check className="w-4 h-4 mr-2" />
-                        Copied!
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-4 h-4 mr-2" />
-                        Copy Address
-                      </>
-                    )}
-                  </Button>
-                </CardContent>
-              </Card>
+                <div className="flex items-start gap-2 text-sm text-white/80 mb-4">
+                  <MapPin className="w-4 h-4 mt-0.5 text-primary shrink-0" />
+                  <div>
+                    <p>{address.address_line1}</p>
+                    {address.address_line2 && <p>{address.address_line2}</p>}
+                    <p>{address.city} {address.postal_code}</p>
+                    <p>{address.country}</p>
+                  </div>
+                </div>
+                
+                {address.contact_name && (
+                  <p className="text-sm text-white/60 mb-4">
+                    Contact: {address.contact_name}
+                  </p>
+                )}
+
+                <Button 
+                  variant="outline"
+                  size="sm" 
+                  className="w-full bg-transparent border-white/20 text-white hover:bg-white hover:text-brand-navy transition-all"
+                  onClick={() => copyAddress(address)}
+                >
+                  {copied === address.region ? (
+                    <>
+                      <Check className="w-4 h-4 mr-2" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4 mr-2" />
+                      Copy Address
+                    </>
+                  )}
+                </Button>
+              </div>
             );
           })}
         </div>
