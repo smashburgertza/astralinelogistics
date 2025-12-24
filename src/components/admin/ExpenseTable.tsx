@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { format } from 'date-fns';
 import {
   Table,
@@ -8,9 +9,23 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { DollarSign } from 'lucide-react';
-import { EXPENSE_CATEGORIES } from '@/hooks/useExpenses';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { DollarSign, MoreHorizontal, Check, X, MessageSquare, Loader2, AlertCircle } from 'lucide-react';
+import { EXPENSE_CATEGORIES, useApproveExpense } from '@/hooks/useExpenses';
+import { ExpenseStatusBadge } from './ExpenseStatusBadge';
+import { ExpenseApprovalDialog } from './ExpenseApprovalDialog';
 import { REGIONS } from '@/lib/constants';
 
 interface ExpenseWithShipment {
@@ -21,6 +36,9 @@ interface ExpenseWithShipment {
   description: string | null;
   region: string | null;
   created_at: string | null;
+  status?: string;
+  denial_reason?: string | null;
+  clarification_notes?: string | null;
   shipments?: {
     tracking_number: string;
     origin_region: string;
@@ -30,6 +48,7 @@ interface ExpenseWithShipment {
 interface ExpenseTableProps {
   expenses: ExpenseWithShipment[] | undefined;
   isLoading: boolean;
+  showActions?: boolean;
 }
 
 const getCategoryLabel = (value: string) => {
@@ -50,7 +69,27 @@ const getCategoryColor = (category: string) => {
   return colors[category] || colors.other;
 };
 
-export function ExpenseTable({ expenses, isLoading }: ExpenseTableProps) {
+export function ExpenseTable({ expenses, isLoading, showActions = true }: ExpenseTableProps) {
+  const [dialogState, setDialogState] = useState<{
+    open: boolean;
+    expenseId: string;
+    mode: 'deny' | 'clarification';
+  }>({ open: false, expenseId: '', mode: 'deny' });
+
+  const approveExpense = useApproveExpense();
+
+  const handleApprove = (expenseId: string) => {
+    approveExpense.mutate(expenseId);
+  };
+
+  const openDenyDialog = (expenseId: string) => {
+    setDialogState({ open: true, expenseId, mode: 'deny' });
+  };
+
+  const openClarificationDialog = (expenseId: string) => {
+    setDialogState({ open: true, expenseId, mode: 'clarification' });
+  };
+
   if (isLoading) {
     return (
       <div className="rounded-lg border bg-card">
@@ -59,10 +98,12 @@ export function ExpenseTable({ expenses, isLoading }: ExpenseTableProps) {
             <TableRow className="bg-muted/50">
               <TableHead>Category</TableHead>
               <TableHead>Amount</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead>Shipment</TableHead>
               <TableHead>Region</TableHead>
               <TableHead>Description</TableHead>
               <TableHead>Date</TableHead>
+              {showActions && <TableHead className="w-[100px]">Actions</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -70,10 +111,12 @@ export function ExpenseTable({ expenses, isLoading }: ExpenseTableProps) {
               <TableRow key={i}>
                 <TableCell><Skeleton className="h-6 w-24" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                <TableCell><Skeleton className="h-6 w-24" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-28" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                {showActions && <TableCell><Skeleton className="h-8 w-8" /></TableCell>}
               </TableRow>
             ))}
           </TableBody>
@@ -95,66 +138,147 @@ export function ExpenseTable({ expenses, isLoading }: ExpenseTableProps) {
   }
 
   return (
-    <div className="rounded-lg border bg-card overflow-hidden">
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-muted/50 hover:bg-muted/50">
-            <TableHead className="font-semibold">Category</TableHead>
-            <TableHead className="font-semibold">Amount</TableHead>
-            <TableHead className="font-semibold">Shipment</TableHead>
-            <TableHead className="font-semibold">Region</TableHead>
-            <TableHead className="font-semibold">Description</TableHead>
-            <TableHead className="font-semibold">Date</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {expenses.map((expense) => {
-            const regionInfo = expense.region ? REGIONS[expense.region as keyof typeof REGIONS] : null;
-            
-            return (
-              <TableRow key={expense.id}>
-                <TableCell>
-                  <Badge className={getCategoryColor(expense.category)} variant="secondary">
-                    {getCategoryLabel(expense.category)}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <span className="font-medium">
-                    {expense.currency || 'USD'} {Number(expense.amount).toFixed(2)}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  {expense.shipments ? (
-                    <code className="font-mono text-sm text-brand-gold">
-                      {expense.shipments.tracking_number}
-                    </code>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  {regionInfo ? (
+    <>
+      <div className="rounded-lg border bg-card overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/50 hover:bg-muted/50">
+              <TableHead className="font-semibold">Category</TableHead>
+              <TableHead className="font-semibold">Amount</TableHead>
+              <TableHead className="font-semibold">Status</TableHead>
+              <TableHead className="font-semibold">Shipment</TableHead>
+              <TableHead className="font-semibold">Region</TableHead>
+              <TableHead className="font-semibold">Description</TableHead>
+              <TableHead className="font-semibold">Date</TableHead>
+              {showActions && <TableHead className="font-semibold w-[100px]">Actions</TableHead>}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {expenses.map((expense) => {
+              const regionInfo = expense.region ? REGIONS[expense.region as keyof typeof REGIONS] : null;
+              const isPending = expense.status === 'pending';
+              const needsClarification = expense.status === 'needs_clarification';
+              const canTakeAction = isPending || needsClarification;
+              
+              return (
+                <TableRow key={expense.id}>
+                  <TableCell>
+                    <Badge className={getCategoryColor(expense.category)} variant="secondary">
+                      {getCategoryLabel(expense.category)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <span className="font-medium">
+                      {expense.currency || 'USD'} {Number(expense.amount).toFixed(2)}
+                    </span>
+                  </TableCell>
+                  <TableCell>
                     <div className="flex items-center gap-2">
-                      <span>{regionInfo.flag}</span>
-                      <span>{regionInfo.label}</span>
+                      <ExpenseStatusBadge status={expense.status || 'pending'} />
+                      {expense.denial_reason && (
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <AlertCircle className="h-4 w-4 text-red-500" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="max-w-xs">{expense.denial_reason}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                      {expense.clarification_notes && (
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <MessageSquare className="h-4 w-4 text-orange-500" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="max-w-xs">{expense.clarification_notes}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
                     </div>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
+                  </TableCell>
+                  <TableCell>
+                    {expense.shipments ? (
+                      <code className="font-mono text-sm text-brand-gold">
+                        {expense.shipments.tracking_number}
+                      </code>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {regionInfo ? (
+                      <div className="flex items-center gap-2">
+                        <span>{regionInfo.flag}</span>
+                        <span>{regionInfo.label}</span>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-muted-foreground max-w-[200px] truncate block">
+                      {expense.description || '—'}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {expense.created_at ? format(new Date(expense.created_at), 'MMM d, yyyy') : '—'}
+                  </TableCell>
+                  {showActions && (
+                    <TableCell>
+                      {canTakeAction && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              {approveExpense.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <MoreHorizontal className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => handleApprove(expense.id)}
+                              className="text-green-600"
+                            >
+                              <Check className="h-4 w-4 mr-2" />
+                              Approve
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => openDenyDialog(expense.id)}
+                              className="text-red-600"
+                            >
+                              <X className="h-4 w-4 mr-2" />
+                              Deny
+                            </DropdownMenuItem>
+                            {isPending && (
+                              <DropdownMenuItem
+                                onClick={() => openClarificationDialog(expense.id)}
+                                className="text-orange-600"
+                              >
+                                <MessageSquare className="h-4 w-4 mr-2" />
+                                Request Clarification
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </TableCell>
                   )}
-                </TableCell>
-                <TableCell>
-                  <span className="text-muted-foreground max-w-[200px] truncate block">
-                    {expense.description || '—'}
-                  </span>
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {expense.created_at ? format(new Date(expense.created_at), 'MMM d, yyyy') : '—'}
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </div>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+
+      <ExpenseApprovalDialog
+        open={dialogState.open}
+        onOpenChange={(open) => setDialogState((prev) => ({ ...prev, open }))}
+        expenseId={dialogState.expenseId}
+        mode={dialogState.mode}
+      />
+    </>
   );
 }

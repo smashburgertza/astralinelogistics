@@ -316,39 +316,57 @@ export type Database = {
       expenses: {
         Row: {
           amount: number
+          approved_at: string | null
+          approved_by: string | null
           category: string
+          clarification_notes: string | null
           created_at: string | null
           created_by: string | null
           currency: string | null
+          denial_reason: string | null
           description: string | null
           id: string
           receipt_url: string | null
           region: Database["public"]["Enums"]["agent_region"] | null
           shipment_id: string | null
+          status: string
+          submitted_by: string | null
         }
         Insert: {
           amount: number
+          approved_at?: string | null
+          approved_by?: string | null
           category: string
+          clarification_notes?: string | null
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
+          denial_reason?: string | null
           description?: string | null
           id?: string
           receipt_url?: string | null
           region?: Database["public"]["Enums"]["agent_region"] | null
           shipment_id?: string | null
+          status?: string
+          submitted_by?: string | null
         }
         Update: {
           amount?: number
+          approved_at?: string | null
+          approved_by?: string | null
           category?: string
+          clarification_notes?: string | null
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
+          denial_reason?: string | null
           description?: string | null
           id?: string
           receipt_url?: string | null
           region?: Database["public"]["Enums"]["agent_region"] | null
           shipment_id?: string | null
+          status?: string
+          submitted_by?: string | null
         }
         Relationships: [
           {

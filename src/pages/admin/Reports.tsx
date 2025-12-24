@@ -62,13 +62,14 @@ export default function ReportsPage() {
     },
   });
 
-  // Fetch expenses data for P&L
+  // Fetch APPROVED expenses data for P&L (only approved expenses count towards P&L)
   const { data: expenses, isLoading: expensesLoading } = useQuery({
-    queryKey: ['reports-expenses'],
+    queryKey: ['reports-expenses-approved'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('expenses')
-        .select('id, amount, category, created_at')
+        .select('id, amount, category, created_at, status')
+        .eq('status', 'approved')
         .order('created_at', { ascending: true });
       if (error) throw error;
       return data;
@@ -351,7 +352,7 @@ export default function ReportsPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-red-700 dark:text-red-300">${stats.totalExpenses.toLocaleString()}</div>
-                  <p className="text-xs text-red-600 dark:text-red-400">All recorded expenses</p>
+                  <p className="text-xs text-red-600 dark:text-red-400">Approved expenses only</p>
                 </CardContent>
               </Card>
 
