@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { OrderRequestTable } from '@/components/admin/OrderRequestTable';
 import { useOrderRequests } from '@/hooks/useOrderRequests';
-import { ShoppingCart, Clock, CheckCircle, XCircle, Filter } from 'lucide-react';
+import { ShoppingCart, Clock, CheckCircle, XCircle, Filter, Search, X } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -11,6 +11,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { useDebounce } from '@/hooks/useDebounce';
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All Statuses' },
@@ -24,19 +26,44 @@ const STATUS_OPTIONS = [
 
 export default function AdminOrderRequestsPage() {
   const [statusFilter, setStatusFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebounce(searchQuery, 300);
   const { data: orders, isLoading } = useOrderRequests();
 
   const filteredOrders = useMemo(() => {
     if (!orders) return [];
-    if (statusFilter === 'all') return orders;
-    return orders.filter(o => o.status === statusFilter);
-  }, [orders, statusFilter]);
+    
+    let filtered = orders;
+    
+    // Filter by status
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(o => o.status === statusFilter);
+    }
+    
+    // Filter by search query (name or email)
+    if (debouncedSearch.trim()) {
+      const query = debouncedSearch.toLowerCase();
+      filtered = filtered.filter(o => 
+        o.customer_name.toLowerCase().includes(query) ||
+        o.customer_email.toLowerCase().includes(query)
+      );
+    }
+    
+    return filtered;
+  }, [orders, statusFilter, debouncedSearch]);
 
   const stats = {
     total: orders?.length || 0,
     pending: orders?.filter(o => o.status === 'pending').length || 0,
     completed: orders?.filter(o => o.status === 'completed').length || 0,
     cancelled: orders?.filter(o => o.status === 'cancelled').length || 0,
+  };
+
+  const hasFilters = statusFilter !== 'all' || searchQuery.trim() !== '';
+
+  const clearFilters = () => {
+    setStatusFilter('all');
+    setSearchQuery('');
   };
 
   return (
@@ -78,29 +105,50 @@ export default function AdminOrderRequestsPage() {
         </div>
 
         {/* Filters */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">Filter by:</span>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          {/* Search Input */}
+          <div className="relative w-full sm:w-auto">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by name or email..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 w-full sm:w-[280px] bg-background"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[180px] bg-background">
-              <SelectValue placeholder="Select status" />
-            </SelectTrigger>
-            <SelectContent className="bg-background z-50">
-              {STATUS_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {statusFilter !== 'all' && (
-            <Button variant="ghost" size="sm" onClick={() => setStatusFilter('all')}>
-              Clear
-            </Button>
-          )}
-          <span className="text-sm text-muted-foreground ml-auto">
+
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[180px] bg-background">
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent className="bg-background z-50">
+                {STATUS_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {hasFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters}>
+                Clear all
+              </Button>
+            )}
+          </div>
+
+          <span className="text-sm text-muted-foreground sm:ml-auto">
             Showing {filteredOrders.length} of {stats.total} orders
           </span>
         </div>
