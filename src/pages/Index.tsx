@@ -4,6 +4,7 @@ import { ServicesSection } from '@/components/home/ServicesSection';
 import { ShopForMeSection } from '@/components/home/ShopForMeSection';
 import { PricingCalculator } from '@/components/home/PricingCalculator';
 import { TestimonialsSection } from '@/components/home/TestimonialsSection';
+import { PartnersSection } from '@/components/home/PartnersSection';
 import { AgentAddresses } from '@/components/home/AgentAddresses';
 import { ContactSection } from '@/components/home/ContactSection';
 import { CTASection } from '@/components/home/CTASection';
@@ -12,6 +13,7 @@ const Index = () => {
   return (
     <div className="scroll-smooth">
       <HeroSection />
+      <PartnersSection />
       <section id="about">
         <AboutSection />
       </section>
