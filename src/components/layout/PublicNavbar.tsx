@@ -163,8 +163,8 @@ export function PublicNavbar() {
 
           {/* Mobile Menu */}
           {isOpen && (
-            <div className="lg:hidden py-6 border-t border-border/20 bg-white animate-slide-up">
-              <div className="flex flex-col gap-2">
+            <div className="lg:hidden absolute right-4 top-full mt-2 w-64 py-4 bg-white rounded-xl shadow-xl border border-border/50 animate-fade-in z-50">
+              <div className="flex flex-col gap-1 px-2">
                 {[
                   { label: 'Home', href: '/' },
                   { label: 'About Us', href: '/about' },
@@ -176,28 +176,31 @@ export function PublicNavbar() {
                   <Link 
                     key={item.href}
                     to={item.href} 
-                    className="py-3 px-4 text-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors font-medium"
+                    className={cn(
+                      "py-2.5 px-3 text-sm text-foreground hover:text-primary hover:bg-muted/50 rounded-lg transition-colors font-medium",
+                      location.pathname === item.href && "bg-primary/10 text-primary"
+                    )}
                     onClick={() => setIsOpen(false)}
                   >
                     {item.label}
                   </Link>
                 ))}
-                <div className="pt-4 mt-2 border-t border-border flex flex-col gap-2 px-4">
+                <div className="pt-3 mt-2 border-t border-border flex flex-col gap-2 px-1">
                   {user ? (
                     <>
-                      <Button variant="outline" onClick={() => { navigate(getDashboardRoute()); setIsOpen(false); }}>
+                      <Button variant="outline" size="sm" onClick={() => { navigate(getDashboardRoute()); setIsOpen(false); }}>
                         Dashboard
                       </Button>
-                      <Button onClick={() => { handleSignOut(); setIsOpen(false); }}>
+                      <Button size="sm" onClick={() => { handleSignOut(); setIsOpen(false); }}>
                         Sign Out
                       </Button>
                     </>
                   ) : (
                     <>
-                      <Button variant="outline" asChild>
+                      <Button variant="outline" size="sm" asChild>
                         <Link to="/auth" onClick={() => setIsOpen(false)}>Sign In</Link>
                       </Button>
-                      <Button asChild>
+                      <Button size="sm" asChild>
                         <Link to="/auth?mode=signup" onClick={() => setIsOpen(false)}>Get a Quote</Link>
                       </Button>
                     </>
