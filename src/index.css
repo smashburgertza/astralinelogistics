@@ -230,13 +230,22 @@
   }
 
   @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-10px); }
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(-15px) rotate(2deg); }
   }
 
   @keyframes pulseGlow {
     0%, 100% { box-shadow: 0 0 20px hsl(42 92% 60% / 0.3); }
     50% { box-shadow: 0 0 40px hsl(42 92% 60% / 0.6); }
+  }
+
+  @keyframes draw {
+    to { stroke-dashoffset: 0; }
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
   }
 
   .text-shadow {
@@ -245,5 +254,11 @@
 
   .text-shadow-lg {
     text-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  }
+
+  .animate-shimmer {
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
   }
 }
