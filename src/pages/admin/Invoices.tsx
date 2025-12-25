@@ -10,6 +10,7 @@ import { CURRENCY_SYMBOLS } from '@/lib/constants';
 export default function AdminInvoicesPage() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
+  const [invoiceType, setInvoiceType] = useState('all');
 
   const debouncedSearch = useDebounce(search, 300);
 
@@ -20,16 +21,24 @@ export default function AdminInvoicesPage() {
 
   const { data: invoices, isLoading } = useInvoices(filters);
 
+  // Filter by invoice type locally
+  const filteredInvoices = useMemo(() => {
+    if (!invoices) return [];
+    if (invoiceType === 'all') return invoices;
+    return invoices.filter(inv => inv.invoice_type === invoiceType);
+  }, [invoices, invoiceType]);
+
   const clearFilters = () => {
     setSearch('');
     setStatus('all');
+    setInvoiceType('all');
   };
 
-  // Calculate totals
-  const totalAmount = invoices?.reduce((sum, inv) => sum + Number(inv.amount), 0) || 0;
-  const paidAmount = invoices?.filter(i => i.status === 'paid').reduce((sum, inv) => sum + Number(inv.amount), 0) || 0;
-  const pendingAmount = invoices?.filter(i => i.status === 'pending').reduce((sum, inv) => sum + Number(inv.amount), 0) || 0;
-  const overdueAmount = invoices?.filter(i => i.status === 'overdue').reduce((sum, inv) => sum + Number(inv.amount), 0) || 0;
+  // Calculate totals from filtered invoices
+  const totalAmount = filteredInvoices.reduce((sum, inv) => sum + Number(inv.amount), 0);
+  const paidAmount = filteredInvoices.filter(i => i.status === 'paid').reduce((sum, inv) => sum + Number(inv.amount), 0);
+  const pendingAmount = filteredInvoices.filter(i => i.status === 'pending').reduce((sum, inv) => sum + Number(inv.amount), 0);
+  const overdueAmount = filteredInvoices.filter(i => i.status === 'overdue').reduce((sum, inv) => sum + Number(inv.amount), 0);
 
   return (
     <AdminLayout title="Invoice Management" subtitle="Create, manage, and track all invoices">
@@ -43,8 +52,10 @@ export default function AdminInvoicesPage() {
         <InvoiceFilters
           search={search}
           status={status}
+          invoiceType={invoiceType}
           onSearchChange={setSearch}
           onStatusChange={setStatus}
+          onTypeChange={setInvoiceType}
           onClear={clearFilters}
         />
 
@@ -66,7 +77,7 @@ export default function AdminInvoicesPage() {
         </div>
 
         {/* Table */}
-        <InvoiceTable invoices={invoices} isLoading={isLoading} />
+        <InvoiceTable invoices={filteredInvoices} isLoading={isLoading} />
       </div>
     </AdminLayout>
   );
