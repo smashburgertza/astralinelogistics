@@ -5,16 +5,19 @@ import { ShipmentTable } from '@/components/admin/ShipmentTable';
 import { BulkActionsBar } from '@/components/admin/BulkActionsBar';
 import { CreateShipmentDialog } from '@/components/admin/CreateShipmentDialog';
 import { ParcelCheckout } from '@/components/admin/ParcelCheckout';
+import { BulkParcelScanner } from '@/components/admin/BulkParcelScanner';
 import { useShipments } from '@/hooks/useShipments';
 import { useDebounce } from '@/hooks/useDebounce';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { PackageSearch, ScanLine } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { PackageSearch, ScanLine, Scan } from 'lucide-react';
 
 export default function AdminShipmentsPage() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
   const [region, setRegion] = useState('all');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   const debouncedSearch = useDebounce(search, 300);
 
@@ -51,8 +54,12 @@ export default function AdminShipmentsPage() {
         </TabsList>
 
         <TabsContent value="shipments" className="space-y-6 mt-0">
-          {/* Header with Action */}
-          <div className="flex justify-end">
+          {/* Header with Actions */}
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setScannerOpen(true)}>
+              <Scan className="h-4 w-4 mr-2" />
+              Bulk Scanner
+            </Button>
             <CreateShipmentDialog />
           </div>
 
@@ -104,6 +111,8 @@ export default function AdminShipmentsPage() {
           <ParcelCheckout />
         </TabsContent>
       </Tabs>
+
+      <BulkParcelScanner open={scannerOpen} onOpenChange={setScannerOpen} />
     </AdminLayout>
   );
 }
