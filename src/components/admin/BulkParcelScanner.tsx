@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
 import { Scan, Check, X, Package, Trash2, CheckCircle2, Camera, Keyboard } from 'lucide-react';
-import { format } from 'date-fns';
 import {
   Dialog,
   DialogContent,
@@ -17,6 +16,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { CameraBarcodeScanner } from './CameraBarcodeScanner';
+import { playSuccessBeep, playErrorBeep, playWarningBeep } from '@/lib/audioFeedback';
 
 interface ScannedParcel {
   id: string;
@@ -62,6 +62,7 @@ export function BulkParcelScanner({ open, onOpenChange }: BulkParcelScannerProps
     
     // Check if already scanned
     if (scannedParcels.some(p => p.barcode.toUpperCase() === trimmedBarcode)) {
+      playWarningBeep();
       toast.warning('Parcel already scanned', {
         description: `Barcode ${trimmedBarcode} is already in the list`,
       });
@@ -94,6 +95,7 @@ export function BulkParcelScanner({ open, onOpenChange }: BulkParcelScannerProps
         .single();
 
       if (error || !parcel) {
+        playErrorBeep();
         toast.error('Parcel not found', {
           description: `No parcel found with barcode ${trimmedBarcode}`,
         });
@@ -118,6 +120,7 @@ export function BulkParcelScanner({ open, onOpenChange }: BulkParcelScannerProps
         ...prev,
       ]);
 
+      playSuccessBeep();
       toast.success('Parcel scanned', {
         description: `${parcel.barcode} added to queue`,
       });
@@ -146,6 +149,7 @@ export function BulkParcelScanner({ open, onOpenChange }: BulkParcelScannerProps
     
     // Check if already scanned
     if (scannedParcels.some(p => p.barcode.toUpperCase() === trimmedBarcode)) {
+      playWarningBeep();
       toast.warning('Parcel already scanned', {
         description: `Barcode ${trimmedBarcode} is already in the list`,
       });
@@ -176,6 +180,7 @@ export function BulkParcelScanner({ open, onOpenChange }: BulkParcelScannerProps
         .single();
 
       if (error || !parcel) {
+        playErrorBeep();
         toast.error('Parcel not found', {
           description: `No parcel found with barcode ${trimmedBarcode}`,
         });
@@ -199,6 +204,7 @@ export function BulkParcelScanner({ open, onOpenChange }: BulkParcelScannerProps
         ...prev,
       ]);
 
+      playSuccessBeep();
       toast.success('Parcel scanned', {
         description: `${parcel.barcode} added to queue`,
       });
