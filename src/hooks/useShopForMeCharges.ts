@@ -137,32 +137,32 @@ export function calculateShopForMeCharges(
     amount: productCost,
   });
 
-  let runningTotal = productCost;
-  let shippingCost = 0;
+  // Calculate shipping cost first (weight × rate)
+  const shippingCost = weightKg * shippingRatePerKg;
 
-  // Process charges in order
+  // Process percentage/fixed charges in order
   const sortedCharges = [...charges].sort((a, b) => a.display_order - b.display_order);
+  
+  let dutyAndOtherCharges = 0;
 
   for (const charge of sortedCharges) {
     let chargeAmount = 0;
 
-    if (charge.charge_key === 'shipping') {
-      // Shipping is weight * rate
-      chargeAmount = weightKg * shippingRatePerKg;
-      shippingCost = chargeAmount;
-    } else if (charge.charge_type === 'percentage') {
+    if (charge.charge_type === 'percentage') {
       let base = 0;
       
       switch (charge.applies_to) {
         case 'product_cost':
+          // Percentage of product cost only
           base = productCost;
           break;
         case 'subtotal':
-          base = runningTotal;
+          // Percentage of product cost + previous charges (not shipping)
+          base = productCost + dutyAndOtherCharges;
           break;
         case 'cumulative':
-          // Cumulative means product cost + all previous charges including shipping
-          base = runningTotal + shippingCost;
+          // Percentage of product cost + duty/other charges + shipping
+          base = productCost + dutyAndOtherCharges + shippingCost;
           break;
       }
       
@@ -179,20 +179,26 @@ export function calculateShopForMeCharges(
       percentage: charge.charge_type === 'percentage' ? charge.charge_value : undefined,
     });
 
-    if (charge.charge_key !== 'shipping') {
-      runningTotal += chargeAmount;
-    }
+    // Track non-shipping charges for cumulative calculations
+    dutyAndOtherCharges += chargeAmount;
   }
 
-  // Add shipping to breakdown if not already added
-  const hasShippingCharge = charges.some(c => c.charge_key === 'shipping');
-  if (!hasShippingCharge && weightKg > 0) {
-    shippingCost = weightKg * shippingRatePerKg;
-    breakdown.push({
-      name: 'Shipping Charges',
-      key: 'shipping',
-      amount: shippingCost,
-    });
+  // Add shipping to breakdown (after duty, before handling if handling is cumulative)
+  // We need to insert shipping in the right position for display
+  // Find where to insert shipping (after duty_clearing, before handling_fee)
+  const handlingIndex = breakdown.findIndex(b => b.key === 'handling_fee');
+  const shippingEntry = {
+    name: 'Shipping Charges',
+    key: 'shipping',
+    amount: shippingCost,
+  };
+
+  if (handlingIndex !== -1) {
+    // Insert shipping before handling fee
+    breakdown.splice(handlingIndex, 0, shippingEntry);
+  } else {
+    // Add at the end
+    breakdown.push(shippingEntry);
   }
 
   // Calculate total
