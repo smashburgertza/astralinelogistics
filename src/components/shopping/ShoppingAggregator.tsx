@@ -167,6 +167,9 @@ export function ShoppingAggregator() {
     );
   };
 
+  // Round weight up to nearest whole number
+  const roundWeight = (weight: number) => Math.ceil(weight);
+
   const calculateTotals = () => {
     const totalProductCost = items.reduce((sum, item) => {
       if (item.productPrice) {
@@ -176,7 +179,7 @@ export function ShoppingAggregator() {
     }, 0);
 
     const totalWeight = items.reduce((sum, item) => {
-      return sum + item.estimatedWeightKg * item.quantity;
+      return sum + roundWeight(item.estimatedWeightKg) * item.quantity;
     }, 0);
 
     // Use the first item's region or default to selected region
@@ -368,7 +371,7 @@ export function ShoppingAggregator() {
                       </p>
                     )}
                     <p className="text-xs text-muted-foreground">
-                      Est. weight: {item.estimatedWeightKg} kg
+                      Est. weight: {roundWeight(item.estimatedWeightKg)} kg
                     </p>
                   </div>
 
@@ -443,7 +446,7 @@ export function ShoppingAggregator() {
                   )}
                   {item.key === 'shipping' && (
                     <span className="ml-1 text-xs">
-                      ({totals.totalWeight.toFixed(2)} kg × {formatCurrency(totals.shippingRate)}/kg)
+                      ({totals.totalWeight} kg × {formatCurrency(totals.shippingRate)}/kg)
                     </span>
                   )}
                 </span>
@@ -457,7 +460,7 @@ export function ShoppingAggregator() {
                 <span className="text-muted-foreground">
                   Shipping Charges
                   <span className="ml-1 text-xs">
-                    ({totals.totalWeight.toFixed(2)} kg × {formatCurrency(totals.shippingRate)}/kg)
+                    ({totals.totalWeight} kg × {formatCurrency(totals.shippingRate)}/kg)
                   </span>
                 </span>
                 <span className="font-medium">
