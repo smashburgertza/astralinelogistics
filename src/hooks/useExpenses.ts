@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables, TablesInsert } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
+import { createExpenseApprovalJournalEntry } from '@/lib/journalEntryUtils';
 
 export type Expense = Tables<'expenses'> & {
   status?: string;
@@ -229,11 +230,27 @@ export function useApproveExpense() {
         });
       }
 
+      // Auto-create journal entry for approved expense (Expense debit, AP credit)
+      try {
+        await createExpenseApprovalJournalEntry({
+          expenseId: data.id,
+          category: data.category,
+          amount: Number(data.amount),
+          currency: data.currency || 'USD',
+          description: data.description || undefined,
+          exchangeRate: 1, // Could be enhanced to fetch from exchange rates table
+        });
+      } catch (journalError) {
+        console.error('Failed to create expense journal entry:', journalError);
+        // Don't fail the approval if journal entry fails
+      }
+
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
       queryClient.invalidateQueries({ queryKey: ['expense-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
       toast.success('Expense approved');
     },
     onError: (error: Error) => {
