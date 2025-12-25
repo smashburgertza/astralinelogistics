@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Scan, Check, X, Package, Trash2, CheckCircle2 } from 'lucide-react';
+import { Scan, Check, X, Package, Trash2, CheckCircle2, Camera, Keyboard } from 'lucide-react';
 import { format } from 'date-fns';
 import {
   Dialog,
@@ -12,9 +12,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
+import { CameraBarcodeScanner } from './CameraBarcodeScanner';
 
 interface ScannedParcel {
   id: string;
@@ -37,19 +39,21 @@ export function BulkParcelScanner({ open, onOpenChange }: BulkParcelScannerProps
   const [scannedParcels, setScannedParcels] = useState<ScannedParcel[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [scanMode, setScanMode] = useState<'manual' | 'camera'>('manual');
   const inputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
   // Focus input when dialog opens
   useEffect(() => {
-    if (open && inputRef.current) {
+    if (open && inputRef.current && scanMode === 'manual') {
       setTimeout(() => inputRef.current?.focus(), 100);
     }
     if (!open) {
       setScannedParcels([]);
       setBarcode('');
+      setScanMode('manual');
     }
-  }, [open]);
+  }, [open, scanMode]);
 
   const handleScan = async () => {
     if (!barcode.trim()) return;
@@ -128,6 +132,86 @@ export function BulkParcelScanner({ open, onOpenChange }: BulkParcelScannerProps
     }
   };
 
+  const handleCameraScan = (scannedBarcode: string) => {
+    // Set barcode and trigger scan
+    setBarcode(scannedBarcode);
+    // Trigger the scan process
+    handleBarcodeProcess(scannedBarcode);
+  };
+
+  const handleBarcodeProcess = async (barcodeValue: string) => {
+    if (!barcodeValue.trim()) return;
+
+    const trimmedBarcode = barcodeValue.trim().toUpperCase();
+    
+    // Check if already scanned
+    if (scannedParcels.some(p => p.barcode.toUpperCase() === trimmedBarcode)) {
+      toast.warning('Parcel already scanned', {
+        description: `Barcode ${trimmedBarcode} is already in the list`,
+      });
+      setBarcode('');
+      return;
+    }
+
+    setIsScanning(true);
+
+    try {
+      const { data: parcel, error } = await supabase
+        .from('parcels')
+        .select(`
+          id,
+          barcode,
+          weight_kg,
+          description,
+          shipment_id,
+          picked_up_at,
+          shipments!inner (
+            tracking_number,
+            customers (
+              name
+            )
+          )
+        `)
+        .ilike('barcode', trimmedBarcode)
+        .single();
+
+      if (error || !parcel) {
+        toast.error('Parcel not found', {
+          description: `No parcel found with barcode ${trimmedBarcode}`,
+        });
+        setBarcode('');
+        return;
+      }
+
+      const shipment = parcel.shipments as { tracking_number: string; customers: { name: string } | null };
+
+      setScannedParcels(prev => [
+        {
+          id: parcel.id,
+          barcode: parcel.barcode,
+          weight_kg: parcel.weight_kg,
+          description: parcel.description,
+          shipment_id: parcel.shipment_id,
+          tracking_number: shipment.tracking_number,
+          customer_name: shipment.customers?.name || 'Unknown',
+          already_picked_up: !!parcel.picked_up_at,
+        },
+        ...prev,
+      ]);
+
+      toast.success('Parcel scanned', {
+        description: `${parcel.barcode} added to queue`,
+      });
+    } catch (err) {
+      toast.error('Scan failed', {
+        description: 'An error occurred while scanning the parcel',
+      });
+    } finally {
+      setIsScanning(false);
+      setBarcode('');
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -141,7 +225,9 @@ export function BulkParcelScanner({ open, onOpenChange }: BulkParcelScannerProps
 
   const clearAll = () => {
     setScannedParcels([]);
-    inputRef.current?.focus();
+    if (scanMode === 'manual') {
+      inputRef.current?.focus();
+    }
   };
 
   const processPickups = async () => {
@@ -201,24 +287,46 @@ export function BulkParcelScanner({ open, onOpenChange }: BulkParcelScannerProps
           </DialogDescription>
         </DialogHeader>
 
-        {/* Scanner Input */}
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Scan className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              ref={inputRef}
-              placeholder="Scan or enter barcode..."
-              value={barcode}
-              onChange={(e) => setBarcode(e.target.value)}
-              onKeyDown={handleKeyDown}
-              className="pl-10 font-mono"
-              disabled={isScanning}
+        {/* Scanner Mode Tabs */}
+        <Tabs value={scanMode} onValueChange={(v) => setScanMode(v as 'manual' | 'camera')} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="manual" className="gap-2">
+              <Keyboard className="h-4 w-4" />
+              Manual Entry
+            </TabsTrigger>
+            <TabsTrigger value="camera" className="gap-2">
+              <Camera className="h-4 w-4" />
+              Camera Scan
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="manual" className="mt-4">
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Scan className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  ref={inputRef}
+                  placeholder="Scan or enter barcode..."
+                  value={barcode}
+                  onChange={(e) => setBarcode(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  className="pl-10 font-mono"
+                  disabled={isScanning}
+                />
+              </div>
+              <Button onClick={handleScan} disabled={isScanning || !barcode.trim()}>
+                {isScanning ? 'Scanning...' : 'Add'}
+              </Button>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="camera" className="mt-4">
+            <CameraBarcodeScanner 
+              onScan={handleCameraScan} 
+              isActive={open && scanMode === 'camera'} 
             />
-          </div>
-          <Button onClick={handleScan} disabled={isScanning || !barcode.trim()}>
-            {isScanning ? 'Scanning...' : 'Add'}
-          </Button>
-        </div>
+          </TabsContent>
+        </Tabs>
 
         {/* Stats */}
         {scannedParcels.length > 0 && (
