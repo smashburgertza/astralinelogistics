@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useInvoices } from '@/hooks/useInvoices';
 import { useAllExpenses } from '@/hooks/useExpenses';
 import { useExchangeRates, convertToTZS } from '@/hooks/useExchangeRates';
@@ -16,13 +17,15 @@ import {
 } from 'recharts';
 import { 
   TrendingUp, TrendingDown, Coins, ArrowUpRight, ArrowDownRight, 
-  DollarSign, Receipt, PiggyBank, CalendarIcon, LineChartIcon 
+  DollarSign, Receipt, PiggyBank, CalendarIcon, LineChartIcon, GitCompare 
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, subDays, subYears, isWithinInterval, parseISO, eachMonthOfInterval, isSameMonth, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 const REVENUE_COLORS = ['#10B981', '#34D399', '#6EE7B7', '#A7F3D0', '#D1FAE5'];
 const EXPENSE_COLORS = ['#F59E0B', '#FBBF24', '#FCD34D', '#FDE68A', '#FEF3C7'];
+
+type ComparisonMode = 'pop' | 'yoy';
 
 type DatePreset = 'all' | 'today' | 'last7' | 'last30' | 'thisMonth' | 'lastMonth' | 'thisYear' | 'custom';
 
@@ -113,6 +116,7 @@ export default function FinancialSummaryPage() {
   const [datePreset, setDatePreset] = useState<DatePreset>('thisMonth');
   const [customFromDate, setCustomFromDate] = useState<Date>();
   const [customToDate, setCustomToDate] = useState<Date>();
+  const [comparisonMode, setComparisonMode] = useState<ComparisonMode>('pop');
 
   const dateRange = useMemo(() => 
     getDateRange(datePreset, customFromDate, customToDate),
@@ -202,7 +206,7 @@ export default function FinancialSummaryPage() {
   const netProfitTzs = totalRevenueTzs - totalExpensesTzs;
   const profitMargin = totalRevenueTzs > 0 ? (netProfitTzs / totalRevenueTzs) * 100 : 0;
 
-  // Calculate previous period for comparison
+  // Calculate previous period for comparison (Period over Period)
   const previousPeriodRange = useMemo(() => {
     if (!dateRange.from || !dateRange.to) return { from: null, to: null };
     
@@ -213,26 +217,39 @@ export default function FinancialSummaryPage() {
     return { from: prevFrom, to: prevTo };
   }, [dateRange]);
 
-  // Filter previous period invoices and expenses
+  // Calculate year-over-year period (same period last year)
+  const yoyPeriodRange = useMemo(() => {
+    if (!dateRange.from || !dateRange.to) return { from: null, to: null };
+    
+    return {
+      from: subYears(dateRange.from, 1),
+      to: subYears(dateRange.to, 1),
+    };
+  }, [dateRange]);
+
+  // Get the active comparison range based on mode
+  const comparisonRange = comparisonMode === 'yoy' ? yoyPeriodRange : previousPeriodRange;
+
+  // Filter comparison period invoices and expenses
   const prevFilteredInvoices = useMemo(() => {
-    if (!invoices || !previousPeriodRange.from || !previousPeriodRange.to) return [];
+    if (!invoices || !comparisonRange.from || !comparisonRange.to) return [];
     
     return invoices.filter(invoice => {
       const invoiceDate = invoice.paid_at ? parseISO(invoice.paid_at) : parseISO(invoice.created_at || '');
-      return isWithinInterval(invoiceDate, { start: previousPeriodRange.from!, end: previousPeriodRange.to! });
+      return isWithinInterval(invoiceDate, { start: comparisonRange.from!, end: comparisonRange.to! });
     });
-  }, [invoices, previousPeriodRange]);
+  }, [invoices, comparisonRange]);
 
   const prevFilteredExpenses = useMemo(() => {
-    if (!expenses || !previousPeriodRange.from || !previousPeriodRange.to) return [];
+    if (!expenses || !comparisonRange.from || !comparisonRange.to) return [];
     
     return expenses.filter(expense => {
       const expenseDate = parseISO(expense.created_at || '');
-      return isWithinInterval(expenseDate, { start: previousPeriodRange.from!, end: previousPeriodRange.to! });
+      return isWithinInterval(expenseDate, { start: comparisonRange.from!, end: comparisonRange.to! });
     });
-  }, [expenses, previousPeriodRange]);
+  }, [expenses, comparisonRange]);
 
-  // Calculate previous period totals
+  // Calculate comparison period totals
   const prevTotalRevenueTzs = useMemo(() => {
     if (!prevFilteredInvoices || !exchangeRates) return 0;
     
@@ -257,6 +274,14 @@ export default function FinancialSummaryPage() {
 
   const prevNetProfitTzs = prevTotalRevenueTzs - prevTotalExpensesTzs;
   const prevProfitMargin = prevTotalRevenueTzs > 0 ? (prevNetProfitTzs / prevTotalRevenueTzs) * 100 : 0;
+
+  // Get comparison label
+  const getComparisonLabel = () => {
+    if (comparisonMode === 'yoy') {
+      return 'same period last year';
+    }
+    return 'prev period';
+  };
 
   // Calculate growth percentages
   const calculateGrowth = (current: number, previous: number): number | null => {
@@ -463,8 +488,29 @@ export default function FinancialSummaryPage() {
                 </Popover>
               </div>
             </div>
-            <div className="mt-3 text-sm text-muted-foreground">
-              Showing data for: <span className="font-medium text-foreground">{getDateRangeLabel()}</span>
+            <div className="mt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="text-sm text-muted-foreground">
+                Showing data for: <span className="font-medium text-foreground">{getDateRangeLabel()}</span>
+              </div>
+              {datePreset !== 'all' && (
+                <div className="flex items-center gap-2">
+                  <GitCompare className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">Compare:</span>
+                  <ToggleGroup 
+                    type="single" 
+                    value={comparisonMode} 
+                    onValueChange={(value) => value && setComparisonMode(value as ComparisonMode)}
+                    size="sm"
+                  >
+                    <ToggleGroupItem value="pop" className="text-xs px-3">
+                      Period over Period
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="yoy" className="text-xs px-3">
+                      Year over Year
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -486,7 +532,7 @@ export default function FinancialSummaryPage() {
                   </p>
                   {datePreset !== 'all' && prevTotalRevenueTzs > 0 && (
                     <p className="text-xs text-muted-foreground mt-1">
-                      vs TZS {prevTotalRevenueTzs.toLocaleString()} prev period
+                      vs TZS {prevTotalRevenueTzs.toLocaleString()} {getComparisonLabel()}
                     </p>
                   )}
                 </div>
@@ -510,7 +556,7 @@ export default function FinancialSummaryPage() {
                   </p>
                   {datePreset !== 'all' && prevTotalExpensesTzs > 0 && (
                     <p className="text-xs text-muted-foreground mt-1">
-                      vs TZS {prevTotalExpensesTzs.toLocaleString()} prev period
+                      vs TZS {prevTotalExpensesTzs.toLocaleString()} {getComparisonLabel()}
                     </p>
                   )}
                 </div>
@@ -534,7 +580,7 @@ export default function FinancialSummaryPage() {
                   </p>
                   {datePreset !== 'all' && (prevNetProfitTzs !== 0 || prevTotalRevenueTzs > 0) && (
                     <p className="text-xs text-muted-foreground mt-1">
-                      vs TZS {prevNetProfitTzs.toLocaleString()} prev period
+                      vs TZS {prevNetProfitTzs.toLocaleString()} {getComparisonLabel()}
                     </p>
                   )}
                 </div>
@@ -573,7 +619,7 @@ export default function FinancialSummaryPage() {
                   </p>
                   {datePreset !== 'all' && prevProfitMargin !== 0 && (
                     <p className="text-xs text-muted-foreground mt-1">
-                      vs {prevProfitMargin.toFixed(1)}% prev period
+                      vs {prevProfitMargin.toFixed(1)}% {getComparisonLabel()}
                     </p>
                   )}
                 </div>
