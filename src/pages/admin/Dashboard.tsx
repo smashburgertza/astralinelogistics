@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { REGIONS, SHIPMENT_STATUSES, type Region, type ShipmentStatus } from '@/lib/constants';
 import { format, subMonths, startOfMonth, endOfMonth, startOfDay, endOfDay } from 'date-fns';
 import { EmployeePerformanceInsights } from '@/components/admin/EmployeePerformanceInsights';
+import { EmployeeLeaderboard } from '@/components/admin/EmployeeLeaderboard';
 import { LiveActivityFeed } from '@/components/admin/LiveActivityFeed';
 import { Link } from 'react-router-dom';
 import {
@@ -628,9 +629,14 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
-      {/* Employee Performance & Live Activity */}
+      {/* Employee Performance & Leaderboard */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <EmployeePerformanceInsights />
+        <EmployeeLeaderboard />
+      </div>
+
+      {/* Live Activity Feed */}
+      <div className="mb-8">
         <LiveActivityFeed />
       </div>
 
