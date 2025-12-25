@@ -1,4 +1,4 @@
-import { Users, ShieldCheck, Shield, FileText } from 'lucide-react';
+import { Users, ShieldCheck, Shield, FileText, Settings2 } from 'lucide-react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -6,6 +6,7 @@ import { StatCard } from '@/components/admin/StatCard';
 import { EmployeeTable } from '@/components/admin/EmployeeTable';
 import { CreateEmployeeDialog } from '@/components/admin/CreateEmployeeDialog';
 import { AuditLogTable } from '@/components/admin/AuditLogTable';
+import { CustomRolesSection } from '@/components/admin/CustomRolesSection';
 import { useEmployees } from '@/hooks/useEmployees';
 
 export default function AdminEmployeesPage() {
@@ -42,6 +43,10 @@ export default function AdminEmployeesPage() {
               <Users className="h-4 w-4" />
               Staff Members
             </TabsTrigger>
+            <TabsTrigger value="roles" className="gap-2">
+              <Settings2 className="h-4 w-4" />
+              Custom Roles
+            </TabsTrigger>
             <TabsTrigger value="audit" className="gap-2">
               <FileText className="h-4 w-4" />
               Audit Logs
@@ -58,6 +63,10 @@ export default function AdminEmployeesPage() {
                 <EmployeeTable />
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="roles">
+            <CustomRolesSection />
           </TabsContent>
 
           <TabsContent value="audit">
