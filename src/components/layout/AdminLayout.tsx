@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, PackageSearch, UsersRound, FileStack, Wallet,
   ChartSpline, Settings2, LogOut, BellRing, Search, ChevronDown, UserCircle2,
-  Container, UserCog, ReceiptText, TrendingUp, ShoppingCart, FileText, User
+  Container, UserCog, ReceiptText, TrendingUp, ShoppingCart, FileText, User, Calculator
 } from 'lucide-react';
 import astralineLogo from '@/assets/astraline-logo.svg';
 import { Button } from '@/components/ui/button';
@@ -52,6 +52,7 @@ const mainNavItems = [
 ];
 
 const financeNavItems = [
+  { label: 'Accounting', href: '/admin/accounting', icon: Calculator },
   { label: 'Expenses', href: '/admin/expenses', icon: Wallet },
   { label: 'Commissions', href: '/admin/commissions', icon: TrendingUp },
   { label: 'Reports', href: '/admin/reports', icon: ChartSpline },
