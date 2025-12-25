@@ -6,6 +6,8 @@ import { toast } from 'sonner';
 export type Invoice = Tables<'invoices'> & {
   customers?: Tables<'customers'> | null;
   shipments?: Tables<'shipments'> | null;
+  amount_in_tzs?: number | null;
+  payment_currency?: string | null;
 };
 
 export function useInvoices(filters?: {
