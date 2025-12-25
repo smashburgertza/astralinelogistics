@@ -482,6 +482,42 @@ export type Database = {
         }
         Relationships: []
       }
+      employee_badges: {
+        Row: {
+          achieved_at: string
+          badge_tier: string
+          badge_type: string
+          employee_id: string
+          id: string
+          metric_type: string
+          rank_achieved: number
+          time_period: string
+          value_achieved: number
+        }
+        Insert: {
+          achieved_at?: string
+          badge_tier: string
+          badge_type: string
+          employee_id: string
+          id?: string
+          metric_type: string
+          rank_achieved: number
+          time_period: string
+          value_achieved?: number
+        }
+        Update: {
+          achieved_at?: string
+          badge_tier?: string
+          badge_type?: string
+          employee_id?: string
+          id?: string
+          metric_type?: string
+          rank_achieved?: number
+          time_period?: string
+          value_achieved?: number
+        }
+        Relationships: []
+      }
       employee_milestones: {
         Row: {
           achieved_at: string

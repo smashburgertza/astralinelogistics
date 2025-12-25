@@ -12,7 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   User, Mail, Phone, Calendar, FileText, DollarSign,
   Package, TrendingUp, Award, BarChart3, Clock, CheckCircle,
-  XCircle, AlertCircle, ArrowUpRight, ArrowDownRight, Trophy
+  XCircle, AlertCircle, ArrowUpRight, ArrowDownRight, Trophy, Medal
 } from 'lucide-react';
 import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import {
@@ -20,6 +20,8 @@ import {
   ResponsiveContainer, BarChart, Bar
 } from 'recharts';
 import { MILESTONES } from '@/hooks/useEmployeeMilestones';
+import { useEmployeeBadges } from '@/hooks/useEmployeeBadges';
+import { BadgeShowcase } from '@/components/admin/EmployeeBadgesDisplay';
 
 interface EmployeeProfileDrawerProps {
   open: boolean;
@@ -71,6 +73,8 @@ export function EmployeeProfileDrawer({ open, onOpenChange, employeeId }: Employ
     milestone_value: string;
     achieved_at: string;
   }>>([]);
+  
+  const { badges, isLoading: badgesLoading } = useEmployeeBadges(employeeId || undefined);
 
   useEffect(() => {
     if (open && employeeId) {
@@ -406,9 +410,13 @@ export function EmployeeProfileDrawer({ open, onOpenChange, employeeId }: Employ
 
                 {/* Tabs for Charts and Activity */}
                 <Tabs defaultValue="performance" className="w-full">
-                  <TabsList className="grid w-full grid-cols-4">
+                  <TabsList className="grid w-full grid-cols-5">
                     <TabsTrigger value="performance">Performance</TabsTrigger>
                     <TabsTrigger value="revenue">Revenue</TabsTrigger>
+                    <TabsTrigger value="badges">
+                      <Medal className="w-3.5 h-3.5 mr-1" />
+                      Badges
+                    </TabsTrigger>
                     <TabsTrigger value="milestones">
                       <Trophy className="w-3.5 h-3.5 mr-1" />
                       Milestones
@@ -484,6 +492,27 @@ export function EmployeeProfileDrawer({ open, onOpenChange, employeeId }: Employ
                             />
                           </AreaChart>
                         </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  <TabsContent value="badges" className="mt-4">
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium flex items-center gap-2">
+                          <Medal className="w-4 h-4 text-amber-500" />
+                          Performance Badges
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {badgesLoading ? (
+                          <div className="animate-pulse space-y-3">
+                            <div className="h-20 bg-muted/50 rounded-lg" />
+                            <div className="h-16 bg-muted/50 rounded-lg" />
+                          </div>
+                        ) : (
+                          <BadgeShowcase badges={badges} />
+                        )}
                       </CardContent>
                     </Card>
                   </TabsContent>
