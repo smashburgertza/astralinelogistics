@@ -85,29 +85,27 @@ export function AdminLayout({ children, title, subtitle }: AdminLayoutProps) {
     <SidebarProvider defaultOpen={true}>
       <div className="min-h-screen flex w-full bg-muted/30">
         {/* Sidebar */}
-        <Sidebar collapsible="icon" className="border-r-0">
+        <Sidebar collapsible="icon" className="border-r border-sidebar-border shadow-sm">
           {/* Logo */}
-          <SidebarHeader className="p-4 border-b border-sidebar-border">
+          <SidebarHeader className="p-5 border-b border-sidebar-border">
             <Link to="/admin" className="flex items-center gap-3">
-              <img 
-                src={astralineLogo} 
-                alt="Astraline" 
-                className="h-10 w-auto group-data-[collapsible=icon]:hidden"
-              />
-              <div className="hidden group-data-[collapsible=icon]:block w-10 h-10 rounded-xl bg-primary flex items-center justify-center font-heading font-bold text-lg text-primary-foreground shadow-gold">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent to-accent/80 flex items-center justify-center font-bold text-lg text-accent-foreground shadow-md">
                 A
               </div>
+              <span className="font-bold text-lg text-foreground group-data-[collapsible=icon]:hidden">
+                Astraline
+              </span>
             </Link>
           </SidebarHeader>
 
-          <SidebarContent className="px-2 py-4">
+          <SidebarContent className="px-3 py-4">
             {/* Main Navigation */}
             <SidebarGroup>
-              <SidebarGroupLabel className="text-sidebar-foreground/50 uppercase text-xs tracking-wider">
+              <SidebarGroupLabel className="text-muted-foreground/70 uppercase text-[11px] font-semibold tracking-wider mb-2">
                 Main
               </SidebarGroupLabel>
               <SidebarGroupContent>
-                <SidebarMenu>
+                <SidebarMenu className="space-y-1">
                   {mainNavItems.map((item) => (
                     <SidebarMenuItem key={item.href}>
                       <SidebarMenuButton
@@ -115,8 +113,10 @@ export function AdminLayout({ children, title, subtitle }: AdminLayoutProps) {
                         isActive={isActive(item.href)}
                         tooltip={item.label}
                         className={cn(
-                          "transition-all duration-200",
-                          isActive(item.href) && "bg-primary/10 text-primary border-l-2 border-primary"
+                          "transition-all duration-200 rounded-lg font-medium",
+                          isActive(item.href) 
+                            ? "bg-accent text-accent-foreground shadow-sm" 
+                            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                         )}
                       >
                         <Link to={item.href}>
@@ -132,11 +132,11 @@ export function AdminLayout({ children, title, subtitle }: AdminLayoutProps) {
 
             {/* Finance */}
             <SidebarGroup>
-              <SidebarGroupLabel className="text-sidebar-foreground/50 uppercase text-xs tracking-wider">
+              <SidebarGroupLabel className="text-muted-foreground/70 uppercase text-[11px] font-semibold tracking-wider mb-2">
                 Finance
               </SidebarGroupLabel>
               <SidebarGroupContent>
-                <SidebarMenu>
+                <SidebarMenu className="space-y-1">
                   {financeNavItems.map((item) => (
                     <SidebarMenuItem key={item.href}>
                       <SidebarMenuButton
@@ -144,8 +144,10 @@ export function AdminLayout({ children, title, subtitle }: AdminLayoutProps) {
                         isActive={isActive(item.href)}
                         tooltip={item.label}
                         className={cn(
-                          "transition-all duration-200",
-                          isActive(item.href) && "bg-primary/10 text-primary border-l-2 border-primary"
+                          "transition-all duration-200 rounded-lg font-medium",
+                          isActive(item.href) 
+                            ? "bg-accent text-accent-foreground shadow-sm" 
+                            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                         )}
                       >
                         <Link to={item.href}>
@@ -161,11 +163,11 @@ export function AdminLayout({ children, title, subtitle }: AdminLayoutProps) {
 
             {/* Management */}
             <SidebarGroup>
-              <SidebarGroupLabel className="text-sidebar-foreground/50 uppercase text-xs tracking-wider">
+              <SidebarGroupLabel className="text-muted-foreground/70 uppercase text-[11px] font-semibold tracking-wider mb-2">
                 Management
               </SidebarGroupLabel>
               <SidebarGroupContent>
-                <SidebarMenu>
+                <SidebarMenu className="space-y-1">
                   {managementNavItems.map((item) => (
                     <SidebarMenuItem key={item.href}>
                       <SidebarMenuButton
@@ -173,8 +175,10 @@ export function AdminLayout({ children, title, subtitle }: AdminLayoutProps) {
                         isActive={isActive(item.href)}
                         tooltip={item.label}
                         className={cn(
-                          "transition-all duration-200",
-                          isActive(item.href) && "bg-primary/10 text-primary border-l-2 border-primary"
+                          "transition-all duration-200 rounded-lg font-medium",
+                          isActive(item.href) 
+                            ? "bg-accent text-accent-foreground shadow-sm" 
+                            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                         )}
                       >
                         <Link to={item.href}>
@@ -193,21 +197,21 @@ export function AdminLayout({ children, title, subtitle }: AdminLayoutProps) {
           <SidebarFooter className="p-4 border-t border-sidebar-border">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-sidebar-accent transition-colors group-data-[collapsible=icon]:justify-center">
-                  <Avatar className="h-9 w-9 bg-primary">
-                    <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">
+                <button className="flex items-center gap-3 w-full p-2.5 rounded-xl hover:bg-sidebar-accent transition-colors group-data-[collapsible=icon]:justify-center">
+                  <Avatar className="h-9 w-9 bg-accent">
+                    <AvatarFallback className="bg-accent text-accent-foreground text-sm font-semibold">
                       {userInitials}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 text-left group-data-[collapsible=icon]:hidden">
-                    <p className="text-sm font-medium text-sidebar-primary-foreground truncate">
+                    <p className="text-sm font-medium text-foreground truncate">
                       {profile?.full_name || 'Admin User'}
                     </p>
-                    <p className="text-xs text-sidebar-foreground/60 truncate">
+                    <p className="text-xs text-muted-foreground truncate">
                       {hasRole('super_admin') ? 'Super Admin' : 'Employee'}
                     </p>
                   </div>
-                  <ChevronDown className="w-4 h-4 text-sidebar-foreground/50 group-data-[collapsible=icon]:hidden" />
+                  <ChevronDown className="w-4 h-4 text-muted-foreground group-data-[collapsible=icon]:hidden" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
