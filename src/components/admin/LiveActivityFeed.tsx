@@ -12,10 +12,12 @@ import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { REGIONS, type Region } from '@/lib/constants';
 
+type ActivityType = 'shipment' | 'invoice' | 'estimate' | 'customer' | 'expense';
+
 interface ActivityItem {
   id: string;
   recordId: string;
-  type: 'shipment' | 'invoice' | 'estimate' | 'customer' | 'expense';
+  type: ActivityType;
   action: string;
   title: string;
   description: string;
@@ -29,11 +31,25 @@ interface ActivityItem {
   link?: string;
 }
 
+const ACTIVITY_FILTERS: { type: ActivityType | 'all'; label: string; icon: typeof Package }[] = [
+  { type: 'all', label: 'All', icon: Activity },
+  { type: 'shipment', label: 'Shipments', icon: Package },
+  { type: 'invoice', label: 'Invoices', icon: FileText },
+  { type: 'estimate', label: 'Estimates', icon: FileText },
+  { type: 'customer', label: 'Customers', icon: UserPlus },
+  { type: 'expense', label: 'Expenses', icon: DollarSign },
+];
+
 export function LiveActivityFeed() {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<ActivityType | 'all'>('all');
   const navigate = useNavigate();
+
+  const filteredActivities = activeFilter === 'all' 
+    ? activities 
+    : activities.filter(a => a.type === activeFilter);
 
   useEffect(() => {
     fetchRecentActivity();
@@ -372,6 +388,29 @@ export function LiveActivityFeed() {
             </button>
           </div>
         </div>
+        
+        {/* Activity Type Filters */}
+        <div className="flex flex-wrap gap-1.5 mt-3">
+          {ACTIVITY_FILTERS.map(({ type, label, icon: FilterIcon }) => (
+            <button
+              key={type}
+              onClick={() => setActiveFilter(type)}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                activeFilter === type
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+              }`}
+            >
+              <FilterIcon className="w-3 h-3" />
+              {label}
+              {type !== 'all' && (
+                <span className={`ml-0.5 ${activeFilter === type ? 'text-primary-foreground/80' : 'text-muted-foreground/70'}`}>
+                  ({activities.filter(a => a.type === type).length})
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
       </CardHeader>
       <CardContent>
         {loading ? (
@@ -380,16 +419,18 @@ export function LiveActivityFeed() {
               <div key={i} className="h-16 bg-muted/50 rounded-lg" />
             ))}
           </div>
-        ) : activities.length === 0 ? (
+        ) : filteredActivities.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <Clock className="w-12 h-12 mx-auto mb-3 text-muted-foreground/30" />
-            <p className="text-sm">No recent activity</p>
-            <p className="text-xs text-muted-foreground/70 mt-1">Activity from the last 24 hours will appear here</p>
+            <p className="text-sm">No {activeFilter === 'all' ? 'recent' : activeFilter} activity</p>
+            <p className="text-xs text-muted-foreground/70 mt-1">
+              {activeFilter === 'all' ? 'Activity from the last 24 hours will appear here' : `No ${activeFilter} updates in the last 24 hours`}
+            </p>
           </div>
         ) : (
           <ScrollArea className="h-[400px] pr-4">
             <div className="space-y-2">
-              {activities.map((activity) => {
+              {filteredActivities.map((activity) => {
                 const Icon = getActivityIcon(activity.type, activity.action);
                 const colorClass = getActivityColor(activity.type, activity.action);
                 const amountDisplay = formatAmount(activity.amount, activity.currency);
