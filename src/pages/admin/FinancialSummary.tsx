@@ -1,7 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useInvoices } from '@/hooks/useInvoices';
 import { useAllExpenses } from '@/hooks/useExpenses';
 import { useExchangeRates, convertToTZS } from '@/hooks/useExchangeRates';
@@ -12,11 +15,26 @@ import {
 } from 'recharts';
 import { 
   TrendingUp, TrendingDown, Coins, ArrowUpRight, ArrowDownRight, 
-  DollarSign, Receipt, PiggyBank 
+  DollarSign, Receipt, PiggyBank, CalendarIcon 
 } from 'lucide-react';
+import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, subDays, isWithinInterval, parseISO } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 const REVENUE_COLORS = ['#10B981', '#34D399', '#6EE7B7', '#A7F3D0', '#D1FAE5'];
 const EXPENSE_COLORS = ['#F59E0B', '#FBBF24', '#FCD34D', '#FDE68A', '#FEF3C7'];
+
+type DatePreset = 'all' | 'today' | 'last7' | 'last30' | 'thisMonth' | 'lastMonth' | 'thisYear' | 'custom';
+
+const DATE_PRESETS: { label: string; value: DatePreset }[] = [
+  { label: 'All Time', value: 'all' },
+  { label: 'Today', value: 'today' },
+  { label: 'Last 7 Days', value: 'last7' },
+  { label: 'Last 30 Days', value: 'last30' },
+  { label: 'This Month', value: 'thisMonth' },
+  { label: 'Last Month', value: 'lastMonth' },
+  { label: 'This Year', value: 'thisYear' },
+  { label: 'Custom', value: 'custom' },
+];
 
 const CurrencyTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
@@ -57,16 +75,77 @@ const ComparisonTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
+const getDateRange = (preset: DatePreset, customFrom?: Date, customTo?: Date): { from: Date | null; to: Date | null } => {
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  
+  switch (preset) {
+    case 'all':
+      return { from: null, to: null };
+    case 'today':
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      return { from: startOfToday, to: today };
+    case 'last7':
+      return { from: subDays(today, 7), to: today };
+    case 'last30':
+      return { from: subDays(today, 30), to: today };
+    case 'thisMonth':
+      return { from: startOfMonth(today), to: endOfMonth(today) };
+    case 'lastMonth':
+      const lastMonth = subMonths(today, 1);
+      return { from: startOfMonth(lastMonth), to: endOfMonth(lastMonth) };
+    case 'thisYear':
+      return { from: startOfYear(today), to: endOfYear(today) };
+    case 'custom':
+      return { from: customFrom || null, to: customTo || null };
+    default:
+      return { from: null, to: null };
+  }
+};
+
 export default function FinancialSummaryPage() {
   const { data: invoices } = useInvoices({});
   const { data: expenses } = useAllExpenses({});
   const { data: exchangeRates } = useExchangeRates();
+  
+  const [datePreset, setDatePreset] = useState<DatePreset>('thisMonth');
+  const [customFromDate, setCustomFromDate] = useState<Date>();
+  const [customToDate, setCustomToDate] = useState<Date>();
+
+  const dateRange = useMemo(() => 
+    getDateRange(datePreset, customFromDate, customToDate),
+    [datePreset, customFromDate, customToDate]
+  );
+
+  // Filter invoices and expenses by date range
+  const filteredInvoices = useMemo(() => {
+    if (!invoices) return [];
+    if (!dateRange.from && !dateRange.to) return invoices;
+    
+    return invoices.filter(invoice => {
+      const invoiceDate = invoice.paid_at ? parseISO(invoice.paid_at) : parseISO(invoice.created_at || '');
+      if (!dateRange.from || !dateRange.to) return true;
+      return isWithinInterval(invoiceDate, { start: dateRange.from, end: dateRange.to });
+    });
+  }, [invoices, dateRange]);
+
+  const filteredExpenses = useMemo(() => {
+    if (!expenses) return [];
+    if (!dateRange.from && !dateRange.to) return expenses;
+    
+    return expenses.filter(expense => {
+      const expenseDate = parseISO(expense.created_at || '');
+      if (!dateRange.from || !dateRange.to) return true;
+      return isWithinInterval(expenseDate, { start: dateRange.from, end: dateRange.to });
+    });
+  }, [expenses, dateRange]);
 
   // Calculate revenue by currency
   const revenueBreakdown = useMemo(() => {
-    if (!invoices || !exchangeRates) return [];
+    if (!filteredInvoices || !exchangeRates) return [];
     
-    const paidInvoices = invoices.filter(i => i.status === 'paid');
+    const paidInvoices = filteredInvoices.filter(i => i.status === 'paid');
     const byCurrency: Record<string, number> = {};
     
     paidInvoices.forEach(invoice => {
@@ -87,13 +166,13 @@ export default function FinancialSummaryPage() {
       ...item,
       percentage: total > 0 ? (item.amountInTzs / total) * 100 : 0,
     })).sort((a, b) => b.amountInTzs - a.amountInTzs);
-  }, [invoices, exchangeRates]);
+  }, [filteredInvoices, exchangeRates]);
 
   // Calculate expenses by currency
   const expenseBreakdown = useMemo(() => {
-    if (!expenses || !exchangeRates) return [];
+    if (!filteredExpenses || !exchangeRates) return [];
     
-    const approvedExpenses = expenses.filter(e => e.status === 'approved');
+    const approvedExpenses = filteredExpenses.filter(e => e.status === 'approved');
     const byCurrency: Record<string, number> = {};
     
     approvedExpenses.forEach(expense => {
@@ -114,7 +193,7 @@ export default function FinancialSummaryPage() {
       ...item,
       percentage: total > 0 ? (item.amountInTzs / total) * 100 : 0,
     })).sort((a, b) => b.amountInTzs - a.amountInTzs);
-  }, [expenses, exchangeRates]);
+  }, [filteredExpenses, exchangeRates]);
 
   // Calculate totals
   const totalRevenueTzs = revenueBreakdown.reduce((sum, item) => sum + item.amountInTzs, 0);
@@ -141,12 +220,102 @@ export default function FinancialSummaryPage() {
     }).sort((a, b) => b.revenue - a.revenue);
   }, [revenueBreakdown, expenseBreakdown]);
 
+  const getDateRangeLabel = () => {
+    if (datePreset === 'all') return 'All Time';
+    if (datePreset === 'custom' && customFromDate && customToDate) {
+      return `${format(customFromDate, 'MMM d, yyyy')} - ${format(customToDate, 'MMM d, yyyy')}`;
+    }
+    if (dateRange.from && dateRange.to) {
+      return `${format(dateRange.from, 'MMM d, yyyy')} - ${format(dateRange.to, 'MMM d, yyyy')}`;
+    }
+    return DATE_PRESETS.find(p => p.value === datePreset)?.label || '';
+  };
+
   return (
     <AdminLayout 
       title="Financial Summary" 
       subtitle="Revenue vs expenses breakdown with net profit calculations"
     >
       <div className="space-y-6">
+        {/* Date Range Filter */}
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+              <div className="flex flex-wrap gap-2">
+                {DATE_PRESETS.filter(p => p.value !== 'custom').map((preset) => (
+                  <Button
+                    key={preset.value}
+                    variant={datePreset === preset.value ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setDatePreset(preset.value)}
+                  >
+                    {preset.label}
+                  </Button>
+                ))}
+              </div>
+              <div className="flex gap-2 items-center">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={datePreset === 'custom' ? 'default' : 'outline'}
+                      size="sm"
+                      className={cn(
+                        "justify-start text-left font-normal",
+                        datePreset === 'custom' && !customFromDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {customFromDate ? format(customFromDate, 'MMM d, yyyy') : 'From'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar
+                      mode="single"
+                      selected={customFromDate}
+                      onSelect={(date) => {
+                        setCustomFromDate(date);
+                        setDatePreset('custom');
+                      }}
+                      initialFocus
+                      className="p-3 pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+                <span className="text-muted-foreground">to</span>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={datePreset === 'custom' ? 'default' : 'outline'}
+                      size="sm"
+                      className={cn(
+                        "justify-start text-left font-normal",
+                        datePreset === 'custom' && !customToDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {customToDate ? format(customToDate, 'MMM d, yyyy') : 'To'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar
+                      mode="single"
+                      selected={customToDate}
+                      onSelect={(date) => {
+                        setCustomToDate(date);
+                        setDatePreset('custom');
+                      }}
+                      initialFocus
+                      className="p-3 pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+            <div className="mt-3 text-sm text-muted-foreground">
+              Showing data for: <span className="font-medium text-foreground">{getDateRangeLabel()}</span>
+            </div>
+          </CardContent>
+        </Card>
         {/* Key Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20">
