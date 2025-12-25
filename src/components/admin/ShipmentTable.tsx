@@ -7,18 +7,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
-import { MoreHorizontal, Package, Plane, MapPin, CheckCircle, Eye, Copy } from 'lucide-react';
+import { Package, Plane, MapPin, CheckCircle, Eye, Copy } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { format } from 'date-fns';
 import { ShipmentStatusBadge } from './ShipmentStatusBadge';
 import { ShipmentDetailDrawer } from './ShipmentDetailDrawer';
@@ -137,7 +130,7 @@ export function ShipmentTable({
             <TableHead className="font-semibold">Weight</TableHead>
             <TableHead className="font-semibold">Status</TableHead>
             <TableHead className="font-semibold">Date</TableHead>
-            <TableHead className="w-[50px]"></TableHead>
+            <TableHead className="font-semibold text-right">Quick Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -198,52 +191,58 @@ export function ShipmentTable({
                   {format(new Date(shipment.created_at || ''), 'MMM d, yyyy')}
                 </TableCell>
                 <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48">
-                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuItem
-                        onClick={() => {
-                          setSelectedShipment(shipment);
-                          setDrawerOpen(true);
-                        }}
-                      >
-                        <Eye className="h-4 w-4 mr-2" />
-                        View Details
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuLabel className="text-xs text-muted-foreground">
-                        Update Status
-                      </DropdownMenuLabel>
-                      {Object.entries(SHIPMENT_STATUSES).map(([key, { label }]) => {
-                        const icons = {
-                          collected: Package,
-                          in_transit: Plane,
-                          arrived: MapPin,
-                          delivered: CheckCircle,
-                        };
-                        const Icon = icons[key as keyof typeof icons];
-                        const isCurrentStatus = shipment.status === key;
-                        
-                        return (
-                          <DropdownMenuItem
-                            key={key}
-                            disabled={isCurrentStatus || updateStatus.isPending}
-                            onClick={() => updateStatus.mutate({ id: shipment.id, status: key })}
-                            className={isCurrentStatus ? 'bg-muted' : ''}
-                          >
-                            <Icon className="h-4 w-4 mr-2" />
-                            {label}
-                            {isCurrentStatus && <span className="ml-auto text-xs">(current)</span>}
-                          </DropdownMenuItem>
-                        );
-                      })}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <div className="flex items-center justify-end gap-1">
+                    {/* Quick status buttons */}
+                    {Object.entries(SHIPMENT_STATUSES).map(([key, { label }]) => {
+                      const icons = {
+                        collected: Package,
+                        in_transit: Plane,
+                        arrived: MapPin,
+                        delivered: CheckCircle,
+                      };
+                      const Icon = icons[key as keyof typeof icons];
+                      const isCurrentStatus = shipment.status === key;
+                      
+                      return (
+                        <Tooltip key={key}>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant={isCurrentStatus ? "default" : "outline"}
+                              size="icon"
+                              className={`h-7 w-7 ${isCurrentStatus ? '' : 'opacity-50 hover:opacity-100'}`}
+                              disabled={isCurrentStatus || updateStatus.isPending}
+                              onClick={() => updateStatus.mutate({ id: shipment.id, status: key })}
+                            >
+                              <Icon className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{isCurrentStatus ? `Current: ${label}` : `Set to ${label}`}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      );
+                    })}
+                    
+                    {/* View details button */}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 ml-1"
+                          onClick={() => {
+                            setSelectedShipment(shipment);
+                            setDrawerOpen(true);
+                          }}
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>View Details</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
                 </TableCell>
               </TableRow>
             );
