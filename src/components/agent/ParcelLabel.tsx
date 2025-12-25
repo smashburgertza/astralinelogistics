@@ -1,5 +1,6 @@
-import { QrCode, Package, Weight, MapPin, User, Phone } from 'lucide-react';
+import { Package, Weight, MapPin, User, Phone } from 'lucide-react';
 import { format } from 'date-fns';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface ParcelLabelProps {
   parcel: {
@@ -19,6 +20,15 @@ interface ParcelLabelProps {
 }
 
 export function ParcelLabel({ parcel, shipmentInfo }: ParcelLabelProps) {
+  // Generate QR code data with all relevant parcel info
+  const qrData = JSON.stringify({
+    tracking: shipmentInfo.tracking_number,
+    barcode: parcel.barcode,
+    parcel: `${shipmentInfo.parcel_index}/${shipmentInfo.total_parcels}`,
+    weight: parcel.weight_kg,
+    origin: shipmentInfo.origin_region,
+  });
+
   return (
     <div className="w-[4in] h-[6in] p-4 border-2 border-black bg-white text-black print:break-after-page">
       {/* Header */}
@@ -41,26 +51,39 @@ export function ParcelLabel({ parcel, shipmentInfo }: ParcelLabelProps) {
         <p className="text-2xl font-mono font-bold tracking-wider">{shipmentInfo.tracking_number}</p>
       </div>
 
-      {/* Barcode Section */}
-      <div className="border-2 border-dashed border-gray-400 p-4 mb-3 text-center">
-        <div className="flex items-center justify-center gap-2 mb-2">
-          <QrCode className="w-5 h-5" />
-          <span className="text-xs font-semibold">PARCEL BARCODE</span>
-        </div>
-        {/* Simple barcode representation - vertical lines pattern */}
-        <div className="flex items-center justify-center gap-[2px] h-16 mb-2">
-          {parcel.barcode.split('').map((char, i) => (
-            <div 
-              key={i}
-              className="bg-black h-full"
-              style={{ 
-                width: (char.charCodeAt(0) % 3) + 2 + 'px',
-                marginRight: (char.charCodeAt(0) % 2) + 1 + 'px'
-              }}
+      {/* QR Code and Barcode Section */}
+      <div className="border-2 border-dashed border-gray-400 p-4 mb-3">
+        <div className="flex items-center gap-4">
+          {/* QR Code */}
+          <div className="flex flex-col items-center">
+            <span className="text-xs font-semibold mb-2">SCAN QR</span>
+            <QRCodeSVG 
+              value={qrData}
+              size={80}
+              level="M"
+              includeMargin={false}
             />
-          ))}
+          </div>
+          
+          {/* Barcode */}
+          <div className="flex-1 text-center">
+            <span className="text-xs font-semibold mb-2 block">PARCEL BARCODE</span>
+            {/* Simple barcode representation - vertical lines pattern */}
+            <div className="flex items-center justify-center gap-[2px] h-12 mb-2">
+              {parcel.barcode.split('').map((char, i) => (
+                <div 
+                  key={i}
+                  className="bg-black h-full"
+                  style={{ 
+                    width: (char.charCodeAt(0) % 3) + 2 + 'px',
+                    marginRight: (char.charCodeAt(0) % 2) + 1 + 'px'
+                  }}
+                />
+              ))}
+            </div>
+            <p className="font-mono text-sm font-bold tracking-widest">{parcel.barcode}</p>
+          </div>
         </div>
-        <p className="font-mono text-lg font-bold tracking-widest">{parcel.barcode}</p>
       </div>
 
       {/* Shipment Details Grid */}
