@@ -437,22 +437,31 @@ export function ShoppingAggregator() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {totals.breakdown.map((item) => (
-              <div key={item.key} className="flex justify-between items-center">
-                <span className="text-muted-foreground">
-                  {item.name}
-                  {item.percentage !== undefined && (
-                    <span className="ml-1 text-xs">({item.percentage}%)</span>
-                  )}
-                  {item.key === 'shipping' && (
-                    <span className="ml-1 text-xs">
-                      ({totals.totalWeight} kg × {formatCurrency(totals.shippingRate)}/kg)
+            {totals.breakdown.map((item, index) => {
+              const prevItem = index > 0 ? totals.breakdown[index - 1] : null;
+              const showSeparator = item.key === 'shipping' || 
+                (prevItem?.key === 'shipping' && item.key !== 'shipping');
+              
+              return (
+                <div key={item.key}>
+                  {showSeparator && <Separator className="my-2" />}
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">
+                      {item.name}
+                      {item.percentage !== undefined && (
+                        <span className="ml-1 text-xs">({item.percentage}%)</span>
+                      )}
+                      {item.key === 'shipping' && (
+                        <span className="ml-1 text-xs">
+                          ({totals.totalWeight} kg × {formatCurrency(totals.shippingRate)}/kg)
+                        </span>
+                      )}
                     </span>
-                  )}
-                </span>
-                <span className="font-medium">{formatCurrency(item.amount)}</span>
-              </div>
-            ))}
+                    <span className="font-medium">{formatCurrency(item.amount)}</span>
+                  </div>
+                </div>
+              );
+            })}
 
             <Separator className="my-3" />
             
