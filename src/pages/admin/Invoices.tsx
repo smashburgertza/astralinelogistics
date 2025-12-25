@@ -34,11 +34,11 @@ export default function AdminInvoicesPage() {
     setInvoiceType('all');
   };
 
-  // Calculate totals from filtered invoices
-  const totalAmount = filteredInvoices.reduce((sum, inv) => sum + Number(inv.amount), 0);
-  const paidAmount = filteredInvoices.filter(i => i.status === 'paid').reduce((sum, inv) => sum + Number(inv.amount), 0);
-  const pendingAmount = filteredInvoices.filter(i => i.status === 'pending').reduce((sum, inv) => sum + Number(inv.amount), 0);
-  const overdueAmount = filteredInvoices.filter(i => i.status === 'overdue').reduce((sum, inv) => sum + Number(inv.amount), 0);
+  // Calculate totals in TZS from filtered invoices
+  const totalAmount = filteredInvoices.reduce((sum, inv) => sum + Number(inv.amount_in_tzs || inv.amount), 0);
+  const paidAmount = filteredInvoices.filter(i => i.status === 'paid').reduce((sum, inv) => sum + Number(inv.amount_in_tzs || inv.amount), 0);
+  const pendingAmount = filteredInvoices.filter(i => i.status === 'pending').reduce((sum, inv) => sum + Number(inv.amount_in_tzs || inv.amount), 0);
+  const overdueAmount = filteredInvoices.filter(i => i.status === 'overdue').reduce((sum, inv) => sum + Number(inv.amount_in_tzs || inv.amount), 0);
 
   return (
     <AdminLayout title="Invoice Management" subtitle="Create, manage, and track all invoices">
@@ -62,15 +62,15 @@ export default function AdminInvoicesPage() {
         {/* Stats Summary */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[
-            { label: 'Total', amount: totalAmount, color: 'text-primary' },
-            { label: 'Paid', amount: paidAmount, color: 'text-emerald-600' },
-            { label: 'Pending', amount: pendingAmount, color: 'text-amber-600' },
-            { label: 'Overdue', amount: overdueAmount, color: 'text-red-600' },
+            { label: 'Total (TZS)', amount: totalAmount, color: 'text-primary' },
+            { label: 'Paid (TZS)', amount: paidAmount, color: 'text-emerald-600' },
+            { label: 'Pending (TZS)', amount: pendingAmount, color: 'text-amber-600' },
+            { label: 'Overdue (TZS)', amount: overdueAmount, color: 'text-red-600' },
           ].map((stat) => (
             <div key={stat.label} className="rounded-lg border bg-card p-4">
               <div className="text-sm text-muted-foreground">{stat.label}</div>
               <div className={`text-2xl font-bold mt-1 ${stat.color}`}>
-                {CURRENCY_SYMBOLS.USD}{stat.amount.toFixed(2)}
+                TZS {stat.amount.toLocaleString()}
               </div>
             </div>
           ))}
