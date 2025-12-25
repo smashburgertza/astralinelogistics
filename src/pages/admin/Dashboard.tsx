@@ -62,8 +62,8 @@ const CustomTooltip = ({ active, payload, label }: any) => {
             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
             <span className="text-muted-foreground">{item.name}:</span>
             <span className="font-semibold">
-              {item.name.includes('$') || item.dataKey === 'revenue' || item.dataKey === 'expenses' 
-                ? `$${item.value.toLocaleString()}` 
+              {item.dataKey === 'revenue' || item.dataKey === 'expenses' 
+                ? `TZS ${item.value.toLocaleString()}` 
                 : item.value}
             </span>
           </p>
@@ -111,7 +111,7 @@ export default function AdminDashboard() {
       const [shipmentsRes, customersRes, invoicesRes, expensesRes, parcelsRes, arrivedShipmentsRes] = await Promise.all([
         supabase.from('shipments').select('id, origin_region, status, tracking_number, total_weight_kg, created_at'),
         supabase.from('customers').select('id', { count: 'exact' }),
-        supabase.from('invoices').select('amount, status, paid_at, created_at'),
+        supabase.from('invoices').select('amount, amount_in_tzs, status, paid_at, created_at'),
         supabase.from('expenses').select('amount, category, created_at'),
         supabase.from('parcels').select('id, picked_up_at'),
         supabase.from('shipments').select('id').eq('status', 'arrived'),
@@ -152,9 +152,9 @@ export default function AdminDashboard() {
         return date >= thisMonthStart && date <= thisMonthEnd;
       });
 
-      // Calculate totals
-      const revenue = paidInvoices.reduce((sum, i) => sum + Number(i.amount), 0);
-      const thisMonthRevenueAmount = thisMonthPaidInvoices.reduce((sum, i) => sum + Number(i.amount), 0);
+      // Calculate totals in TZS
+      const revenue = paidInvoices.reduce((sum, i) => sum + Number(i.amount_in_tzs || i.amount), 0);
+      const thisMonthRevenueAmount = thisMonthPaidInvoices.reduce((sum, i) => sum + Number(i.amount_in_tzs || i.amount), 0);
       const totalExpensesAmount = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
       const thisMonthExpensesAmount = thisMonthExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
 
@@ -191,7 +191,7 @@ export default function AdminDashboard() {
         const monthRevenue = paidInvoices.filter(inv => {
           const date = new Date(inv.paid_at || inv.created_at || '');
           return date >= monthStart && date <= monthEnd;
-        }).reduce((sum, i) => sum + Number(i.amount), 0);
+        }).reduce((sum, i) => sum + Number(i.amount_in_tzs || i.amount), 0);
 
         const monthExpenses = expenses.filter(e => {
           const date = new Date(e.created_at || '');
@@ -276,16 +276,16 @@ export default function AdminDashboard() {
           variant="primary"
         />
         <StatCard
-          title="Revenue"
-          value={`$${stats.revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          subtitle={`$${stats.thisMonthRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} this month`}
+          title="Revenue (TZS)"
+          value={`TZS ${stats.revenue.toLocaleString()}`}
+          subtitle={`TZS ${stats.thisMonthRevenue.toLocaleString()} this month`}
           icon={BadgeDollarSign}
           variant="success"
         />
         <StatCard
-          title="Total Expenses"
-          value={`$${stats.totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          subtitle={`$${stats.thisMonthExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} this month`}
+          title="Expenses (TZS)"
+          value={`TZS ${stats.totalExpenses.toLocaleString()}`}
+          subtitle={`TZS ${stats.thisMonthExpenses.toLocaleString()} this month`}
           icon={ReceiptText}
           variant="warning"
         />
@@ -383,7 +383,7 @@ export default function AdminDashboard() {
                     axisLine={false}
                     tickLine={false}
                     tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                    tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                    tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`}
                   />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend 
