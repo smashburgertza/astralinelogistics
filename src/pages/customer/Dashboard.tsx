@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Package, FileText, CreditCard, MapPin, ArrowRight, Plane, Clock, CheckCircle, Search, ShoppingCart } from 'lucide-react';
+import { Package, FileText, CreditCard, MapPin, ArrowRight, Plane, Clock, CheckCircle, Search, ShoppingCart, Sparkles } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCustomerStats, useCustomerShipments, useCustomerInvoices } from '@/hooks/useCustomerPortal';
 import { SHIPMENT_STATUSES, REGIONS } from '@/lib/constants';
@@ -59,7 +59,7 @@ export default function CustomerDashboard() {
         />
         <StatCard
           title="Total Paid"
-          value={statsLoading ? '...' : `$${(stats?.totalPaid || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          value={statsLoading ? '...' : `$${(stats?.totalPaid || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
           subtitle="All time"
           icon={CreditCard}
           variant="success"
@@ -76,13 +76,18 @@ export default function CustomerDashboard() {
       {/* Main Content */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Shipments */}
-        <Card className="lg:col-span-2 shadow-lg border-0">
-          <CardHeader className="flex flex-row items-center justify-between">
+        <Card className="lg:col-span-2 shadow-xl border-0 bg-card/80 backdrop-blur-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
             <div>
-              <CardTitle className="font-heading text-lg">My Shipments</CardTitle>
-              <CardDescription>Track your active shipments</CardDescription>
+              <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center">
+                  <Package className="w-4 h-4 text-white" />
+                </div>
+                My Shipments
+              </CardTitle>
+              <CardDescription className="mt-1">Track your active shipments</CardDescription>
             </div>
-            <Button variant="ghost" size="sm" asChild>
+            <Button variant="ghost" size="sm" className="text-accent hover:text-accent/80" asChild>
               <Link to="/customer/shipments">
                 View all <ArrowRight className="w-4 h-4 ml-1" />
               </Link>
@@ -97,14 +102,16 @@ export default function CustomerDashboard() {
               </div>
             ) : recentShipments.length === 0 ? (
               <div className="text-center py-12">
-                <Package className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-                <p className="text-muted-foreground mb-4">No shipments yet</p>
+                <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-4">
+                  <Package className="w-8 h-8 text-muted-foreground/40" />
+                </div>
+                <p className="text-muted-foreground font-medium mb-4">No shipments yet</p>
                 <Button asChild>
                   <Link to="/">Request a Quote</Link>
                 </Button>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {recentShipments.map((shipment) => {
                   const StatusIcon = getStatusIcon(shipment.status || 'collected');
                   const statusConfig = SHIPMENT_STATUSES[shipment.status as keyof typeof SHIPMENT_STATUSES];
@@ -113,26 +120,26 @@ export default function CustomerDashboard() {
                   return (
                     <div
                       key={shipment.id}
-                      className="flex items-center gap-4 p-4 rounded-xl bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
+                      className="flex items-center gap-4 p-4 rounded-xl bg-muted/30 hover:bg-muted/50 transition-all duration-200 border border-transparent hover:border-border/50 cursor-pointer group"
                       onClick={() => navigate(`/tracking?number=${shipment.tracking_number}`)}
                     >
-                      <div className="w-10 h-10 rounded-lg bg-brand-navy/10 flex items-center justify-center">
-                        <StatusIcon className="w-5 h-5 text-brand-navy" />
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/10 to-indigo-500/10 flex items-center justify-center group-hover:scale-105 transition-transform">
+                        <StatusIcon className="w-6 h-6 text-accent" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <code className="font-mono text-sm font-medium text-brand-gold">
+                          <code className="font-mono text-sm font-semibold text-primary">
                             {shipment.tracking_number}
                           </code>
-                          <span className="text-muted-foreground">•</span>
+                          <span className="text-muted-foreground/50">•</span>
                           <span className="text-sm text-muted-foreground">
-                            {region?.flag} {region?.label}
+                            <span className="text-base">{region?.flag}</span> {region?.label}
                           </span>
                         </div>
                         <p className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
                           <Clock className="h-3 w-3" />
                           {format(new Date(shipment.created_at || ''), 'MMM d, yyyy')}
-                          <span>•</span>
+                          <span className="text-muted-foreground/50">•</span>
                           <span>{shipment.total_weight_kg} kg</span>
                         </p>
                       </div>
@@ -153,9 +160,14 @@ export default function CustomerDashboard() {
           <NotificationsList />
 
           {/* Quick Track */}
-          <Card className="shadow-lg border-0">
-            <CardHeader>
-              <CardTitle className="font-heading text-lg">Quick Track</CardTitle>
+          <Card className="shadow-xl border-0 bg-card/80 backdrop-blur-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-400 to-purple-500 flex items-center justify-center">
+                  <Search className="w-4 h-4 text-white" />
+                </div>
+                Quick Track
+              </CardTitle>
               <CardDescription>Enter a tracking number to check status</CardDescription>
             </CardHeader>
             <CardContent>
@@ -165,8 +177,9 @@ export default function CustomerDashboard() {
                   value={trackingNumber}
                   onChange={(e) => setTrackingNumber(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleTrack()}
+                  className="bg-muted/50 border-0"
                 />
-                <Button onClick={handleTrack}>
+                <Button onClick={handleTrack} className="shrink-0">
                   <Search className="h-4 w-4" />
                 </Button>
               </div>
@@ -174,13 +187,13 @@ export default function CustomerDashboard() {
           </Card>
 
           {/* Pending Invoices */}
-          <Card className="shadow-lg border-0">
-            <CardHeader className="flex flex-row items-center justify-between">
+          <Card className="shadow-xl border-0 bg-card/80 backdrop-blur-sm">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
               <div>
-                <CardTitle className="font-heading text-lg">Pending Invoices</CardTitle>
+                <CardTitle className="text-lg font-semibold">Pending Invoices</CardTitle>
                 <CardDescription>Awaiting payment</CardDescription>
               </div>
-              <Button variant="ghost" size="sm" asChild>
+              <Button variant="ghost" size="sm" className="text-accent hover:text-accent/80" asChild>
                 <Link to="/customer/invoices">
                   View all <ArrowRight className="w-4 h-4 ml-1" />
                 </Link>
@@ -195,7 +208,9 @@ export default function CustomerDashboard() {
                 </div>
               ) : pendingInvoices.length === 0 ? (
                 <div className="text-center py-6">
-                  <CheckCircle className="w-10 h-10 text-green-500/30 mx-auto mb-3" />
+                  <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-3">
+                    <CheckCircle className="w-6 h-6 text-emerald-500" />
+                  </div>
                   <p className="text-sm text-muted-foreground">No pending invoices</p>
                 </div>
               ) : (
@@ -203,19 +218,19 @@ export default function CustomerDashboard() {
                   {pendingInvoices.map((invoice) => (
                     <div
                       key={invoice.id}
-                      className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
+                      className="flex items-center justify-between p-3 rounded-xl bg-orange-500/5 border border-orange-500/10 hover:bg-orange-500/10 transition-colors"
                     >
                       <div>
-                        <p className="font-medium text-sm">{invoice.invoice_number}</p>
+                        <p className="font-semibold text-sm">{invoice.invoice_number}</p>
                         <p className="text-xs text-muted-foreground">
                           Due: {invoice.due_date ? format(new Date(invoice.due_date), 'MMM d, yyyy') : 'N/A'}
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="font-bold text-primary">
+                        <p className="font-bold text-lg text-primary">
                           ${Number(invoice.amount).toFixed(2)}
                         </p>
-                        <Badge variant="outline" className="text-amber-600 border-amber-600">
+                        <Badge variant="outline" className="text-orange-600 border-orange-500/50 bg-orange-500/10">
                           Pending
                         </Badge>
                       </div>
@@ -227,16 +242,19 @@ export default function CustomerDashboard() {
           </Card>
 
           {/* Shop For Me Card */}
-          <Card className="shadow-lg border-0 bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
-            <CardContent className="p-6">
+          <Card className="shadow-xl border-0 overflow-hidden relative">
+            <div className="absolute inset-0 bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500" />
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+            <CardContent className="relative z-10 p-6">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">
-                  <ShoppingCart className="w-6 h-6" />
+                <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-lg">
+                  <ShoppingCart className="w-7 h-7 text-white" />
                 </div>
                 <div>
-                  <p className="font-medium">Shop For Me</p>
-                  <Link to="/shop-for-me" className="text-white/80 hover:text-white hover:underline text-sm">
-                    Paste links, we'll buy & ship →
+                  <p className="font-semibold text-white text-lg">Shop For Me</p>
+                  <Link to="/shop-for-me" className="text-white/80 hover:text-white text-sm flex items-center gap-1 group">
+                    Paste links, we'll buy & ship 
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </Link>
                 </div>
               </div>
@@ -244,16 +262,19 @@ export default function CustomerDashboard() {
           </Card>
 
           {/* Help Card */}
-          <Card className="shadow-lg border-0 bg-gradient-to-br from-brand-navy to-brand-navy/80 text-white">
-            <CardContent className="p-6">
+          <Card className="shadow-xl border-0 overflow-hidden relative">
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700" />
+            <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2" />
+            <CardContent className="relative z-10 p-6">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">
-                  <Plane className="w-6 h-6" />
+                <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-lg">
+                  <Plane className="w-7 h-7 text-white" />
                 </div>
                 <div>
-                  <p className="font-medium">Need help shipping?</p>
-                  <Link to="/" className="text-brand-gold hover:underline text-sm">
-                    Contact our team →
+                  <p className="font-semibold text-white text-lg">Need help shipping?</p>
+                  <Link to="/" className="text-amber-300 hover:text-amber-200 text-sm flex items-center gap-1 group">
+                    Contact our team
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </Link>
                 </div>
               </div>
