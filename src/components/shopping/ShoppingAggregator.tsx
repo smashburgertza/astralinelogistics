@@ -437,7 +437,7 @@ export function ShoppingAggregator() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {totals.breakdown.map((item, index) => (
+            {totals.breakdown.map((item) => (
               <div key={item.key} className="flex justify-between items-center">
                 <span className="text-muted-foreground">
                   {item.name}
@@ -453,21 +453,6 @@ export function ShoppingAggregator() {
                 <span className="font-medium">{formatCurrency(item.amount)}</span>
               </div>
             ))}
-            
-            {/* If no shipping in breakdown, show it separately */}
-            {!totals.breakdown.some(b => b.key === 'shipping') && totals.totalWeight > 0 && (
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">
-                  Shipping Charges
-                  <span className="ml-1 text-xs">
-                    ({totals.totalWeight} kg × {formatCurrency(totals.shippingRate)}/kg)
-                  </span>
-                </span>
-                <span className="font-medium">
-                  {formatCurrency(totals.totalWeight * totals.shippingRate)}
-                </span>
-              </div>
-            )}
 
             <Separator className="my-3" />
             
