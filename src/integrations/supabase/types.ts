@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_balances: {
+        Row: {
+          account_id: string
+          closing_balance: number | null
+          currency: string | null
+          fiscal_period_id: string | null
+          id: string
+          opening_balance: number | null
+          total_credits: number | null
+          total_debits: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          account_id: string
+          closing_balance?: number | null
+          currency?: string | null
+          fiscal_period_id?: string | null
+          id?: string
+          opening_balance?: number | null
+          total_credits?: number | null
+          total_debits?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string
+          closing_balance?: number | null
+          currency?: string | null
+          fiscal_period_id?: string | null
+          id?: string
+          opening_balance?: number | null
+          total_credits?: number | null
+          total_debits?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_balances_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_balances_fiscal_period_id_fkey"
+            columns: ["fiscal_period_id"]
+            isOneToOne: false
+            referencedRelation: "fiscal_periods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_addresses: {
         Row: {
           address_line1: string
@@ -91,6 +142,169 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      bank_accounts: {
+        Row: {
+          account_name: string
+          account_number: string | null
+          bank_name: string
+          chart_account_id: string | null
+          created_at: string | null
+          currency: string | null
+          current_balance: number | null
+          id: string
+          is_active: boolean | null
+          opening_balance: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          account_name: string
+          account_number?: string | null
+          bank_name: string
+          chart_account_id?: string | null
+          created_at?: string | null
+          currency?: string | null
+          current_balance?: number | null
+          id?: string
+          is_active?: boolean | null
+          opening_balance?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          account_name?: string
+          account_number?: string | null
+          bank_name?: string
+          chart_account_id?: string | null
+          created_at?: string | null
+          currency?: string | null
+          current_balance?: number | null
+          id?: string
+          is_active?: boolean | null
+          opening_balance?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_accounts_chart_account_id_fkey"
+            columns: ["chart_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bank_transactions: {
+        Row: {
+          balance: number | null
+          bank_account_id: string
+          created_at: string | null
+          credit_amount: number | null
+          debit_amount: number | null
+          description: string | null
+          id: string
+          is_reconciled: boolean | null
+          journal_entry_id: string | null
+          reconciled_at: string | null
+          reference: string | null
+          transaction_date: string
+        }
+        Insert: {
+          balance?: number | null
+          bank_account_id: string
+          created_at?: string | null
+          credit_amount?: number | null
+          debit_amount?: number | null
+          description?: string | null
+          id?: string
+          is_reconciled?: boolean | null
+          journal_entry_id?: string | null
+          reconciled_at?: string | null
+          reference?: string | null
+          transaction_date: string
+        }
+        Update: {
+          balance?: number | null
+          bank_account_id?: string
+          created_at?: string | null
+          credit_amount?: number | null
+          debit_amount?: number | null
+          description?: string | null
+          id?: string
+          is_reconciled?: boolean | null
+          journal_entry_id?: string | null
+          reconciled_at?: string | null
+          reference?: string | null
+          transaction_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_transactions_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_transactions_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chart_of_accounts: {
+        Row: {
+          account_code: string
+          account_name: string
+          account_subtype: string | null
+          account_type: string
+          created_at: string | null
+          currency: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          normal_balance: string
+          parent_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          account_code: string
+          account_name: string
+          account_subtype?: string | null
+          account_type: string
+          created_at?: string | null
+          currency?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          normal_balance: string
+          parent_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          account_code?: string
+          account_name?: string
+          account_subtype?: string | null
+          account_type?: string
+          created_at?: string | null
+          currency?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          normal_balance?: string
+          parent_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chart_of_accounts_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       commission_rules: {
         Row: {
@@ -405,6 +619,48 @@ export type Database = {
           },
         ]
       }
+      fiscal_periods: {
+        Row: {
+          closed_at: string | null
+          closed_by: string | null
+          created_at: string | null
+          end_date: string
+          fiscal_year: number
+          id: string
+          period_name: string
+          period_number: number
+          period_type: string | null
+          start_date: string
+          status: string | null
+        }
+        Insert: {
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string | null
+          end_date: string
+          fiscal_year: number
+          id?: string
+          period_name: string
+          period_number: number
+          period_type?: string | null
+          start_date: string
+          status?: string | null
+        }
+        Update: {
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string | null
+          end_date?: string
+          fiscal_year?: number
+          id?: string
+          period_name?: string
+          period_number?: number
+          period_type?: string | null
+          start_date?: string
+          status?: string | null
+        }
+        Relationships: []
+      }
       invoices: {
         Row: {
           amount: number
@@ -483,6 +739,108 @@ export type Database = {
             columns: ["shipment_id"]
             isOneToOne: false
             referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      journal_entries: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string
+          entry_date: string
+          entry_number: string
+          id: string
+          notes: string | null
+          posted_at: string | null
+          posted_by: string | null
+          reference_id: string | null
+          reference_type: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description: string
+          entry_date?: string
+          entry_number: string
+          id?: string
+          notes?: string | null
+          posted_at?: string | null
+          posted_by?: string | null
+          reference_id?: string | null
+          reference_type?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string
+          entry_date?: string
+          entry_number?: string
+          id?: string
+          notes?: string | null
+          posted_at?: string | null
+          posted_by?: string | null
+          reference_id?: string | null
+          reference_type?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      journal_lines: {
+        Row: {
+          account_id: string
+          amount_in_tzs: number | null
+          created_at: string | null
+          credit_amount: number | null
+          currency: string | null
+          debit_amount: number | null
+          description: string | null
+          exchange_rate: number | null
+          id: string
+          journal_entry_id: string
+        }
+        Insert: {
+          account_id: string
+          amount_in_tzs?: number | null
+          created_at?: string | null
+          credit_amount?: number | null
+          currency?: string | null
+          debit_amount?: number | null
+          description?: string | null
+          exchange_rate?: number | null
+          id?: string
+          journal_entry_id: string
+        }
+        Update: {
+          account_id?: string
+          amount_in_tzs?: number | null
+          created_at?: string | null
+          credit_amount?: number | null
+          currency?: string | null
+          debit_amount?: number | null
+          description?: string | null
+          exchange_rate?: number | null
+          id?: string
+          journal_entry_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journal_lines_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "journal_lines_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
             referencedColumns: ["id"]
           },
         ]
@@ -899,6 +1257,47 @@ export type Database = {
           },
         ]
       }
+      tax_rates: {
+        Row: {
+          account_id: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          rate: number
+          tax_code: string
+          tax_name: string
+          tax_type: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          rate: number
+          tax_code: string
+          tax_name: string
+          tax_type?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          rate?: number
+          tax_code?: string
+          tax_name?: string
+          tax_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tax_rates_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -935,6 +1334,7 @@ export type Database = {
     }
     Functions: {
       generate_document_number: { Args: { prefix: string }; Returns: string }
+      generate_journal_number: { Args: never; Returns: string }
       generate_tracking_number: { Args: never; Returns: string }
       get_user_region: {
         Args: { _user_id: string }
