@@ -4,6 +4,7 @@ import {
   LayoutDashboard, PackageSearch, MapPinned, FileStack, CreditCard,
   LogOut, BellRing, ChevronDown, UserCircle2, Settings2, ShoppingBag, ClipboardList
 } from 'lucide-react';
+import astralineLogo from '@/assets/astraline-logo-horizontal.svg';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
@@ -78,13 +79,12 @@ export function CustomerLayout({ children, title, subtitle }: CustomerLayoutProp
         <Sidebar collapsible="icon" className="border-r border-sidebar-border shadow-sm">
           {/* Logo */}
           <SidebarHeader className="p-4 border-b border-sidebar-border group-data-[collapsible=icon]:px-2">
-            <Link to="/" className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent to-accent/80 flex items-center justify-center font-bold text-lg text-accent-foreground shadow-md shrink-0 transition-transform duration-300">
-                A
-              </div>
-              <span className="font-bold text-lg text-foreground transition-all duration-300 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:overflow-hidden">
-                Astraline
-              </span>
+            <Link to="/" className="flex items-center group-data-[collapsible=icon]:justify-center">
+              <img 
+                src={astralineLogo} 
+                alt="Astraline" 
+                className="h-8 w-auto transition-all duration-300 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:object-left group-data-[collapsible=icon]:object-cover"
+              />
             </Link>
           </SidebarHeader>
 
