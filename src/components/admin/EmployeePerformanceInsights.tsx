@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
+import { EmployeeProfileDrawer } from './EmployeeProfileDrawer';
 
 interface EmployeeMetrics {
   userId: string;
@@ -29,6 +30,8 @@ export function EmployeePerformanceInsights() {
   const [employees, setEmployees] = useState<EmployeeMetrics[]>([]);
   const [loading, setLoading] = useState(true);
   const [topPerformer, setTopPerformer] = useState<EmployeeMetrics | null>(null);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
     fetchEmployeePerformance();
@@ -246,11 +249,12 @@ export function EmployeePerformanceInsights() {
                               variant="ghost"
                               size="icon"
                               className="h-7 w-7"
-                              asChild
+                              onClick={() => {
+                                setSelectedEmployeeId(employee.userId);
+                                setDrawerOpen(true);
+                              }}
                             >
-                              <Link to="/admin/employees">
-                                <Eye className="h-3.5 w-3.5" />
-                              </Link>
+                              <Eye className="h-3.5 w-3.5" />
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent side="top">View Details</TooltipContent>
@@ -306,6 +310,12 @@ export function EmployeePerformanceInsights() {
           </div>
         )}
       </CardContent>
+
+      <EmployeeProfileDrawer
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        employeeId={selectedEmployeeId}
+      />
     </Card>
   );
 }
