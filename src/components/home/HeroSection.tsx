@@ -53,16 +53,16 @@ export function HeroSection() {
       
       {/* Content */}
       <div className="container mx-auto px-4 relative z-10">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
+        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
           {/* Left Content */}
-          <div className="max-w-2xl">
+          <div className="max-w-2xl text-center lg:text-left">
             {/* Badge */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 mb-8 animate-fade-in">
+            <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 mb-6 sm:mb-8 animate-fade-in">
               <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-              <span className="text-sm text-white/90 font-medium">Trusted by 10,000+ customers worldwide</span>
+              <span className="text-xs sm:text-sm text-white/90 font-medium">Trusted by 10,000+ customers worldwide</span>
             </div>
 
-            <h1 className="font-heading text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-white leading-[1.1] mb-6">
+            <h1 className="font-heading text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-white leading-[1.1] mb-4 sm:mb-6">
               <span className="block opacity-0 animate-slide-up" style={{ animationDelay: '0.1s', animationFillMode: 'forwards' }}>
                 {content?.title?.split(' ').slice(0, 2).join(' ') || 'Global Shipping'}
               </span>
@@ -76,21 +76,21 @@ export function HeroSection() {
               </span>
             </h1>
 
-            <p className="text-lg md:text-xl text-white/80 mb-10 max-w-xl leading-relaxed opacity-0 animate-slide-up" style={{ animationDelay: '0.3s', animationFillMode: 'forwards' }}>
+            <p className="text-base sm:text-lg md:text-xl text-white/80 mb-8 sm:mb-10 max-w-xl mx-auto lg:mx-0 leading-relaxed opacity-0 animate-slide-up" style={{ animationDelay: '0.3s', animationFillMode: 'forwards' }}>
               {content?.description || 'Premium air cargo from UK, Germany, France, Dubai, China & India to Tanzania. Fast customs clearance. Doorstep delivery.'}
             </p>
 
             {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 mb-12 opacity-0 animate-slide-up" style={{ animationDelay: '0.4s', animationFillMode: 'forwards' }}>
-              <Button size="xl" className="btn-gold group relative overflow-hidden" asChild>
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-8 sm:mb-12 opacity-0 animate-slide-up justify-center lg:justify-start" style={{ animationDelay: '0.4s', animationFillMode: 'forwards' }}>
+              <Button size="lg" className="btn-gold group relative overflow-hidden w-full sm:w-auto" asChild>
                 <Link to="/tracking">
-                  <span className="relative z-10 flex items-center">
+                  <span className="relative z-10 flex items-center justify-center">
                     {content?.content?.cta_secondary || 'TRACK SHIPMENT'}
                     <MoveRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
                   </span>
                 </Link>
               </Button>
-              <Button size="xl" className="group bg-white/10 backdrop-blur-sm border-2 border-white/30 text-white hover:bg-white hover:text-brand-navy transition-all duration-300" asChild>
+              <Button size="lg" className="group bg-white/10 backdrop-blur-sm border-2 border-white/30 text-white hover:bg-white hover:text-brand-navy transition-all duration-300 w-full sm:w-auto" asChild>
                 <Link to="/contact">
                   {content?.content?.cta_primary || 'GET FREE QUOTE'}
                 </Link>
@@ -98,19 +98,19 @@ export function HeroSection() {
             </div>
 
             {/* Stats Row */}
-            <div className="flex flex-wrap gap-8 opacity-0 animate-slide-up" style={{ animationDelay: '0.5s', animationFillMode: 'forwards' }}>
+            <div className="flex flex-wrap gap-4 sm:gap-8 justify-center lg:justify-start opacity-0 animate-slide-up" style={{ animationDelay: '0.5s', animationFillMode: 'forwards' }}>
               {[
                 { icon: Globe, value: '6+', label: 'Countries' },
                 { icon: Package, value: '10K+', label: 'Delivered' },
                 { icon: Plane, value: '24/7', label: 'Support' },
               ].map((stat, index) => (
-                <div key={stat.label} className="flex items-center gap-3 group">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/30 to-primary/10 border border-primary/30 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                    <stat.icon className="w-6 h-6 text-primary" />
+                <div key={stat.label} className="flex items-center gap-2 sm:gap-3 group">
+                  <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-gradient-to-br from-primary/30 to-primary/10 border border-primary/30 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                    <stat.icon className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
                   </div>
                   <div>
-                    <p className="text-2xl md:text-3xl font-bold text-white">{stat.value}</p>
-                    <p className="text-sm text-white/60">{stat.label}</p>
+                    <p className="text-xl sm:text-2xl md:text-3xl font-bold text-white">{stat.value}</p>
+                    <p className="text-xs sm:text-sm text-white/60">{stat.label}</p>
                   </div>
                 </div>
               ))}

@@ -79,21 +79,21 @@ export function ServicesSection() {
         {/* Section Header */}
         <div 
           ref={headerRef}
-          className={cn("text-center mb-16 scroll-animate", headerVisible && "visible")}
+          className={cn("text-center mb-10 sm:mb-16 scroll-animate", headerVisible && "visible")}
         >
-          <span className="inline-block px-4 py-2 rounded-full bg-primary/10 text-primary font-semibold text-sm uppercase tracking-wide mb-4">
+          <span className="inline-block px-3 sm:px-4 py-2 rounded-full bg-primary/10 text-primary font-semibold text-xs sm:text-sm uppercase tracking-wide mb-4">
             {content?.subtitle || 'What We Offer'}
           </span>
-          <h2 className="font-heading text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4">
+          <h2 className="font-heading text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4">
             {content?.title || 'Our Services'}
           </h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
+          <p className="text-muted-foreground max-w-2xl mx-auto text-sm sm:text-base lg:text-lg px-4">
             {content?.description || "Complete logistics solutions from collection to delivery. We handle everything so you don't have to."}
           </p>
         </div>
 
         {/* Services Grid */}
-        <div ref={gridRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div ref={gridRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
           {services.map((service, index) => (
             <Link 
               key={index} 
@@ -102,14 +102,14 @@ export function ServicesSection() {
               style={{ transitionDelay: `${index * 100}ms` }}
             >
               <Card className="h-full card-hover border-0 shadow-lg group overflow-hidden">
-                <CardContent className="p-8">
-                  <div className="w-16 h-16 rounded-xl bg-brand-navy flex items-center justify-center mb-6 group-hover:bg-primary group-hover:scale-110 transition-all duration-300">
-                    <service.icon className="w-8 h-8 text-white" />
+                <CardContent className="p-5 sm:p-8">
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg sm:rounded-xl bg-brand-navy flex items-center justify-center mb-4 sm:mb-6 group-hover:bg-primary group-hover:scale-110 transition-all duration-300">
+                    <service.icon className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
                   </div>
-                  <h3 className="font-heading text-xl font-semibold mb-3 group-hover:text-primary transition-colors">
+                  <h3 className="font-heading text-lg sm:text-xl font-semibold mb-2 sm:mb-3 group-hover:text-primary transition-colors">
                     {service.title}
                   </h3>
-                  <p className="text-muted-foreground leading-relaxed">
+                  <p className="text-muted-foreground leading-relaxed text-sm sm:text-base">
                     {service.description}
                   </p>
                 </CardContent>

@@ -66,55 +66,55 @@ export function TestimonialsSection() {
         {/* Section Header */}
         <div 
           ref={headerRef}
-          className={cn("text-center mb-16 scroll-animate", headerVisible && "visible")}
+          className={cn("text-center mb-10 sm:mb-16 scroll-animate", headerVisible && "visible")}
         >
-          <span className="inline-block px-4 py-2 rounded-full bg-primary/10 text-primary font-semibold text-sm uppercase tracking-wide mb-4">
+          <span className="inline-block px-3 sm:px-4 py-2 rounded-full bg-primary/10 text-primary font-semibold text-xs sm:text-sm uppercase tracking-wide mb-4">
             {content?.subtitle || 'Testimonials'}
           </span>
-          <h2 className="font-heading text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4">
+          <h2 className="font-heading text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4">
             {content?.title || 'What Our'} <span className="text-primary">Customers</span> Say
           </h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
+          <p className="text-muted-foreground max-w-2xl mx-auto text-sm sm:text-base lg:text-lg px-4">
             {content?.description || "Don't just take our word for it. Here's what our valued customers have to say about their experience with Astraline."}
           </p>
         </div>
 
         {/* Testimonials Grid */}
-        <div ref={gridRef} className="grid md:grid-cols-2 gap-6 lg:gap-8">
+        <div ref={gridRef} className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
           {testimonials.map((testimonial, index) => (
             <div 
               key={testimonial.name}
               className={cn(
-                "relative bg-card rounded-2xl p-8 border border-border shadow-lg hover:shadow-xl transition-all duration-300 scroll-animate-scale",
+                "relative bg-card rounded-xl sm:rounded-2xl p-5 sm:p-8 border border-border shadow-lg hover:shadow-xl transition-all duration-300 scroll-animate-scale",
                 gridVisible && "visible"
               )}
               style={{ transitionDelay: `${index * 100}ms` }}
             >
               {/* Quote Icon */}
-              <div className="absolute top-6 right-6 w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                <Quote className="w-5 h-5 text-primary" />
+              <div className="absolute top-4 right-4 sm:top-6 sm:right-6 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <Quote className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
               </div>
 
               {/* Rating */}
-              <div className="flex gap-1 mb-4">
+              <div className="flex gap-1 mb-3 sm:mb-4">
                 {[...Array(testimonial.rating)].map((_, i) => (
-                  <Star key={i} className="w-5 h-5 fill-primary text-primary" />
+                  <Star key={i} className="w-4 h-4 sm:w-5 sm:h-5 fill-primary text-primary" />
                 ))}
               </div>
 
               {/* Testimonial Text */}
-              <p className="text-foreground/80 leading-relaxed mb-6 italic">
+              <p className="text-foreground/80 leading-relaxed mb-4 sm:mb-6 italic text-sm sm:text-base">
                 &ldquo;{testimonial.text}&rdquo;
               </p>
 
               {/* Author */}
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-brand-navy flex items-center justify-center text-white font-semibold">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-brand-navy flex items-center justify-center text-white font-semibold text-sm sm:text-base">
                   {testimonial.avatar}
                 </div>
                 <div>
-                  <p className="font-semibold text-foreground">{testimonial.name}</p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="font-semibold text-foreground text-sm sm:text-base">{testimonial.name}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">
                     {testimonial.role} • {testimonial.location}
                   </p>
                 </div>
@@ -125,13 +125,13 @@ export function TestimonialsSection() {
 
         {/* Stats */}
         <div 
-          className={cn("mt-16 grid grid-cols-2 md:grid-cols-4 gap-8 scroll-animate", gridVisible && "visible")}
+          className={cn("mt-10 sm:mt-16 grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-8 scroll-animate", gridVisible && "visible")}
           style={{ transitionDelay: '400ms' }}
         >
           {stats.map((stat: any) => (
             <div key={stat.label} className="text-center">
-              <p className="text-3xl md:text-4xl font-bold text-primary mb-1">{stat.value}</p>
-              <p className="text-sm text-muted-foreground">{stat.label}</p>
+              <p className="text-2xl sm:text-3xl md:text-4xl font-bold text-primary mb-1">{stat.value}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">{stat.label}</p>
             </div>
           ))}
         </div>
