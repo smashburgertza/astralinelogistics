@@ -167,6 +167,14 @@ export function ShoppingAggregator() {
     );
   };
 
+  const handlePriceChange = (id: string, price: number | null) => {
+    setItems(prev =>
+      prev.map(item =>
+        item.id === id ? { ...item, productPrice: price } : item
+      )
+    );
+  };
+
   // Round weight up to nearest whole number
   const roundWeight = (weight: number) => Math.ceil(weight);
 
@@ -365,12 +373,22 @@ export function ShoppingAggregator() {
                       {item.url.substring(0, 50)}...
                       <ExternalLink className="h-3 w-3 flex-shrink-0" />
                     </a>
-                    {item.productPrice && (
-                      <p className="text-sm text-primary font-semibold mt-1">
-                        {item.currency} {item.productPrice.toFixed(2)}
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground">
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-sm text-muted-foreground">{item.currency}</span>
+                      <Input
+                        type="number"
+                        value={item.productPrice ?? ''}
+                        onChange={(e) => handlePriceChange(item.id, e.target.value ? parseFloat(e.target.value) : null)}
+                        placeholder="Enter price"
+                        className="w-24 h-7 text-sm"
+                        min="0"
+                        step="0.01"
+                      />
+                      {!item.productPrice && (
+                        <span className="text-xs text-orange-500">Price required</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
                       Est. weight: {roundWeight(item.estimatedWeightKg)} kg
                     </p>
                   </div>
