@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Trash2, Loader2, ExternalLink, ShoppingCart, Calculator } from 'lucide-react';
+import { Plus, Trash2, Loader2, ExternalLink, ShoppingCart, Calculator, Package, FileText, Truck, HandCoins } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -442,22 +442,64 @@ export function ShoppingAggregator() {
               const showSeparator = item.key === 'shipping' || 
                 (prevItem?.key === 'shipping' && item.key !== 'shipping');
               
+              // Get icon and colors based on charge type
+              const getChargeStyle = (key: string) => {
+                switch (key) {
+                  case 'product_cost':
+                    return { 
+                      icon: Package, 
+                      bg: 'bg-blue-50 dark:bg-blue-950/30', 
+                      iconColor: 'text-blue-600 dark:text-blue-400' 
+                    };
+                  case 'duty_clearing':
+                    return { 
+                      icon: FileText, 
+                      bg: 'bg-amber-50 dark:bg-amber-950/30', 
+                      iconColor: 'text-amber-600 dark:text-amber-400' 
+                    };
+                  case 'shipping':
+                    return { 
+                      icon: Truck, 
+                      bg: 'bg-green-50 dark:bg-green-950/30', 
+                      iconColor: 'text-green-600 dark:text-green-400' 
+                    };
+                  case 'handling_fee':
+                    return { 
+                      icon: HandCoins, 
+                      bg: 'bg-purple-50 dark:bg-purple-950/30', 
+                      iconColor: 'text-purple-600 dark:text-purple-400' 
+                    };
+                  default:
+                    return { 
+                      icon: FileText, 
+                      bg: 'bg-muted/50', 
+                      iconColor: 'text-muted-foreground' 
+                    };
+                }
+              };
+
+              const style = getChargeStyle(item.key);
+              const IconComponent = style.icon;
+              
               return (
                 <div key={item.key}>
                   {showSeparator && <Separator className="my-2" />}
-                  <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">
-                      {item.name}
-                      {item.percentage !== undefined && (
-                        <span className="ml-1 text-xs">({item.percentage}%)</span>
-                      )}
-                      {item.key === 'shipping' && (
-                        <span className="ml-1 text-xs">
-                          ({totals.totalWeight} kg × {formatCurrency(totals.shippingRate)}/kg)
-                        </span>
-                      )}
-                    </span>
-                    <span className="font-medium">{formatCurrency(item.amount)}</span>
+                  <div className={`flex justify-between items-center p-2 rounded-lg ${style.bg}`}>
+                    <div className="flex items-center gap-2">
+                      <IconComponent className={`h-4 w-4 ${style.iconColor}`} />
+                      <span className="text-foreground">
+                        {item.name}
+                        {item.percentage !== undefined && (
+                          <span className="ml-1 text-xs text-muted-foreground">({item.percentage}%)</span>
+                        )}
+                        {item.key === 'shipping' && (
+                          <span className="ml-1 text-xs text-muted-foreground">
+                            ({totals.totalWeight} kg × {formatCurrency(totals.shippingRate)}/kg)
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                    <span className="font-semibold">{formatCurrency(item.amount)}</span>
                   </div>
                 </div>
               );
