@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
   PackageSearch, UsersRound, BadgeDollarSign, TrendingUp, 
-  Plane, ArrowRight, AlertTriangle, MapPinned, ReceiptText
+  Plane, ArrowRight, AlertTriangle, MapPinned, ReceiptText,
+  ArrowUpRight, Sparkles
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { REGIONS, SHIPMENT_STATUSES, type Region, type ShipmentStatus } from '@/lib/constants';
@@ -26,6 +27,8 @@ import {
   LineChart,
   Line,
   Legend,
+  Area,
+  AreaChart,
 } from 'recharts';
 import { EXPENSE_CATEGORIES } from '@/hooks/useExpenses';
 
@@ -45,7 +48,29 @@ interface DashboardStats {
   monthlyData: Array<{ month: string; shipments: number; revenue: number; expenses: number }>;
 }
 
-const CHART_COLORS = ['#F7BB3A', '#1F8ECE', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#6B7280'];
+const CHART_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#6366F1', '#14B8A6'];
+
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-background/95 backdrop-blur-md border border-border/50 rounded-xl p-3 shadow-xl">
+        <p className="font-medium text-sm mb-1">{label}</p>
+        {payload.map((item: any, index: number) => (
+          <p key={index} className="text-xs flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
+            <span className="text-muted-foreground">{item.name}:</span>
+            <span className="font-semibold">
+              {item.name.includes('$') || item.dataKey === 'revenue' || item.dataKey === 'expenses' 
+                ? `$${item.value.toLocaleString()}` 
+                : item.value}
+            </span>
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<DashboardStats>({
@@ -246,84 +271,132 @@ export default function AdminDashboard() {
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* Revenue & Expenses Trend */}
-        <Card className="shadow-lg border-0">
-          <CardHeader>
-            <CardTitle className="font-heading text-lg">Revenue & Expenses Trend</CardTitle>
-            <CardDescription>Last 6 months performance</CardDescription>
+        <Card className="shadow-xl border-0 bg-card/80 backdrop-blur-sm overflow-hidden">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center">
+                    <TrendingUp className="w-4 h-4 text-white" />
+                  </div>
+                  Revenue & Expenses
+                </CardTitle>
+                <CardDescription className="mt-1">6-month performance trend</CardDescription>
+              </div>
+              <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-accent">
+                <ArrowUpRight className="w-4 h-4" />
+              </Button>
+            </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-4">
             {stats.monthlyData.length > 0 ? (
               <ResponsiveContainer width="100%" height={280}>
-                <LineChart data={stats.monthlyData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="month" className="text-xs" />
-                  <YAxis className="text-xs" tickFormatter={(value) => `$${value}`} />
-                  <Tooltip 
-                    formatter={(value: number) => [`$${value.toFixed(2)}`, '']}
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
-                    }}
+                <AreaChart data={stats.monthlyData}>
+                  <defs>
+                    <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="expensesGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#F59E0B" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
+                  <XAxis 
+                    dataKey="month" 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
                   />
-                  <Legend />
-                  <Line 
+                  <YAxis 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                    tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend 
+                    wrapperStyle={{ paddingTop: '20px' }}
+                    iconType="circle"
+                  />
+                  <Area 
                     type="monotone" 
                     dataKey="revenue" 
                     stroke="#10B981" 
-                    strokeWidth={2}
-                    dot={{ fill: '#10B981' }}
+                    strokeWidth={2.5}
+                    fill="url(#revenueGradient)"
                     name="Revenue"
                   />
-                  <Line 
+                  <Area 
                     type="monotone" 
                     dataKey="expenses" 
                     stroke="#F59E0B" 
-                    strokeWidth={2}
-                    dot={{ fill: '#F59E0B' }}
+                    strokeWidth={2.5}
+                    fill="url(#expensesGradient)"
                     name="Expenses"
                   />
-                </LineChart>
+                </AreaChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-[280px] flex items-center justify-center text-muted-foreground">
-                No data available
+              <div className="h-[280px] flex flex-col items-center justify-center text-muted-foreground">
+                <Sparkles className="w-12 h-12 mb-3 text-muted-foreground/30" />
+                <p className="text-sm">No data available yet</p>
               </div>
             )}
           </CardContent>
         </Card>
 
         {/* Shipments by Month */}
-        <Card className="shadow-lg border-0">
-          <CardHeader>
-            <CardTitle className="font-heading text-lg">Monthly Shipments</CardTitle>
-            <CardDescription>Shipment volume over time</CardDescription>
+        <Card className="shadow-xl border-0 bg-card/80 backdrop-blur-sm overflow-hidden">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center">
+                    <PackageSearch className="w-4 h-4 text-white" />
+                  </div>
+                  Monthly Shipments
+                </CardTitle>
+                <CardDescription className="mt-1">Volume over time</CardDescription>
+              </div>
+            </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-4">
             {stats.monthlyData.length > 0 ? (
               <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={stats.monthlyData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="month" className="text-xs" />
-                  <YAxis className="text-xs" />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
-                    }}
+                <BarChart data={stats.monthlyData} barCategoryGap="20%">
+                  <defs>
+                    <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#3B82F6"/>
+                      <stop offset="100%" stopColor="#6366F1"/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} vertical={false} />
+                  <XAxis 
+                    dataKey="month" 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
                   />
+                  <YAxis 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
                   <Bar 
                     dataKey="shipments" 
-                    fill="#1F8ECE" 
-                    radius={[6, 6, 0, 0]}
+                    fill="url(#barGradient)"
+                    radius={[8, 8, 0, 0]}
                     name="Shipments"
                   />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-[280px] flex items-center justify-center text-muted-foreground">
-                No data available
+              <div className="h-[280px] flex flex-col items-center justify-center text-muted-foreground">
+                <Sparkles className="w-12 h-12 mb-3 text-muted-foreground/30" />
+                <p className="text-sm">No data available yet</p>
               </div>
             )}
           </CardContent>
@@ -333,119 +406,150 @@ export default function AdminDashboard() {
       {/* Second Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         {/* Shipments by Status */}
-        <Card className="shadow-lg border-0">
-          <CardHeader>
-            <CardTitle className="font-heading text-lg">Shipment Status</CardTitle>
+        <Card className="shadow-xl border-0 bg-card/80 backdrop-blur-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg font-semibold">Status Overview</CardTitle>
             <CardDescription>Current distribution</CardDescription>
           </CardHeader>
           <CardContent>
             {statusChartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie
-                    data={statusChartData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
-                    paddingAngle={2}
-                    dataKey="value"
-                  >
-                    {statusChartData.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
-                    }}
-                  />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
+              <div>
+                <ResponsiveContainer width="100%" height={180}>
+                  <PieChart>
+                    <defs>
+                      {CHART_COLORS.map((color, index) => (
+                        <linearGradient key={`gradient-${index}`} id={`pieGradient${index}`} x1="0" y1="0" x2="1" y2="1">
+                          <stop offset="0%" stopColor={color} stopOpacity={1}/>
+                          <stop offset="100%" stopColor={color} stopOpacity={0.7}/>
+                        </linearGradient>
+                      ))}
+                    </defs>
+                    <Pie
+                      data={statusChartData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={45}
+                      outerRadius={70}
+                      paddingAngle={4}
+                      dataKey="value"
+                      strokeWidth={0}
+                    >
+                      {statusChartData.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={`url(#pieGradient${index % CHART_COLORS.length})`} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<CustomTooltip />} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex flex-wrap justify-center gap-3 mt-2">
+                  {statusChartData.map((item, index) => (
+                    <div key={item.name} className="flex items-center gap-1.5 text-xs">
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }} />
+                      <span className="text-muted-foreground">{item.name}</span>
+                      <span className="font-semibold">{item.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             ) : (
-              <div className="h-[220px] flex items-center justify-center text-muted-foreground">
-                No shipments yet
+              <div className="h-[220px] flex flex-col items-center justify-center text-muted-foreground">
+                <PackageSearch className="w-10 h-10 mb-2 text-muted-foreground/30" />
+                <p className="text-sm">No shipments yet</p>
               </div>
             )}
           </CardContent>
         </Card>
 
         {/* Expenses by Category */}
-        <Card className="shadow-lg border-0">
-          <CardHeader>
-            <CardTitle className="font-heading text-lg">Expenses Breakdown</CardTitle>
+        <Card className="shadow-xl border-0 bg-card/80 backdrop-blur-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg font-semibold">Expense Breakdown</CardTitle>
             <CardDescription>By category</CardDescription>
           </CardHeader>
           <CardContent>
             {expenseChartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie
-                    data={expenseChartData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
-                    paddingAngle={2}
-                    dataKey="value"
-                  >
-                    {expenseChartData.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    formatter={(value: number) => [`$${value.toFixed(2)}`, '']}
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
-                    }}
-                  />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
+              <div>
+                <ResponsiveContainer width="100%" height={180}>
+                  <PieChart>
+                    <Pie
+                      data={expenseChartData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={45}
+                      outerRadius={70}
+                      paddingAngle={4}
+                      dataKey="value"
+                      strokeWidth={0}
+                    >
+                      {expenseChartData.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={`url(#pieGradient${index % CHART_COLORS.length})`} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<CustomTooltip />} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex flex-wrap justify-center gap-3 mt-2">
+                  {expenseChartData.slice(0, 4).map((item, index) => (
+                    <div key={item.name} className="flex items-center gap-1.5 text-xs">
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }} />
+                      <span className="text-muted-foreground truncate max-w-[60px]">{item.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             ) : (
-              <div className="h-[220px] flex items-center justify-center text-muted-foreground">
-                No expenses yet
+              <div className="h-[220px] flex flex-col items-center justify-center text-muted-foreground">
+                <ReceiptText className="w-10 h-10 mb-2 text-muted-foreground/30" />
+                <p className="text-sm">No expenses yet</p>
               </div>
             )}
           </CardContent>
         </Card>
 
         {/* Shipments by Region */}
-        <Card className="shadow-lg border-0">
-          <CardHeader>
-            <CardTitle className="font-heading text-lg">By Region</CardTitle>
+        <Card className="shadow-xl border-0 bg-card/80 backdrop-blur-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg font-semibold">By Region</CardTitle>
             <CardDescription>Shipment origins</CardDescription>
           </CardHeader>
           <CardContent>
             {regionChartData.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={regionChartData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis type="number" className="text-xs" />
-                  <YAxis dataKey="name" type="category" className="text-xs" width={60} />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
-                    }}
+                <BarChart data={regionChartData} layout="vertical" barCategoryGap="25%">
+                  <defs>
+                    <linearGradient id="regionBarGradient" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#F59E0B"/>
+                      <stop offset="100%" stopColor="#FBBF24"/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} horizontal={false} />
+                  <XAxis 
+                    type="number" 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
                   />
+                  <YAxis 
+                    dataKey="name" 
+                    type="category" 
+                    width={55}
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
                   <Bar 
                     dataKey="shipments" 
-                    fill="#F7BB3A" 
+                    fill="url(#regionBarGradient)"
                     radius={[0, 6, 6, 0]}
                     name="Shipments"
                   />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-[220px] flex items-center justify-center text-muted-foreground">
-                No data yet
+              <div className="h-[220px] flex flex-col items-center justify-center text-muted-foreground">
+                <MapPinned className="w-10 h-10 mb-2 text-muted-foreground/30" />
+                <p className="text-sm">No data yet</p>
               </div>
             )}
           </CardContent>
@@ -455,13 +559,13 @@ export default function AdminDashboard() {
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Shipments */}
-        <Card className="lg:col-span-2 shadow-lg border-0">
+        <Card className="lg:col-span-2 shadow-xl border-0 bg-card/80 backdrop-blur-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <div>
-              <CardTitle className="font-heading text-lg">Recent Shipments</CardTitle>
-              <CardDescription>Latest shipment activity</CardDescription>
+              <CardTitle className="text-lg font-semibold">Recent Shipments</CardTitle>
+              <CardDescription>Latest activity</CardDescription>
             </div>
-            <Button variant="ghost" size="sm" asChild>
+            <Button variant="ghost" size="sm" className="text-accent hover:text-accent/80" asChild>
               <Link to="/admin/shipments">
                 View all
                 <ArrowRight className="w-4 h-4 ml-1" />
@@ -471,25 +575,28 @@ export default function AdminDashboard() {
           <CardContent>
             {stats.recentShipments.length === 0 ? (
               <div className="text-center py-12">
-                <PackageSearch className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-                <p className="text-muted-foreground">No shipments yet</p>
+                <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-4">
+                  <PackageSearch className="w-8 h-8 text-muted-foreground/40" />
+                </div>
+                <p className="text-muted-foreground font-medium">No shipments yet</p>
+                <p className="text-sm text-muted-foreground/70 mt-1">Your shipments will appear here</p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {stats.recentShipments.map((shipment: any) => (
                   <div 
                     key={shipment.id} 
-                    className="flex items-center gap-4 p-4 rounded-xl bg-muted/50 hover:bg-muted transition-colors"
+                    className="flex items-center gap-4 p-4 rounded-xl bg-muted/30 hover:bg-muted/50 transition-all duration-200 border border-transparent hover:border-border/50 group"
                   >
-                    <div className="w-10 h-10 rounded-lg bg-brand-navy/10 flex items-center justify-center">
-                      <Plane className="w-5 h-5 text-brand-navy" />
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/10 to-indigo-500/10 flex items-center justify-center group-hover:scale-105 transition-transform">
+                      <Plane className="w-6 h-6 text-accent" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{shipment.tracking_number}</p>
+                      <p className="font-semibold truncate">{shipment.tracking_number}</p>
                       <p className="text-sm text-muted-foreground flex items-center gap-2">
-                        <span>{REGIONS[shipment.origin_region as Region]?.flag}</span>
+                        <span className="text-base">{REGIONS[shipment.origin_region as Region]?.flag}</span>
                         <span>{shipment.total_weight_kg}kg</span>
-                        <span>•</span>
+                        <span className="text-muted-foreground/50">•</span>
                         <span>{format(new Date(shipment.created_at), 'MMM d')}</span>
                       </p>
                     </div>
@@ -502,49 +609,49 @@ export default function AdminDashboard() {
         </Card>
 
         {/* Quick Stats */}
-        <Card className="shadow-lg border-0">
-          <CardHeader>
-            <CardTitle className="font-heading text-lg">Quick Stats</CardTitle>
-            <CardDescription>Key metrics at a glance</CardDescription>
+        <Card className="shadow-xl border-0 bg-card/80 backdrop-blur-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg font-semibold">Quick Stats</CardTitle>
+            <CardDescription>Key metrics</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="flex items-center justify-between">
+          <CardContent className="space-y-5">
+            <div className="flex items-center justify-between p-3 rounded-xl bg-orange-500/5 border border-orange-500/10 hover:bg-orange-500/10 transition-colors">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
-                  <AlertTriangle className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center shadow-lg shadow-orange-500/20">
+                  <AlertTriangle className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Pending Invoices</p>
-                  <p className="text-xl font-bold">{stats.pendingInvoices}</p>
+                  <p className="text-xs text-muted-foreground font-medium">Pending Invoices</p>
+                  <p className="text-2xl font-bold">{stats.pendingInvoices}</p>
                 </div>
               </div>
-              <Button variant="ghost" size="sm" asChild>
+              <Button variant="ghost" size="sm" className="text-orange-600 hover:text-orange-700 hover:bg-orange-500/10" asChild>
                 <Link to="/admin/invoices">View</Link>
               </Button>
             </div>
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10 hover:bg-emerald-500/10 transition-colors">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                  <TrendingUp className="w-5 h-5 text-green-600 dark:text-green-400" />
+                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                  <TrendingUp className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Net Profit (Est.)</p>
-                  <p className="text-xl font-bold">
-                    ${(stats.revenue - stats.totalExpenses).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  <p className="text-xs text-muted-foreground font-medium">Net Profit (Est.)</p>
+                  <p className="text-2xl font-bold">
+                    ${(stats.revenue - stats.totalExpenses).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between p-3 rounded-xl bg-blue-500/5 border border-blue-500/10 hover:bg-blue-500/10 transition-colors">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                  <MapPinned className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                  <MapPinned className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Active Regions</p>
-                  <p className="text-xl font-bold">{Object.keys(stats.shipmentsByRegion).length}</p>
+                  <p className="text-xs text-muted-foreground font-medium">Active Regions</p>
+                  <p className="text-2xl font-bold">{Object.keys(stats.shipmentsByRegion).length}</p>
                 </div>
               </div>
             </div>
@@ -553,29 +660,53 @@ export default function AdminDashboard() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-8">
-        <Button variant="outline" className="h-auto py-4 flex-col gap-2 hover:bg-accent/5 hover:border-accent" asChild>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
+        <Button 
+          variant="outline" 
+          className="h-auto py-5 flex-col gap-3 bg-card/50 border-border/50 hover:bg-accent/5 hover:border-accent/50 hover:shadow-lg transition-all duration-300 group" 
+          asChild
+        >
           <Link to="/admin/shipments">
-            <PackageSearch className="w-6 h-6 text-accent" />
-            <span>View Shipments</span>
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/10 to-indigo-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <PackageSearch className="w-6 h-6 text-accent" />
+            </div>
+            <span className="font-medium">View Shipments</span>
           </Link>
         </Button>
-        <Button variant="outline" className="h-auto py-4 flex-col gap-2 hover:bg-accent/5 hover:border-accent" asChild>
+        <Button 
+          variant="outline" 
+          className="h-auto py-5 flex-col gap-3 bg-card/50 border-border/50 hover:bg-accent/5 hover:border-accent/50 hover:shadow-lg transition-all duration-300 group" 
+          asChild
+        >
           <Link to="/admin/customers">
-            <UsersRound className="w-6 h-6 text-accent" />
-            <span>Manage Customers</span>
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500/10 to-purple-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <UsersRound className="w-6 h-6 text-violet-600" />
+            </div>
+            <span className="font-medium">Manage Customers</span>
           </Link>
         </Button>
-        <Button variant="outline" className="h-auto py-4 flex-col gap-2 hover:bg-accent/5 hover:border-accent" asChild>
+        <Button 
+          variant="outline" 
+          className="h-auto py-5 flex-col gap-3 bg-card/50 border-border/50 hover:bg-accent/5 hover:border-accent/50 hover:shadow-lg transition-all duration-300 group" 
+          asChild
+        >
           <Link to="/admin/invoices">
-            <BadgeDollarSign className="w-6 h-6 text-accent" />
-            <span>View Invoices</span>
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500/10 to-teal-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <BadgeDollarSign className="w-6 h-6 text-emerald-600" />
+            </div>
+            <span className="font-medium">View Invoices</span>
           </Link>
         </Button>
-        <Button variant="outline" className="h-auto py-4 flex-col gap-2 hover:bg-accent/5 hover:border-accent" asChild>
+        <Button 
+          variant="outline" 
+          className="h-auto py-5 flex-col gap-3 bg-card/50 border-border/50 hover:bg-accent/5 hover:border-accent/50 hover:shadow-lg transition-all duration-300 group" 
+          asChild
+        >
           <Link to="/admin/expenses">
-            <ReceiptText className="w-6 h-6 text-accent" />
-            <span>Track Expenses</span>
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500/10 to-red-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <ReceiptText className="w-6 h-6 text-orange-600" />
+            </div>
+            <span className="font-medium">Track Expenses</span>
           </Link>
         </Button>
       </div>
