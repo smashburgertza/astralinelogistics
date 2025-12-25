@@ -5,9 +5,12 @@ import { ExpenseFilters } from '@/components/admin/ExpenseFilters';
 import { ExpenseTable } from '@/components/admin/ExpenseTable';
 import { useAllExpenses, useExpenseStats, usePendingExpenses } from '@/hooks/useExpenses';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useExchangeRates, convertToTZS } from '@/hooks/useExchangeRates';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { DollarSign, TrendingUp, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DollarSign, TrendingUp, Clock, CheckCircle, AlertCircle, Coins } from 'lucide-react';
+import { CURRENCY_SYMBOLS } from '@/lib/constants';
 
 export default function AdminExpensesPage() {
   const [search, setSearch] = useState('');
@@ -27,6 +30,29 @@ export default function AdminExpensesPage() {
   const { data: expenses, isLoading } = useAllExpenses(filters);
   const { data: pendingExpenses, isLoading: pendingLoading } = usePendingExpenses();
   const { data: stats } = useExpenseStats();
+  const { data: exchangeRates } = useExchangeRates();
+
+  // Calculate currency breakdown from all approved expenses
+  const currencyBreakdown = useMemo(() => {
+    if (!expenses || !exchangeRates) return [];
+    
+    const approvedExpenses = expenses.filter(e => e.status === 'approved');
+    const byCurrency: Record<string, number> = {};
+    
+    approvedExpenses.forEach(expense => {
+      const currency = expense.currency || 'USD';
+      byCurrency[currency] = (byCurrency[currency] || 0) + Number(expense.amount);
+    });
+
+    return Object.entries(byCurrency).map(([currency, amount]) => ({
+      currency,
+      amount,
+      amountInTzs: convertToTZS(amount, currency, exchangeRates),
+      symbol: CURRENCY_SYMBOLS[currency] || currency,
+    })).sort((a, b) => b.amountInTzs - a.amountInTzs);
+  }, [expenses, exchangeRates]);
+
+  const totalInTzs = currencyBreakdown.reduce((sum, item) => sum + item.amountInTzs, 0);
 
   const clearFilters = () => {
     setSearch('');
@@ -45,14 +71,14 @@ export default function AdminExpensesPage() {
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <StatCard
-          title="Approved Expenses"
-          value={`$${(stats?.totalAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          title="Approved (TZS)"
+          value={`TZS ${totalInTzs.toLocaleString()}`}
           icon={DollarSign}
           variant="default"
         />
         <StatCard
-          title="This Month (Approved)"
-          value={`$${(stats?.thisMonthAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          title="This Month (TZS)"
+          value={`TZS ${(stats?.thisMonthAmount || 0).toLocaleString()}`}
           icon={TrendingUp}
           variant="primary"
         />
@@ -75,6 +101,46 @@ export default function AdminExpensesPage() {
           variant="success"
         />
       </div>
+
+      {/* Currency Summary Widget */}
+      {currencyBreakdown.length > 0 && (
+        <Card className="mb-6 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Coins className="h-5 w-5 text-primary" />
+              Currency Breakdown (Approved Expenses)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              {currencyBreakdown.map(({ currency, amount, amountInTzs, symbol }) => (
+                <div 
+                  key={currency} 
+                  className="bg-background/80 rounded-lg p-3 border shadow-sm"
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <Badge variant="outline" className="text-xs font-mono">
+                      {currency}
+                    </Badge>
+                  </div>
+                  <p className="text-lg font-bold">
+                    {symbol}{amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    ≈ TZS {amountInTzs.toLocaleString()}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 pt-4 border-t flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Total in TZS</span>
+              <span className="text-xl font-bold text-primary">
+                TZS {totalInTzs.toLocaleString()}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Tabs for Approval Queue and All Expenses */}
       <Tabs defaultValue="queue" className="space-y-4">
