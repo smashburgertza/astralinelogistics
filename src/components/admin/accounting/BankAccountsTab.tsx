@@ -7,11 +7,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Building } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Plus, Building, Scale } from 'lucide-react';
 import { useBankAccounts, useCreateBankAccount, useChartOfAccounts } from '@/hooks/useAccounting';
+import { BankReconciliationTab } from './BankReconciliationTab';
 
 export function BankAccountsTab() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [activeTab, setActiveTab] = useState('accounts');
   const { data: bankAccounts = [], isLoading } = useBankAccounts();
   const { data: accounts = [] } = useChartOfAccounts({ type: 'asset' });
 
@@ -24,70 +27,89 @@ export function BankAccountsTab() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle>Bank Accounts</CardTitle>
-          <Button onClick={() => setShowCreateDialog(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Bank Account
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Account Name</TableHead>
-                <TableHead>Bank</TableHead>
-                <TableHead>Account Number</TableHead>
-                <TableHead>Currency</TableHead>
-                <TableHead className="text-right">Current Balance</TableHead>
-                <TableHead className="w-24">Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">Loading...</TableCell>
-                </TableRow>
-              ) : bankAccounts.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    <Building className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    No bank accounts configured
-                  </TableCell>
-                </TableRow>
-              ) : (
-                bankAccounts.map((account) => (
-                  <TableRow key={account.id}>
-                    <TableCell className="font-medium">{account.account_name}</TableCell>
-                    <TableCell>{account.bank_name}</TableCell>
-                    <TableCell className="font-mono">{account.account_number || '-'}</TableCell>
-                    <TableCell>{account.currency}</TableCell>
-                    <TableCell className="text-right font-medium">
-                      {formatCurrency(account.current_balance, account.currency)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={account.is_active ? 'default' : 'secondary'}>
-                        {account.is_active ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
+    <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsTrigger value="accounts" className="flex items-center gap-2">
+          <Building className="h-4 w-4" />
+          Bank Accounts
+        </TabsTrigger>
+        <TabsTrigger value="reconciliation" className="flex items-center gap-2">
+          <Scale className="h-4 w-4" />
+          Reconciliation
+        </TabsTrigger>
+      </TabsList>
 
-      <CreateBankAccountDialog 
-        open={showCreateDialog} 
-        onOpenChange={setShowCreateDialog}
-        chartAccounts={accounts}
-      />
-    </Card>
+      <TabsContent value="accounts" className="mt-4">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>Bank Accounts</CardTitle>
+              <Button onClick={() => setShowCreateDialog(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Bank Account
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Account Name</TableHead>
+                    <TableHead>Bank</TableHead>
+                    <TableHead>Account Number</TableHead>
+                    <TableHead>Currency</TableHead>
+                    <TableHead className="text-right">Current Balance</TableHead>
+                    <TableHead className="w-24">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8">Loading...</TableCell>
+                    </TableRow>
+                  ) : bankAccounts.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        <Building className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        No bank accounts configured
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    bankAccounts.map((account) => (
+                      <TableRow key={account.id}>
+                        <TableCell className="font-medium">{account.account_name}</TableCell>
+                        <TableCell>{account.bank_name}</TableCell>
+                        <TableCell className="font-mono">{account.account_number || '-'}</TableCell>
+                        <TableCell>{account.currency}</TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatCurrency(account.current_balance, account.currency)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={account.is_active ? 'default' : 'secondary'}>
+                            {account.is_active ? 'Active' : 'Inactive'}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+
+          <CreateBankAccountDialog 
+            open={showCreateDialog} 
+            onOpenChange={setShowCreateDialog}
+            chartAccounts={accounts}
+          />
+        </Card>
+      </TabsContent>
+
+      <TabsContent value="reconciliation" className="mt-4">
+        <BankReconciliationTab />
+      </TabsContent>
+    </Tabs>
   );
 }
 
