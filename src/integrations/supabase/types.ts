@@ -1024,6 +1024,8 @@ export type Database = {
           description: string | null
           dimensions: string | null
           id: string
+          picked_up_at: string | null
+          picked_up_by: string | null
           shipment_id: string
           weight_kg: number
         }
@@ -1033,6 +1035,8 @@ export type Database = {
           description?: string | null
           dimensions?: string | null
           id?: string
+          picked_up_at?: string | null
+          picked_up_by?: string | null
           shipment_id: string
           weight_kg: number
         }
@@ -1042,6 +1046,8 @@ export type Database = {
           description?: string | null
           dimensions?: string | null
           id?: string
+          picked_up_at?: string | null
+          picked_up_by?: string | null
           shipment_id?: string
           weight_kg?: number
         }
