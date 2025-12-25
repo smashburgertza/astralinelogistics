@@ -8,11 +8,12 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Users, FileText, Package, 
-  DollarSign, Award, Eye, Mail, BarChart3
+  DollarSign, Award, Eye, Mail, BarChart3, Trophy, RefreshCw
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { EmployeeProfileDrawer } from './EmployeeProfileDrawer';
+import { useCheckAllEmployeeMilestones } from '@/hooks/useEmployeeMilestones';
 
 interface EmployeeMetrics {
   userId: string;
@@ -32,10 +33,19 @@ export function EmployeePerformanceInsights() {
   const [topPerformer, setTopPerformer] = useState<EmployeeMetrics | null>(null);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  
+  const checkMilestones = useCheckAllEmployeeMilestones();
 
   useEffect(() => {
     fetchEmployeePerformance();
   }, []);
+
+  // Check milestones after employees are loaded
+  useEffect(() => {
+    if (employees.length > 0 && !loading) {
+      checkMilestones.mutate();
+    }
+  }, [employees.length, loading]);
 
   const fetchEmployeePerformance = async () => {
     try {

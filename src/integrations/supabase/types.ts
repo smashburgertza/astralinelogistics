@@ -482,6 +482,33 @@ export type Database = {
         }
         Relationships: []
       }
+      employee_milestones: {
+        Row: {
+          achieved_at: string
+          employee_id: string
+          id: string
+          milestone_type: string
+          milestone_value: string
+          notified_at: string | null
+        }
+        Insert: {
+          achieved_at?: string
+          employee_id: string
+          id?: string
+          milestone_type: string
+          milestone_value: string
+          notified_at?: string | null
+        }
+        Update: {
+          achieved_at?: string
+          employee_id?: string
+          id?: string
+          milestone_type?: string
+          milestone_value?: string
+          notified_at?: string | null
+        }
+        Relationships: []
+      }
       estimates: {
         Row: {
           created_at: string | null

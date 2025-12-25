@@ -12,13 +12,14 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   User, Mail, Phone, Calendar, FileText, DollarSign,
   Package, TrendingUp, Award, BarChart3, Clock, CheckCircle,
-  XCircle, AlertCircle, ArrowUpRight, ArrowDownRight
+  XCircle, AlertCircle, ArrowUpRight, ArrowDownRight, Trophy
 } from 'lucide-react';
 import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, BarChart, Bar
 } from 'recharts';
+import { MILESTONES } from '@/hooks/useEmployeeMilestones';
 
 interface EmployeeProfileDrawerProps {
   open: boolean;
@@ -65,6 +66,11 @@ export function EmployeeProfileDrawer({ open, onOpenChange, employeeId }: Employ
   const [profile, setProfile] = useState<EmployeeProfile | null>(null);
   const [metrics, setMetrics] = useState<PerformanceMetrics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [achievedMilestones, setAchievedMilestones] = useState<Array<{
+    milestone_type: string;
+    milestone_value: string;
+    achieved_at: string;
+  }>>([]);
 
   useEffect(() => {
     if (open && employeeId) {
@@ -216,6 +222,15 @@ export function EmployeeProfileDrawer({ open, onOpenChange, employeeId }: Employ
         monthlyData,
         recentActivity: recentActivity.slice(0, 10),
       });
+
+      // Fetch achieved milestones
+      const { data: milestones } = await supabase
+        .from('employee_milestones')
+        .select('milestone_type, milestone_value, achieved_at')
+        .eq('employee_id', employeeId)
+        .order('achieved_at', { ascending: false });
+
+      setAchievedMilestones(milestones || []);
     } catch (error) {
       console.error('Error fetching employee data:', error);
     } finally {
@@ -391,9 +406,13 @@ export function EmployeeProfileDrawer({ open, onOpenChange, employeeId }: Employ
 
                 {/* Tabs for Charts and Activity */}
                 <Tabs defaultValue="performance" className="w-full">
-                  <TabsList className="grid w-full grid-cols-3">
+                  <TabsList className="grid w-full grid-cols-4">
                     <TabsTrigger value="performance">Performance</TabsTrigger>
                     <TabsTrigger value="revenue">Revenue</TabsTrigger>
+                    <TabsTrigger value="milestones">
+                      <Trophy className="w-3.5 h-3.5 mr-1" />
+                      Milestones
+                    </TabsTrigger>
                     <TabsTrigger value="activity">Activity</TabsTrigger>
                   </TabsList>
 
@@ -465,6 +484,94 @@ export function EmployeeProfileDrawer({ open, onOpenChange, employeeId }: Employ
                             />
                           </AreaChart>
                         </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  <TabsContent value="milestones" className="mt-4">
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium flex items-center gap-2">
+                          <Trophy className="w-4 h-4 text-amber-500" />
+                          Achievements
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {achievedMilestones.length === 0 ? (
+                          <div className="text-center py-6 text-muted-foreground">
+                            <Trophy className="w-12 h-12 mx-auto mb-3 text-muted-foreground/30" />
+                            <p className="text-sm">No milestones achieved yet</p>
+                            <p className="text-xs text-muted-foreground/70 mt-1">Keep working to unlock achievements!</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {achievedMilestones.map((milestone, index) => {
+                              const milestoneInfo = MILESTONES.find(
+                                m => m.type === milestone.milestone_type && String(m.value) === milestone.milestone_value
+                              );
+                              return (
+                                <div
+                                  key={index}
+                                  className="flex items-center gap-3 p-3 rounded-lg bg-amber-500/5 border border-amber-500/20"
+                                >
+                                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-lg">
+                                    {milestoneInfo?.icon || '🏆'}
+                                  </div>
+                                  <div className="flex-1">
+                                    <p className="font-medium text-sm">{milestoneInfo?.label || 'Milestone'}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      Achieved on {format(new Date(milestone.achieved_at), 'MMM d, yyyy')}
+                                    </p>
+                                  </div>
+                                  <CheckCircle className="w-5 h-5 text-emerald-500" />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                        
+                        {/* Upcoming milestones */}
+                        {metrics && (
+                          <div className="mt-4 pt-4 border-t border-border">
+                            <p className="text-xs font-medium text-muted-foreground mb-3">Next Milestones</p>
+                            <div className="space-y-2">
+                              {MILESTONES
+                                .filter(m => !achievedMilestones.some(
+                                  am => am.milestone_type === m.type && am.milestone_value === String(m.value)
+                                ))
+                                .slice(0, 3)
+                                .map((milestone, index) => {
+                                  let current = 0;
+                                  let target = milestone.value;
+                                  switch (milestone.type) {
+                                    case 'invoices': current = metrics.totalInvoices; break;
+                                    case 'estimates': current = metrics.totalEstimates; break;
+                                    case 'shipments': current = metrics.totalShipments; break;
+                                    case 'revenue': current = metrics.totalRevenue; break;
+                                  }
+                                  const progress = Math.min((current / target) * 100, 100);
+                                  
+                                  return (
+                                    <div key={index} className="space-y-1">
+                                      <div className="flex items-center justify-between text-xs">
+                                        <span className="flex items-center gap-1.5">
+                                          <span>{milestone.icon}</span>
+                                          <span className="text-muted-foreground">{milestone.label}</span>
+                                        </span>
+                                        <span className="font-medium">
+                                          {milestone.type === 'revenue' 
+                                            ? `${(current / 1000000).toFixed(1)}M / ${(target / 1000000).toFixed(0)}M`
+                                            : `${current} / ${target}`
+                                          }
+                                        </span>
+                                      </div>
+                                      <Progress value={progress} className="h-1.5" />
+                                    </div>
+                                  );
+                                })}
+                            </div>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   </TabsContent>
