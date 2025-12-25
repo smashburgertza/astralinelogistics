@@ -7,6 +7,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { PublicLayout } from "@/components/layout/PublicLayout";
 import Index from "./pages/Index";
 import AuthPage from "./pages/Auth";
+import SystemAuthPage from "./pages/SystemAuth";
 import TrackingPage from "./pages/Tracking";
 import ShopForMe from "./pages/ShopForMe";
 import AboutPage from "./pages/About";
@@ -59,6 +60,7 @@ const App = () => (
             
             {/* Auth */}
             <Route path="/auth" element={<AuthPage />} />
+            <Route path="/system" element={<SystemAuthPage />} />
             
             {/* Customer Portal */}
             <Route path="/customer" element={<CustomerDashboard />} />
