@@ -179,45 +179,82 @@ export function ShoppingAggregator() {
   const roundWeight = (weight: number) => Math.ceil(weight);
 
   const calculateTotals = () => {
-    const totalProductCost = items.reduce((sum, item) => {
-      if (item.productPrice) {
-        return sum + item.productPrice * item.quantity;
-      }
-      return sum;
-    }, 0);
+    // Group items by region
+    const itemsByRegion = items.reduce((acc, item) => {
+      const region = item.originRegion || selectedRegion;
+      if (!acc[region]) acc[region] = [];
+      acc[region].push(item);
+      return acc;
+    }, {} as Record<Region, ProductItem[]>);
+
+    // Calculate per-region breakdowns
+    const regionBreakdowns: {
+      region: Region;
+      currency: string;
+      productCost: number;
+      weight: number;
+      shippingRate: number;
+      charges: { name: string; key: string; amount: number; percentage?: number }[];
+      subtotal: number;
+      subtotalInTZS: number;
+      exchangeRate: number;
+    }[] = [];
+
+    let grandTotalInTZS = 0;
+
+    Object.entries(itemsByRegion).forEach(([region, regionItems]) => {
+      const regionKey = region as Region;
+      const currency = REGIONS[regionKey]?.currency || 'USD';
+      const shippingRate = getShippingRate(regionKey);
+      const exchangeRate = getExchangeRate(currency);
+
+      const productCost = regionItems.reduce((sum, item) => {
+        if (item.productPrice) {
+          return sum + item.productPrice * item.quantity;
+        }
+        return sum;
+      }, 0);
+
+      const weight = regionItems.reduce((sum, item) => {
+        return sum + roundWeight(item.estimatedWeightKg) * item.quantity;
+      }, 0);
+
+      // Calculate charges for this region
+      const chargeCalc = calculateShopForMeCharges(
+        productCost,
+        weight,
+        shippingRate,
+        charges || []
+      );
+
+      const subtotalInTZS = chargeCalc.total * exchangeRate;
+      grandTotalInTZS += subtotalInTZS;
+
+      regionBreakdowns.push({
+        region: regionKey,
+        currency,
+        productCost,
+        weight,
+        shippingRate,
+        charges: chargeCalc.breakdown,
+        subtotal: chargeCalc.total,
+        subtotalInTZS,
+        exchangeRate,
+      });
+    });
 
     const totalWeight = items.reduce((sum, item) => {
       return sum + roundWeight(item.estimatedWeightKg) * item.quantity;
     }, 0);
 
-    // Use the first item's region or default to selected region
-    const primaryRegion = items[0]?.originRegion || selectedRegion;
-    const shippingRate = getShippingRate(primaryRegion);
-    
-    // Get currency based on region
-    const regionCurrency = REGIONS[primaryRegion]?.currency || 'USD';
-
-    // Calculate using configurable charges
-    const chargeCalc = calculateShopForMeCharges(
-      totalProductCost,
-      totalWeight,
-      shippingRate,
-      charges || []
-    );
-
-    // Get exchange rate based on region currency
-    const exchangeRate = getExchangeRate(regionCurrency);
-    const totalInTZS = chargeCalc.total * exchangeRate;
+    // Check if it's a single-region order
+    const isSingleRegion = regionBreakdowns.length === 1;
 
     return {
-      totalProductCost,
+      regionBreakdowns,
+      grandTotalInTZS,
       totalWeight,
-      shippingRate,
-      breakdown: chargeCalc.breakdown,
-      grandTotal: chargeCalc.total,
-      totalInTZS,
-      exchangeRate,
-      currency: regionCurrency,
+      isSingleRegion,
     };
   };
 
@@ -236,6 +273,17 @@ export function ShoppingAggregator() {
     const totals = calculateTotals();
 
     try {
+      // Sum up totals from all regions
+      const totalProductCost = totals.regionBreakdowns.reduce((sum, rb) => sum + rb.productCost, 0);
+      const totalShipping = totals.regionBreakdowns.reduce((sum, rb) => {
+        const shipping = rb.charges.find(c => c.key === 'shipping');
+        return sum + (shipping?.amount || 0);
+      }, 0);
+      const totalHandling = totals.regionBreakdowns.reduce((sum, rb) => {
+        const handling = rb.charges.find(c => c.key === 'handling_fee');
+        return sum + (handling?.amount || 0);
+      }, 0);
+
       const { data: orderRequest, error: orderError } = await supabase
         .from('order_requests')
         .insert({
@@ -243,10 +291,10 @@ export function ShoppingAggregator() {
           customer_email: customerDetails.email,
           customer_phone: customerDetails.phone,
           customer_address: customerDetails.address,
-          total_product_cost: totals.totalProductCost,
-          estimated_shipping_cost: totals.breakdown.find(b => b.key === 'shipping')?.amount || 0,
-          handling_fee: totals.breakdown.find(b => b.key === 'handling_fee')?.amount || 0,
-          grand_total: totals.grandTotal,
+          total_product_cost: totalProductCost,
+          estimated_shipping_cost: totalShipping,
+          handling_fee: totalHandling,
+          grand_total: totals.grandTotalInTZS,
         })
         .select()
         .single();
@@ -458,53 +506,91 @@ export function ShoppingAggregator() {
               Price Breakdown
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {totals.breakdown.map((item, index) => {
-              const prevItem = index > 0 ? totals.breakdown[index - 1] : null;
-              const showSeparator = item.key === 'shipping' || 
-                (prevItem?.key === 'shipping' && item.key !== 'shipping');
-              
-              return (
-                <div key={item.key}>
-                  {showSeparator && <Separator className="my-2" />}
-                  <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">
-                      {item.name}
-                      {item.percentage !== undefined && (
-                        <span className="ml-1 text-xs">({item.percentage}%)</span>
-                      )}
-                      {item.key === 'shipping' && (
-                        <span className="ml-1 text-xs">
-                          ({totals.totalWeight} kg × {formatCurrency(totals.shippingRate, totals.currency)}/kg)
-                        </span>
-                      )}
-                    </span>
-                    <span className="font-medium">{formatCurrency(item.amount, totals.currency)}</span>
+          <CardContent className="space-y-4">
+            {/* Show breakdown per region */}
+            {totals.regionBreakdowns.map((regionData, regionIndex) => (
+              <div key={regionData.region} className="space-y-2">
+                {/* Region header for multi-region orders */}
+                {!totals.isSingleRegion && (
+                  <div className="flex items-center gap-2 font-medium text-sm bg-muted/50 px-3 py-2 rounded-md -mx-1">
+                    <span>{REGIONS[regionData.region]?.flag}</span>
+                    <span>{REGIONS[regionData.region]?.label}</span>
+                    <span className="text-muted-foreground">({regionData.currency})</span>
                   </div>
-                </div>
-              );
-            })}
+                )}
+                
+                {regionData.charges.map((charge, index) => {
+                  const prevCharge = index > 0 ? regionData.charges[index - 1] : null;
+                  const showSeparator = charge.key === 'shipping' || 
+                    (prevCharge?.key === 'shipping' && charge.key !== 'shipping');
+                  
+                  return (
+                    <div key={`${regionData.region}-${charge.key}`}>
+                      {showSeparator && <Separator className="my-2" />}
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">
+                          {charge.name}
+                          {charge.percentage !== undefined && (
+                            <span className="ml-1 text-xs">({charge.percentage}%)</span>
+                          )}
+                          {charge.key === 'shipping' && (
+                            <span className="ml-1 text-xs">
+                              ({regionData.weight} kg × {formatCurrency(regionData.shippingRate, regionData.currency)}/kg)
+                            </span>
+                          )}
+                        </span>
+                        <span className="font-medium">{formatCurrency(charge.amount, regionData.currency)}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Region subtotal for multi-region */}
+                {!totals.isSingleRegion && (
+                  <>
+                    <Separator className="my-2" />
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium">Subtotal ({regionData.currency})</span>
+                      <span className="font-semibold">{formatCurrency(regionData.subtotal, regionData.currency)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm text-muted-foreground">
+                      <span>= TZS @ {regionData.exchangeRate.toLocaleString()}</span>
+                      <span>{formatTZS(regionData.subtotalInTZS)}</span>
+                    </div>
+                  </>
+                )}
+
+                {/* Separator between regions */}
+                {!totals.isSingleRegion && regionIndex < totals.regionBreakdowns.length - 1 && (
+                  <Separator className="my-4" />
+                )}
+              </div>
+            ))}
 
             <Separator className="my-3" />
-            
-            {/* Total in foreign currency */}
-            <div className="flex justify-between items-center">
-              <span className="font-semibold text-lg">Total ({totals.currency})</span>
-              <span className="font-bold text-xl text-primary">
-                {formatCurrency(totals.grandTotal, totals.currency)}
-              </span>
-            </div>
+
+            {/* Single region: show total in that currency */}
+            {totals.isSingleRegion && totals.regionBreakdowns[0] && (
+              <div className="flex justify-between items-center">
+                <span className="font-semibold text-lg">Total ({totals.regionBreakdowns[0].currency})</span>
+                <span className="font-bold text-xl text-primary">
+                  {formatCurrency(totals.regionBreakdowns[0].subtotal, totals.regionBreakdowns[0].currency)}
+                </span>
+              </div>
+            )}
 
             {/* Total in TZS */}
             <div className="flex justify-between items-center bg-primary/10 p-3 rounded-lg -mx-3">
               <span className="font-semibold">
                 Total (TZS)
-                <span className="text-xs text-muted-foreground ml-2">
-                  @ {totals.exchangeRate.toLocaleString()} TZS/{totals.currency}
-                </span>
+                {totals.isSingleRegion && totals.regionBreakdowns[0] && (
+                  <span className="text-xs text-muted-foreground ml-2">
+                    @ {totals.regionBreakdowns[0].exchangeRate.toLocaleString()} TZS/{totals.regionBreakdowns[0].currency}
+                  </span>
+                )}
               </span>
               <span className="font-bold text-xl">
-                {formatTZS(totals.totalInTZS)}
+                {formatTZS(totals.grandTotalInTZS)}
               </span>
             </div>
           </CardContent>
