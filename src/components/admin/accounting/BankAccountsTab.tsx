@@ -1,0 +1,230 @@
+import { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, Building } from 'lucide-react';
+import { useBankAccounts, useCreateBankAccount, useChartOfAccounts } from '@/hooks/useAccounting';
+
+export function BankAccountsTab() {
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const { data: bankAccounts = [], isLoading } = useBankAccounts();
+  const { data: accounts = [] } = useChartOfAccounts({ type: 'asset' });
+
+  const formatCurrency = (amount: number, currency: string = 'TZS') => {
+    return new Intl.NumberFormat('en-TZ', {
+      style: 'currency',
+      currency,
+      minimumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle>Bank Accounts</CardTitle>
+          <Button onClick={() => setShowCreateDialog(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Bank Account
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Account Name</TableHead>
+                <TableHead>Bank</TableHead>
+                <TableHead>Account Number</TableHead>
+                <TableHead>Currency</TableHead>
+                <TableHead className="text-right">Current Balance</TableHead>
+                <TableHead className="w-24">Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8">Loading...</TableCell>
+                </TableRow>
+              ) : bankAccounts.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <Building className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    No bank accounts configured
+                  </TableCell>
+                </TableRow>
+              ) : (
+                bankAccounts.map((account) => (
+                  <TableRow key={account.id}>
+                    <TableCell className="font-medium">{account.account_name}</TableCell>
+                    <TableCell>{account.bank_name}</TableCell>
+                    <TableCell className="font-mono">{account.account_number || '-'}</TableCell>
+                    <TableCell>{account.currency}</TableCell>
+                    <TableCell className="text-right font-medium">
+                      {formatCurrency(account.current_balance, account.currency)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={account.is_active ? 'default' : 'secondary'}>
+                        {account.is_active ? 'Active' : 'Inactive'}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+
+      <CreateBankAccountDialog 
+        open={showCreateDialog} 
+        onOpenChange={setShowCreateDialog}
+        chartAccounts={accounts}
+      />
+    </Card>
+  );
+}
+
+function CreateBankAccountDialog({ 
+  open, 
+  onOpenChange, 
+  chartAccounts 
+}: { 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void;
+  chartAccounts: any[];
+}) {
+  const [accountName, setAccountName] = useState('');
+  const [bankName, setBankName] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [currency, setCurrency] = useState('TZS');
+  const [chartAccountId, setChartAccountId] = useState('');
+  const [openingBalance, setOpeningBalance] = useState(0);
+
+  const createBankAccount = useCreateBankAccount();
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    createBankAccount.mutate({
+      account_name: accountName,
+      bank_name: bankName,
+      account_number: accountNumber || null,
+      currency,
+      chart_account_id: chartAccountId || null,
+      opening_balance: openingBalance,
+      is_active: true,
+    }, {
+      onSuccess: () => {
+        onOpenChange(false);
+        setAccountName('');
+        setBankName('');
+        setAccountNumber('');
+        setCurrency('TZS');
+        setChartAccountId('');
+        setOpeningBalance(0);
+      },
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Add Bank Account</DialogTitle>
+        </DialogHeader>
+        
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="account_name">Account Name *</Label>
+            <Input
+              id="account_name"
+              value={accountName}
+              onChange={(e) => setAccountName(e.target.value)}
+              placeholder="e.g., Main Operating Account"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="bank_name">Bank Name *</Label>
+              <Input
+                id="bank_name"
+                value={bankName}
+                onChange={(e) => setBankName(e.target.value)}
+                placeholder="e.g., CRDB Bank"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="account_number">Account Number</Label>
+              <Input
+                id="account_number"
+                value={accountNumber}
+                onChange={(e) => setAccountNumber(e.target.value)}
+                placeholder="e.g., 123456789"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="currency">Currency</Label>
+              <Select value={currency} onValueChange={setCurrency}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="TZS">TZS</SelectItem>
+                  <SelectItem value="USD">USD</SelectItem>
+                  <SelectItem value="GBP">GBP</SelectItem>
+                  <SelectItem value="EUR">EUR</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="opening_balance">Opening Balance</Label>
+              <Input
+                id="opening_balance"
+                type="number"
+                value={openingBalance}
+                onChange={(e) => setOpeningBalance(parseFloat(e.target.value) || 0)}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="chart_account">Link to Chart Account</Label>
+            <Select value={chartAccountId} onValueChange={setChartAccountId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select account" />
+              </SelectTrigger>
+              <SelectContent>
+                {chartAccounts.map((account) => (
+                  <SelectItem key={account.id} value={account.id}>
+                    {account.account_code} - {account.account_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={createBankAccount.isPending}>
+              {createBankAccount.isPending ? 'Creating...' : 'Create'}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
