@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -8,9 +8,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Plus } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Plus, ArrowRight } from 'lucide-react';
 import { useCreateInvoice } from '@/hooks/useInvoices';
 import { useCustomers, useShipments } from '@/hooks/useShipments';
+import { useExchangeRates, convertToTZS } from '@/hooks/useExchangeRates';
 import { supabase } from '@/integrations/supabase/client';
 
 const invoiceSchema = z.object({
@@ -29,17 +31,30 @@ export function CreateInvoiceDialog() {
   const createInvoice = useCreateInvoice();
   const { data: customers } = useCustomers();
   const { data: shipments } = useShipments();
+  const { data: exchangeRates } = useExchangeRates();
 
   const form = useForm<InvoiceFormData>({
     resolver: zodResolver(invoiceSchema),
     defaultValues: {
       currency: 'USD',
+      amount: 0,
     },
   });
+
+  const watchAmount = form.watch('amount');
+  const watchCurrency = form.watch('currency');
+
+  // Calculate TZS equivalent
+  const amountInTZS = exchangeRates && watchAmount && watchCurrency
+    ? convertToTZS(watchAmount, watchCurrency, exchangeRates)
+    : 0;
 
   const onSubmit = async (data: InvoiceFormData) => {
     // Generate invoice number
     const { data: invoiceNumber } = await supabase.rpc('generate_document_number', { prefix: 'INV' });
+
+    // Calculate TZS amount
+    const tzs = exchangeRates ? convertToTZS(data.amount, data.currency, exchangeRates) : null;
 
     await createInvoice.mutateAsync({
       invoice_number: invoiceNumber || `INV-${Date.now()}`,
@@ -47,6 +62,7 @@ export function CreateInvoiceDialog() {
       shipment_id: data.shipment_id || null,
       amount: data.amount,
       currency: data.currency,
+      amount_in_tzs: tzs,
       due_date: data.due_date || null,
       notes: data.notes || null,
       status: 'pending',
@@ -148,10 +164,11 @@ export function CreateInvoiceDialog() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="USD">USD</SelectItem>
-                        <SelectItem value="GBP">GBP</SelectItem>
-                        <SelectItem value="EUR">EUR</SelectItem>
-                        <SelectItem value="TZS">TZS</SelectItem>
+                        {exchangeRates?.map((rate) => (
+                          <SelectItem key={rate.currency_code} value={rate.currency_code}>
+                            {rate.currency_code} - {rate.currency_name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -159,6 +176,26 @@ export function CreateInvoiceDialog() {
                 )}
               />
             </div>
+
+            {/* TZS Equivalent Display */}
+            {watchCurrency !== 'TZS' && watchAmount > 0 && (
+              <Card className="p-4 bg-primary/5 border-primary/20">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Invoice Amount</p>
+                    <p className="text-lg font-semibold">{watchCurrency} {watchAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground">Equivalent in TZS</p>
+                    <p className="text-lg font-bold text-primary">TZS {amountInTZS.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Rate: 1 {watchCurrency} = {exchangeRates?.find(r => r.currency_code === watchCurrency)?.rate_to_tzs.toLocaleString() || '?'} TZS
+                </p>
+              </Card>
+            )}
 
             <FormField
               control={form.control}

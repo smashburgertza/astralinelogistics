@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Building2, Mail, Shield, Settings, Save, Loader2, Upload, Trash2, ImageIcon } from 'lucide-react';
+import { Building2, Mail, Shield, Settings, Save, Loader2, Upload, Trash2, ImageIcon, RefreshCw } from 'lucide-react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { useAllSettings, useUpdateSettings } from '@/hooks/useSettings';
+import { ExchangeRateManagement } from '@/components/admin/ExchangeRateManagement';
 
 // Schemas
 const companySchema = z.object({
@@ -339,10 +340,14 @@ export default function AdminSettingsPage() {
   return (
     <AdminLayout title="Settings" subtitle="Configure your system preferences">
       <Tabs defaultValue="company" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
+        <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
           <TabsTrigger value="company" className="gap-2">
             <Building2 className="h-4 w-4 hidden sm:inline" />
             Company
+          </TabsTrigger>
+          <TabsTrigger value="currency" className="gap-2">
+            <RefreshCw className="h-4 w-4 hidden sm:inline" />
+            Currency
           </TabsTrigger>
           <TabsTrigger value="notifications" className="gap-2">
             <Mail className="h-4 w-4 hidden sm:inline" />
@@ -357,6 +362,11 @@ export default function AdminSettingsPage() {
             System
           </TabsTrigger>
         </TabsList>
+
+        {/* Currency / Exchange Rates */}
+        <TabsContent value="currency">
+          <ExchangeRateManagement />
+        </TabsContent>
 
         {/* Company Settings */}
         <TabsContent value="company">

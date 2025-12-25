@@ -199,6 +199,33 @@ export type Database = {
         }
         Relationships: []
       }
+      currency_exchange_rates: {
+        Row: {
+          currency_code: string
+          currency_name: string
+          id: string
+          rate_to_tzs: number
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          currency_code: string
+          currency_name: string
+          id?: string
+          rate_to_tzs: number
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          currency_code?: string
+          currency_name?: string
+          id?: string
+          rate_to_tzs?: number
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           address: string | null
@@ -381,6 +408,7 @@ export type Database = {
       invoices: {
         Row: {
           amount: number
+          amount_in_tzs: number | null
           created_at: string | null
           created_by: string | null
           currency: string | null
@@ -391,6 +419,7 @@ export type Database = {
           invoice_number: string
           notes: string | null
           paid_at: string | null
+          payment_currency: string | null
           payment_method: string | null
           shipment_id: string | null
           status: string | null
@@ -398,6 +427,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          amount_in_tzs?: number | null
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
@@ -408,6 +438,7 @@ export type Database = {
           invoice_number: string
           notes?: string | null
           paid_at?: string | null
+          payment_currency?: string | null
           payment_method?: string | null
           shipment_id?: string | null
           status?: string | null
@@ -415,6 +446,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          amount_in_tzs?: number | null
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
@@ -425,6 +457,7 @@ export type Database = {
           invoice_number?: string
           notes?: string | null
           paid_at?: string | null
+          payment_currency?: string | null
           payment_method?: string | null
           shipment_id?: string | null
           status?: string | null
