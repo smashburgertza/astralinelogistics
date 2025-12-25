@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
+import { createInvoicePaymentJournalEntry, createInvoiceJournalEntry } from '@/lib/journalEntryUtils';
 
 export type Invoice = Tables<'invoices'> & {
   customers?: Tables<'customers'> | null;
@@ -60,13 +61,30 @@ export function useCreateInvoice() {
       const { data, error } = await supabase
         .from('invoices')
         .insert(invoice)
-        .select()
+        .select('*, customers(name)')
         .single();
       if (error) throw error;
+
+      // Auto-create journal entry for the invoice (AR debit, Revenue credit)
+      try {
+        await createInvoiceJournalEntry({
+          invoiceId: data.id,
+          invoiceNumber: data.invoice_number,
+          amount: Number(data.amount),
+          currency: data.currency || 'USD',
+          exchangeRate: data.amount_in_tzs ? Number(data.amount_in_tzs) / Number(data.amount) : 1,
+          customerName: (data as any).customers?.name,
+        });
+      } catch (journalError) {
+        console.error('Failed to create journal entry for invoice:', journalError);
+        // Don't fail the invoice creation if journal entry fails
+      }
+
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
       toast.success('Invoice created successfully');
     },
     onError: (error) => {
@@ -117,10 +135,29 @@ export function useUpdateInvoiceStatus() {
         .select()
         .single();
       if (error) throw error;
+
+      // Auto-create journal entry when invoice is paid (Cash debit, AR credit)
+      if (status === 'paid') {
+        try {
+          await createInvoicePaymentJournalEntry({
+            invoiceId: data.id,
+            invoiceNumber: data.invoice_number,
+            amount: Number(data.amount),
+            currency: data.currency || 'USD',
+            exchangeRate: data.amount_in_tzs ? Number(data.amount_in_tzs) / Number(data.amount) : 1,
+            paymentCurrency: data.payment_currency || undefined,
+          });
+        } catch (journalError) {
+          console.error('Failed to create payment journal entry:', journalError);
+          // Don't fail the status update if journal entry fails
+        }
+      }
+
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
       toast.success('Invoice status updated');
     },
     onError: (error) => {
