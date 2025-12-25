@@ -18,7 +18,7 @@ import {
   TrendingUp, TrendingDown, Coins, ArrowUpRight, ArrowDownRight, 
   DollarSign, Receipt, PiggyBank, CalendarIcon, LineChartIcon 
 } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, subDays, isWithinInterval, parseISO, eachMonthOfInterval, isSameMonth } from 'date-fns';
+import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, subDays, subYears, isWithinInterval, parseISO, eachMonthOfInterval, isSameMonth, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 const REVENUE_COLORS = ['#10B981', '#34D399', '#6EE7B7', '#A7F3D0', '#D1FAE5'];
@@ -201,6 +201,94 @@ export default function FinancialSummaryPage() {
   const totalExpensesTzs = expenseBreakdown.reduce((sum, item) => sum + item.amountInTzs, 0);
   const netProfitTzs = totalRevenueTzs - totalExpensesTzs;
   const profitMargin = totalRevenueTzs > 0 ? (netProfitTzs / totalRevenueTzs) * 100 : 0;
+
+  // Calculate previous period for comparison
+  const previousPeriodRange = useMemo(() => {
+    if (!dateRange.from || !dateRange.to) return { from: null, to: null };
+    
+    const daysDiff = differenceInDays(dateRange.to, dateRange.from);
+    const prevTo = subDays(dateRange.from, 1);
+    const prevFrom = subDays(prevTo, daysDiff);
+    
+    return { from: prevFrom, to: prevTo };
+  }, [dateRange]);
+
+  // Filter previous period invoices and expenses
+  const prevFilteredInvoices = useMemo(() => {
+    if (!invoices || !previousPeriodRange.from || !previousPeriodRange.to) return [];
+    
+    return invoices.filter(invoice => {
+      const invoiceDate = invoice.paid_at ? parseISO(invoice.paid_at) : parseISO(invoice.created_at || '');
+      return isWithinInterval(invoiceDate, { start: previousPeriodRange.from!, end: previousPeriodRange.to! });
+    });
+  }, [invoices, previousPeriodRange]);
+
+  const prevFilteredExpenses = useMemo(() => {
+    if (!expenses || !previousPeriodRange.from || !previousPeriodRange.to) return [];
+    
+    return expenses.filter(expense => {
+      const expenseDate = parseISO(expense.created_at || '');
+      return isWithinInterval(expenseDate, { start: previousPeriodRange.from!, end: previousPeriodRange.to! });
+    });
+  }, [expenses, previousPeriodRange]);
+
+  // Calculate previous period totals
+  const prevTotalRevenueTzs = useMemo(() => {
+    if (!prevFilteredInvoices || !exchangeRates) return 0;
+    
+    return prevFilteredInvoices
+      .filter(i => i.status === 'paid')
+      .reduce((sum, inv) => {
+        const currency = inv.currency || 'USD';
+        return sum + convertToTZS(Number(inv.amount), currency, exchangeRates);
+      }, 0);
+  }, [prevFilteredInvoices, exchangeRates]);
+
+  const prevTotalExpensesTzs = useMemo(() => {
+    if (!prevFilteredExpenses || !exchangeRates) return 0;
+    
+    return prevFilteredExpenses
+      .filter(e => e.status === 'approved')
+      .reduce((sum, exp) => {
+        const currency = exp.currency || 'USD';
+        return sum + convertToTZS(Number(exp.amount), currency, exchangeRates);
+      }, 0);
+  }, [prevFilteredExpenses, exchangeRates]);
+
+  const prevNetProfitTzs = prevTotalRevenueTzs - prevTotalExpensesTzs;
+  const prevProfitMargin = prevTotalRevenueTzs > 0 ? (prevNetProfitTzs / prevTotalRevenueTzs) * 100 : 0;
+
+  // Calculate growth percentages
+  const calculateGrowth = (current: number, previous: number): number | null => {
+    if (previous === 0) return current > 0 ? 100 : null;
+    return ((current - previous) / Math.abs(previous)) * 100;
+  };
+
+  const revenueGrowth = calculateGrowth(totalRevenueTzs, prevTotalRevenueTzs);
+  const expenseGrowth = calculateGrowth(totalExpensesTzs, prevTotalExpensesTzs);
+  const profitGrowth = calculateGrowth(netProfitTzs, prevNetProfitTzs);
+  const marginChange = profitMargin - prevProfitMargin;
+
+  const GrowthBadge = ({ growth, inverted = false }: { growth: number | null; inverted?: boolean }) => {
+    if (growth === null) return null;
+    
+    const isPositive = inverted ? growth < 0 : growth > 0;
+    const isNegative = inverted ? growth > 0 : growth < 0;
+    
+    return (
+      <Badge 
+        variant="outline" 
+        className={cn(
+          "text-xs font-medium ml-2",
+          isPositive && "bg-emerald-500/10 text-emerald-600 border-emerald-500/30",
+          isNegative && "bg-red-500/10 text-red-600 border-red-500/30",
+          !isPositive && !isNegative && "bg-muted text-muted-foreground"
+        )}
+      >
+        {growth > 0 ? '+' : ''}{growth.toFixed(1)}%
+      </Badge>
+    );
+  };
 
   // Prepare comparison data by currency
   const comparisonData = useMemo(() => {
@@ -388,11 +476,19 @@ export default function FinancialSummaryPage() {
                 <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center">
                   <TrendingUp className="h-6 w-6 text-emerald-600" />
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Revenue</p>
+                <div className="flex-1">
+                  <div className="flex items-center">
+                    <p className="text-sm text-muted-foreground">Total Revenue</p>
+                    {datePreset !== 'all' && <GrowthBadge growth={revenueGrowth} />}
+                  </div>
                   <p className="text-2xl font-bold text-emerald-600">
                     TZS {totalRevenueTzs.toLocaleString()}
                   </p>
+                  {datePreset !== 'all' && prevTotalRevenueTzs > 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      vs TZS {prevTotalRevenueTzs.toLocaleString()} prev period
+                    </p>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -404,11 +500,19 @@ export default function FinancialSummaryPage() {
                 <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center">
                   <TrendingDown className="h-6 w-6 text-amber-600" />
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Expenses</p>
+                <div className="flex-1">
+                  <div className="flex items-center">
+                    <p className="text-sm text-muted-foreground">Total Expenses</p>
+                    {datePreset !== 'all' && <GrowthBadge growth={expenseGrowth} inverted />}
+                  </div>
                   <p className="text-2xl font-bold text-amber-600">
                     TZS {totalExpensesTzs.toLocaleString()}
                   </p>
+                  {datePreset !== 'all' && prevTotalExpensesTzs > 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      vs TZS {prevTotalExpensesTzs.toLocaleString()} prev period
+                    </p>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -420,11 +524,19 @@ export default function FinancialSummaryPage() {
                 <div className={`w-12 h-12 rounded-xl ${netProfitTzs >= 0 ? 'bg-blue-500/20' : 'bg-red-500/20'} flex items-center justify-center`}>
                   <PiggyBank className={`h-6 w-6 ${netProfitTzs >= 0 ? 'text-blue-600' : 'text-red-600'}`} />
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Net Profit</p>
+                <div className="flex-1">
+                  <div className="flex items-center">
+                    <p className="text-sm text-muted-foreground">Net Profit</p>
+                    {datePreset !== 'all' && <GrowthBadge growth={profitGrowth} />}
+                  </div>
                   <p className={`text-2xl font-bold ${netProfitTzs >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
                     TZS {netProfitTzs.toLocaleString()}
                   </p>
+                  {datePreset !== 'all' && (prevNetProfitTzs !== 0 || prevTotalRevenueTzs > 0) && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      vs TZS {prevNetProfitTzs.toLocaleString()} prev period
+                    </p>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -440,11 +552,30 @@ export default function FinancialSummaryPage() {
                     <ArrowDownRight className="h-6 w-6 text-purple-600" />
                   )}
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Profit Margin</p>
+                <div className="flex-1">
+                  <div className="flex items-center">
+                    <p className="text-sm text-muted-foreground">Profit Margin</p>
+                    {datePreset !== 'all' && marginChange !== 0 && (
+                      <Badge 
+                        variant="outline" 
+                        className={cn(
+                          "text-xs font-medium ml-2",
+                          marginChange > 0 && "bg-emerald-500/10 text-emerald-600 border-emerald-500/30",
+                          marginChange < 0 && "bg-red-500/10 text-red-600 border-red-500/30"
+                        )}
+                      >
+                        {marginChange > 0 ? '+' : ''}{marginChange.toFixed(1)}pp
+                      </Badge>
+                    )}
+                  </div>
                   <p className="text-2xl font-bold text-purple-600">
                     {profitMargin.toFixed(1)}%
                   </p>
+                  {datePreset !== 'all' && prevProfitMargin !== 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      vs {prevProfitMargin.toFixed(1)}% prev period
+                    </p>
+                  )}
                 </div>
               </div>
             </CardContent>
