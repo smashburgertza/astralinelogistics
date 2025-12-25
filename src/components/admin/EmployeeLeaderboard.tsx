@@ -5,12 +5,15 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Trophy, Medal, Award, Crown,
-  FileText, DollarSign, Package, TrendingUp
+  FileText, DollarSign, Package, TrendingUp, Sparkles
 } from 'lucide-react';
 import { startOfWeek, startOfMonth, startOfQuarter, startOfYear, format } from 'date-fns';
+import { useAwardBadges, useAllEmployeeBadges } from '@/hooks/useEmployeeBadges';
+import { EmployeeBadgesDisplay } from './EmployeeBadgesDisplay';
 
 type MetricType = 'revenue' | 'invoices' | 'estimates' | 'shipments';
 type TimePeriod = 'week' | 'month' | 'quarter' | 'year' | 'all';
@@ -44,6 +47,9 @@ export function EmployeeLeaderboard() {
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('month');
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  const awardBadges = useAwardBadges();
+  const { badges: allBadges } = useAllEmployeeBadges();
 
   useEffect(() => {
     fetchLeaderboard();
@@ -241,6 +247,25 @@ export function EmployeeLeaderboard() {
             <CardDescription className="mt-1">Top performers by {METRIC_CONFIG[metric].label.toLowerCase()}</CardDescription>
           </div>
           <div className="flex items-center gap-2">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => awardBadges.mutate()}
+                    disabled={awardBadges.isPending}
+                    className="h-9"
+                  >
+                    <Sparkles className="w-4 h-4 mr-1" />
+                    {awardBadges.isPending ? 'Awarding...' : 'Award Badges'}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Award badges to top 3 performers for each metric and time period
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             <Select value={timePeriod} onValueChange={(v) => setTimePeriod(v as TimePeriod)}>
               <SelectTrigger className="w-[140px] h-9">
                 <SelectValue />
@@ -341,36 +366,44 @@ export function EmployeeLeaderboard() {
 
               {/* Full List */}
               <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-                {leaderboard.map((entry) => (
-                  <div
-                    key={entry.userId}
-                    className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
-                      entry.rank <= 3 ? 'bg-muted/50' : 'bg-muted/20 hover:bg-muted/40'
-                    }`}
-                  >
-                    <div className="w-8 flex justify-center">
-                      {getRankIcon(entry.rank)}
-                    </div>
-                    <Avatar className="h-9 w-9 border border-border">
-                      <AvatarFallback className="bg-accent/50 text-accent-foreground font-medium text-sm">
-                        {getInitials(entry.fullName)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">{entry.fullName}</p>
-                      {entry.employeeRole && (
-                        <p className="text-xs text-muted-foreground capitalize">
-                          {entry.employeeRole.replace('_', ' ')}
+                {leaderboard.map((entry) => {
+                  const employeeBadges = allBadges.filter(b => b.employeeId === entry.userId);
+                  return (
+                    <div
+                      key={entry.userId}
+                      className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
+                        entry.rank <= 3 ? 'bg-muted/50' : 'bg-muted/20 hover:bg-muted/40'
+                      }`}
+                    >
+                      <div className="w-8 flex justify-center">
+                        {getRankIcon(entry.rank)}
+                      </div>
+                      <Avatar className="h-9 w-9 border border-border">
+                        <AvatarFallback className="bg-accent/50 text-accent-foreground font-medium text-sm">
+                          {getInitials(entry.fullName)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-sm truncate">{entry.fullName}</p>
+                          {employeeBadges.length > 0 && (
+                            <EmployeeBadgesDisplay badges={employeeBadges} compact maxDisplay={3} />
+                          )}
+                        </div>
+                        {entry.employeeRole && (
+                          <p className="text-xs text-muted-foreground capitalize">
+                            {entry.employeeRole.replace('_', ' ')}
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <p className={`text-sm font-semibold ${entry.rank === 1 ? 'text-emerald-600' : ''}`}>
+                          {METRIC_CONFIG[metric].prefix}{entry.value.toLocaleString()}
                         </p>
-                      )}
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className={`text-sm font-semibold ${entry.rank === 1 ? 'text-emerald-600' : ''}`}>
-                        {METRIC_CONFIG[metric].prefix}{entry.value.toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
