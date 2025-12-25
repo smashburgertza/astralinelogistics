@@ -30,7 +30,8 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { useCreateEmployee, EMPLOYEE_ROLES, PERMISSIONS } from '@/hooks/useEmployees';
+import { useCreateEmployee, PERMISSIONS } from '@/hooks/useEmployees';
+import { useCustomRoles } from '@/hooks/useCustomRoles';
 import { usePermissionTemplates } from '@/components/admin/PermissionTemplatesSection';
 
 const formSchema = z.object({
@@ -49,6 +50,7 @@ export function CreateEmployeeDialog() {
   const [open, setOpen] = useState(false);
   const createEmployee = useCreateEmployee();
   const { templates } = usePermissionTemplates();
+  const { roleOptions, getRoleDefaultPermissions } = useCustomRoles();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -69,6 +71,19 @@ export function CreateEmployeeDialog() {
       const newPermissions = PERMISSIONS.reduce((acc, p) => ({
         ...acc,
         [p.key]: template.permissions[p.key] || false,
+      }), {} as Record<string, boolean>);
+      form.setValue('permissions', newPermissions);
+    }
+  };
+
+  const handleRoleChange = (roleValue: string) => {
+    form.setValue('employeeRole', roleValue);
+    // Apply default permissions from the role
+    const defaultPerms = getRoleDefaultPermissions(roleValue);
+    if (Object.keys(defaultPerms).length > 0) {
+      const newPermissions = PERMISSIONS.reduce((acc, p) => ({
+        ...acc,
+        [p.key]: defaultPerms[p.key] || false,
       }), {} as Record<string, boolean>);
       form.setValue('permissions', newPermissions);
     }
@@ -164,14 +179,14 @@ export function CreateEmployeeDialog() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Department/Role</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={handleRoleChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select department" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {EMPLOYEE_ROLES.map((role) => (
+                      {roleOptions.map((role) => (
                         <SelectItem key={role.value} value={role.value}>
                           {role.label}
                         </SelectItem>
@@ -208,24 +223,26 @@ export function CreateEmployeeDialog() {
                 </div>
                 
                 {/* Quick Apply Templates */}
-                <div className="space-y-2">
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Zap className="h-3 w-3" />
-                    Quick apply a template:
-                  </p>
-                  <div className="flex flex-wrap gap-1">
-                    {templates.map((template) => (
-                      <Badge
-                        key={template.id}
-                        variant="outline"
-                        className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors"
-                        onClick={() => applyTemplate(template.id)}
-                      >
-                        {template.name}
-                      </Badge>
-                    ))}
+                {templates.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Zap className="h-3 w-3" />
+                      Quick apply a template:
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {templates.map((template) => (
+                        <Badge
+                          key={template.id}
+                          variant="outline"
+                          className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors"
+                          onClick={() => applyTemplate(template.id)}
+                        >
+                          {template.name}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="grid gap-2 rounded-lg border p-3">
                   {PERMISSIONS.map((permission) => (

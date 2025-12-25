@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { MoreHorizontal, Shield, ShieldCheck, Pencil } from 'lucide-react';
+import { MoreHorizontal, Shield, ShieldCheck, Pencil, Zap } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -39,14 +39,18 @@ import {
   useUpdateEmployee,
   useDeleteEmployee,
   Employee,
-  EMPLOYEE_ROLES,
   PERMISSIONS,
 } from '@/hooks/useEmployees';
+import { useCustomRoles } from '@/hooks/useCustomRoles';
+import { usePermissionTemplates } from '@/components/admin/PermissionTemplatesSection';
 
 export function EmployeeTable() {
   const { data: employees, isLoading } = useEmployees();
   const updateEmployee = useUpdateEmployee();
   const deleteEmployee = useDeleteEmployee();
+  const { roleOptions, getRoleLabel, getRoleDefaultPermissions } = useCustomRoles();
+  const { templates } = usePermissionTemplates();
+  
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [editForm, setEditForm] = useState({
     employeeRole: '',
@@ -72,6 +76,30 @@ export function EmployeeTable() {
     setEditingEmployee(null);
   };
 
+  const handleRoleChange = (roleValue: string) => {
+    setEditForm(prev => ({ ...prev, employeeRole: roleValue }));
+    // Apply default permissions from the role
+    const defaultPerms = getRoleDefaultPermissions(roleValue);
+    if (Object.keys(defaultPerms).length > 0) {
+      const newPermissions = PERMISSIONS.reduce((acc, p) => ({
+        ...acc,
+        [p.key]: defaultPerms[p.key] || false,
+      }), {} as Record<string, boolean>);
+      setEditForm(prev => ({ ...prev, permissions: newPermissions }));
+    }
+  };
+
+  const applyTemplate = (templateId: string) => {
+    const template = templates.find(t => t.id === templateId);
+    if (template) {
+      const newPermissions = PERMISSIONS.reduce((acc, p) => ({
+        ...acc,
+        [p.key]: template.permissions[p.key] || false,
+      }), {} as Record<string, boolean>);
+      setEditForm(prev => ({ ...prev, permissions: newPermissions }));
+    }
+  };
+
   const getRoleBadge = (employee: Employee) => {
     if (employee.role === 'super_admin') {
       return (
@@ -84,7 +112,7 @@ export function EmployeeTable() {
     return (
       <Badge variant="secondary" className="gap-1">
         <Shield className="h-3 w-3" />
-        {EMPLOYEE_ROLES.find(r => r.value === employee.employee_role)?.label || 'Employee'}
+        {getRoleLabel(employee.employee_role || '')}
       </Badge>
     );
   };
@@ -180,7 +208,7 @@ export function EmployeeTable() {
       </Table>
 
       <Dialog open={!!editingEmployee} onOpenChange={() => setEditingEmployee(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Employee Permissions</DialogTitle>
           </DialogHeader>
@@ -189,13 +217,13 @@ export function EmployeeTable() {
               <Label>Department/Role</Label>
               <Select
                 value={editForm.employeeRole}
-                onValueChange={(v) => setEditForm({ ...editForm, employeeRole: v })}
+                onValueChange={handleRoleChange}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select department" />
                 </SelectTrigger>
                 <SelectContent>
-                  {EMPLOYEE_ROLES.map((role) => (
+                  {roleOptions.map((role) => (
                     <SelectItem key={role.value} value={role.value}>
                       {role.label}
                     </SelectItem>
@@ -216,8 +244,31 @@ export function EmployeeTable() {
             </div>
 
             {!editForm.isSuperAdmin && (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label>Permissions</Label>
+                
+                {/* Quick Apply Templates */}
+                {templates.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Zap className="h-3 w-3" />
+                      Quick apply a template:
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {templates.map((template) => (
+                        <Badge
+                          key={template.id}
+                          variant="outline"
+                          className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors"
+                          onClick={() => applyTemplate(template.id)}
+                        >
+                          {template.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid gap-2 rounded-lg border p-3">
                   {PERMISSIONS.map((permission) => (
                     <div key={permission.key} className="flex items-center space-x-2">
