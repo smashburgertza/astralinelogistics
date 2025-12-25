@@ -38,7 +38,7 @@ serve(async (req) => {
         product_name: 'Unknown Product',
         product_price: null,
         currency: 'USD',
-        estimated_weight_kg: 0.5
+        estimated_weight_kg: 1
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -46,10 +46,10 @@ serve(async (req) => {
 
     const html = await pageResponse.text();
     
-    // Truncate HTML to avoid token limits (keep first 15000 chars)
-    const truncatedHtml = html.substring(0, 15000);
+    // Truncate HTML to avoid token limits (keep first 20000 chars for better context)
+    const truncatedHtml = html.substring(0, 20000);
 
-    // Use Lovable AI to extract product info
+    // Use Lovable AI to extract product info with detailed weight reasoning
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY is not configured');
@@ -66,31 +66,119 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are a product information extractor. Given HTML content from a product page, extract the product name, price, and estimate the shipping weight.
+            content: `You are an expert product analyst specializing in logistics and shipping weight estimation. Your task is to extract product information and ACCURATELY estimate the shipping weight in kilograms.
+
+CRITICAL: You must reason about the actual product weight based on:
+1. Product category and type
+2. Dimensions if mentioned (length x width x height)
+3. Materials (metal, plastic, fabric, wood, glass, etc.)
+4. Any weight specifications on the page
+5. Similar products' typical weights
+
+WEIGHT ESTIMATION GUIDE (use these as reference, adjust based on actual product details):
+
+ELECTRONICS:
+- Smartphone: 0.2-0.3 kg
+- Phone case/accessories: 0.1 kg
+- Earbuds/AirPods: 0.1 kg
+- Smartwatch: 0.1-0.2 kg
+- Tablet (iPad size): 0.5-0.8 kg
+- Laptop 13": 1.3-1.8 kg
+- Laptop 15-16": 1.8-2.5 kg
+- Gaming laptop: 2.5-3.5 kg
+- Monitor 24": 3-5 kg
+- Monitor 27"+: 5-8 kg
+- Desktop computer: 8-15 kg
+- TV 32": 5-7 kg
+- TV 55": 15-20 kg
+- TV 65"+: 25-35 kg
+- Printer: 5-15 kg
+- Gaming console: 3-5 kg
+- Camera: 0.5-1.5 kg
+- Drone: 0.5-2 kg
+
+CLOTHING & FASHION:
+- T-shirt/Top: 0.2-0.3 kg
+- Dress shirt: 0.25-0.35 kg
+- Jeans: 0.5-0.8 kg
+- Dress: 0.3-0.6 kg
+- Jacket (light): 0.5-1 kg
+- Winter coat: 1-2.5 kg
+- Suit: 1-1.5 kg
+- Sweater/Hoodie: 0.4-0.8 kg
+- Shoes (pair): 0.8-1.5 kg
+- Boots: 1.5-2.5 kg
+- Sneakers: 0.8-1.2 kg
+- Bag/Purse: 0.5-2 kg
+- Backpack: 0.8-1.5 kg
+
+HOME & KITCHEN:
+- Small appliance (blender, toaster): 1-3 kg
+- Microwave: 10-15 kg
+- Coffee machine: 3-8 kg
+- Air fryer: 4-7 kg
+- Vacuum cleaner: 3-8 kg
+- Robot vacuum: 3-5 kg
+- Cookware set: 5-15 kg
+- Single pot/pan: 1-3 kg
+- Dishes set: 5-10 kg
+- Bedding/Sheets: 2-4 kg
+- Pillows: 0.5-1 kg each
+- Towels: 0.5-1 kg each
+- Small furniture: 10-30 kg
+- Chair: 5-15 kg
+- Table: 15-50 kg
+
+SPORTS & FITNESS:
+- Yoga mat: 1-2 kg
+- Dumbbells (pair): actual weight + 0.5 kg packaging
+- Bicycle: 10-15 kg
+- Treadmill: 50-100 kg
+- Sports equipment: 0.5-5 kg
+
+BOOKS & MEDIA:
+- Paperback book: 0.2-0.4 kg
+- Hardcover book: 0.5-1 kg
+- Textbook: 1-2 kg
+
+TOYS & GAMES:
+- Action figure: 0.1-0.3 kg
+- Board game: 0.5-2 kg
+- LEGO set (small): 0.3-1 kg
+- LEGO set (large): 2-5 kg
+- Video game: 0.1 kg
+
+BEAUTY & PERSONAL CARE:
+- Perfume/Cologne: 0.2-0.5 kg
+- Makeup set: 0.3-1 kg
+- Skincare products: 0.2-0.5 kg
+- Hair dryer: 0.5-1 kg
+
+Always round up to ensure safe shipping estimates. If the page shows actual weight, USE THAT VALUE.
 
 IMPORTANT: Return ONLY valid JSON, no markdown or extra text. Use this exact format:
 {
-  "product_name": "string - the product name",
-  "product_price": number - price as a number (no currency symbols),
-  "currency": "string - 3 letter currency code like USD, EUR, GBP, TZS",
-  "estimated_weight_kg": number - estimated weight in kg based on the product type
+  "product_name": "string - the full product name",
+  "product_price": number or null - price as a number without currency symbols,
+  "currency": "string - 3 letter currency code (USD, EUR, GBP, AED, CNY, INR, TZS)",
+  "estimated_weight_kg": number - weight in kg rounded UP to nearest whole number (minimum 1),
+  "weight_reasoning": "string - brief explanation of how you estimated the weight"
 }
 
-For weight estimation, use common sense:
-- Small electronics (phone cases, earbuds): 0.1-0.3 kg
-- Medium electronics (tablets, small appliances): 0.5-2 kg  
-- Clothing items: 0.2-0.8 kg
-- Shoes: 0.5-1.5 kg
-- Books: 0.3-1 kg
-- Large electronics (laptops, monitors): 2-5 kg
-- Furniture: 5-50 kg
-
-If you cannot find the price, set product_price to null.
-If you cannot identify the product, use "Unknown Product" as the name.`
+CRITICAL RULES:
+1. If page shows actual weight (in kg, lbs, g, oz), convert to kg and use that
+2. ALWAYS round UP to the nearest whole kilogram (e.g., 0.3 kg → 1 kg, 1.2 kg → 2 kg)
+3. Minimum weight is 1 kg
+4. When in doubt, estimate higher rather than lower for shipping safety`
           },
           {
             role: 'user',
-            content: `Extract product information from this webpage HTML. URL: ${url}\n\nHTML Content:\n${truncatedHtml}`
+            content: `Analyze this product page and extract information. Pay special attention to finding the actual weight if listed, otherwise reason about what this specific product should weigh.
+
+URL: ${url}
+
+HTML Content:
+${truncatedHtml}`
           }
         ],
       }),
@@ -128,6 +216,15 @@ If you cannot identify the product, use "Unknown Product" as the name.`
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         productInfo = JSON.parse(jsonMatch[0]);
+        
+        // Ensure weight is rounded up to nearest whole number and minimum 1
+        if (productInfo.estimated_weight_kg) {
+          productInfo.estimated_weight_kg = Math.max(1, Math.ceil(productInfo.estimated_weight_kg));
+        } else {
+          productInfo.estimated_weight_kg = 1;
+        }
+        
+        console.log('Weight reasoning:', productInfo.weight_reasoning);
       } else {
         throw new Error('No JSON found in response');
       }
@@ -137,11 +234,15 @@ If you cannot identify the product, use "Unknown Product" as the name.`
         product_name: 'Unknown Product',
         product_price: null,
         currency: 'USD',
-        estimated_weight_kg: 0.5
+        estimated_weight_kg: 1,
+        weight_reasoning: 'Could not analyze product, using default weight'
       };
     }
 
-    return new Response(JSON.stringify(productInfo), {
+    // Remove weight_reasoning from response (internal use only)
+    const { weight_reasoning, ...responseData } = productInfo;
+
+    return new Response(JSON.stringify(responseData), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
@@ -152,11 +253,10 @@ If you cannot identify the product, use "Unknown Product" as the name.`
       product_name: 'Unknown Product',
       product_price: null,
       currency: 'USD',
-      estimated_weight_kg: 0.5
+      estimated_weight_kg: 1
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });
-
