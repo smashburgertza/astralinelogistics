@@ -1,13 +1,24 @@
 import { useState } from 'react';
-import { Plus, Trash2, Loader2, ExternalLink, ShoppingCart } from 'lucide-react';
+import { Plus, Trash2, Loader2, ExternalLink, ShoppingCart, Calculator } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Separator } from '@/components/ui/separator';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useRegionPricing } from '@/hooks/useRegionPricing';
+import { useExchangeRates } from '@/hooks/useExchangeRates';
+import { useShopForMeCharges, calculateShopForMeCharges } from '@/hooks/useShopForMeCharges';
+import { REGIONS, type Region } from '@/lib/constants';
 
 interface ProductItem {
   id: string;
@@ -19,6 +30,7 @@ interface ProductItem {
   quantity: number;
   isLoading: boolean;
   error?: string;
+  originRegion?: Region;
 }
 
 interface CustomerDetails {
@@ -28,13 +40,12 @@ interface CustomerDetails {
   address: string;
 }
 
-const HANDLING_FEE = 15; // Fixed handling fee in USD
-
 export function ShoppingAggregator() {
   const [items, setItems] = useState<ProductItem[]>([]);
   const [newUrl, setNewUrl] = useState('');
   const [isAddingUrl, setIsAddingUrl] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedRegion, setSelectedRegion] = useState<Region>('usa');
   const [customerDetails, setCustomerDetails] = useState<CustomerDetails>({
     name: '',
     email: '',
@@ -43,11 +54,20 @@ export function ShoppingAggregator() {
   });
 
   const { data: regionPricing } = useRegionPricing();
-  
-  // Use average rate for shipping estimate
-  const avgShippingRate = regionPricing?.length 
-    ? regionPricing.reduce((sum, r) => sum + r.customer_rate_per_kg, 0) / regionPricing.length
-    : 8; // Default $8/kg
+  const { data: exchangeRates } = useExchangeRates();
+  const { data: charges } = useShopForMeCharges();
+
+  // Get shipping rate for selected region
+  const getShippingRate = (region: Region) => {
+    const pricing = regionPricing?.find(r => r.region === region);
+    return pricing?.customer_rate_per_kg ?? 8; // Default $8/kg
+  };
+
+  // Get exchange rate to TZS
+  const getExchangeRate = (currency: string) => {
+    const rate = exchangeRates?.find(r => r.currency_code === currency);
+    return rate?.rate_to_tzs ?? 2500; // Default USD rate
+  };
 
   const fetchProductInfo = async (url: string): Promise<Partial<ProductItem>> => {
     const response = await supabase.functions.invoke('fetch-product-info', {
@@ -72,7 +92,6 @@ export function ShoppingAggregator() {
       return;
     }
 
-    // Validate URL
     try {
       new URL(newUrl);
     } catch {
@@ -90,6 +109,7 @@ export function ShoppingAggregator() {
       estimatedWeightKg: 0,
       quantity: 1,
       isLoading: true,
+      originRegion: selectedRegion,
     };
 
     setItems(prev => [...prev, newItem]);
@@ -139,6 +159,14 @@ export function ShoppingAggregator() {
     );
   };
 
+  const handleRegionChange = (id: string, region: Region) => {
+    setItems(prev =>
+      prev.map(item =>
+        item.id === id ? { ...item, originRegion: region } : item
+      )
+    );
+  };
+
   const calculateTotals = () => {
     const totalProductCost = items.reduce((sum, item) => {
       if (item.productPrice) {
@@ -151,15 +179,30 @@ export function ShoppingAggregator() {
       return sum + item.estimatedWeightKg * item.quantity;
     }, 0);
 
-    const estimatedShipping = totalWeight * avgShippingRate;
-    const grandTotal = totalProductCost + estimatedShipping + HANDLING_FEE;
+    // Use the first item's region or default to selected region
+    const primaryRegion = items[0]?.originRegion || selectedRegion;
+    const shippingRate = getShippingRate(primaryRegion);
+
+    // Calculate using configurable charges
+    const chargeCalc = calculateShopForMeCharges(
+      totalProductCost,
+      totalWeight,
+      shippingRate,
+      charges || []
+    );
+
+    // Get exchange rate
+    const exchangeRate = getExchangeRate('USD');
+    const totalInTZS = chargeCalc.total * exchangeRate;
 
     return {
       totalProductCost,
       totalWeight,
-      estimatedShipping,
-      handlingFee: HANDLING_FEE,
-      grandTotal,
+      shippingRate,
+      breakdown: chargeCalc.breakdown,
+      grandTotal: chargeCalc.total,
+      totalInTZS,
+      exchangeRate,
     };
   };
 
@@ -178,7 +221,6 @@ export function ShoppingAggregator() {
     const totals = calculateTotals();
 
     try {
-      // Create order request
       const { data: orderRequest, error: orderError } = await supabase
         .from('order_requests')
         .insert({
@@ -187,8 +229,8 @@ export function ShoppingAggregator() {
           customer_phone: customerDetails.phone,
           customer_address: customerDetails.address,
           total_product_cost: totals.totalProductCost,
-          estimated_shipping_cost: totals.estimatedShipping,
-          handling_fee: totals.handlingFee,
+          estimated_shipping_cost: totals.breakdown.find(b => b.key === 'shipping')?.amount || 0,
+          handling_fee: totals.breakdown.find(b => b.key === 'handling_fee')?.amount || 0,
           grand_total: totals.grandTotal,
         })
         .select()
@@ -196,7 +238,6 @@ export function ShoppingAggregator() {
 
       if (orderError) throw orderError;
 
-      // Create order items
       const orderItems = items.map(item => ({
         order_request_id: orderRequest.id,
         product_url: item.url,
@@ -216,7 +257,6 @@ export function ShoppingAggregator() {
 
       toast.success('Order request submitted successfully! We will contact you soon.');
       
-      // Reset form
       setItems([]);
       setCustomerDetails({ name: '', email: '', phone: '', address: '' });
 
@@ -230,6 +270,23 @@ export function ShoppingAggregator() {
 
   const totals = calculateTotals();
 
+  const formatCurrency = (amount: number, currency: string = 'USD') => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency,
+      minimumFractionDigits: 2,
+    }).format(amount);
+  };
+
+  const formatTZS = (amount: number) => {
+    return new Intl.NumberFormat('en-TZ', {
+      style: 'currency',
+      currency: 'TZS',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
   return (
     <div className="space-y-6">
       {/* Add Product URL */}
@@ -240,7 +297,22 @@ export function ShoppingAggregator() {
             Add Products
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label>Select Origin Region</Label>
+            <Select value={selectedRegion} onValueChange={(v: Region) => setSelectedRegion(v)}>
+              <SelectTrigger className="w-full md:w-64">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(REGIONS).map(([key, { label, flag }]) => (
+                  <SelectItem key={key} value={key}>
+                    {flag} {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="flex gap-2">
             <Input
               placeholder="Paste product URL here..."
@@ -271,92 +343,149 @@ export function ShoppingAggregator() {
             {items.map((item) => (
               <div
                 key={item.id}
-                className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 bg-muted/50 rounded-lg"
+                className="flex flex-col gap-4 p-4 bg-muted/50 rounded-lg"
               >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    {item.isLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                    ) : null}
-                    <p className="font-medium truncate">{item.productName}</p>
-                  </div>
-                  <a
-                    href={item.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-muted-foreground hover:text-primary flex items-center gap-1 truncate"
-                  >
-                    {item.url.substring(0, 50)}...
-                    <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                  </a>
-                  {item.productPrice && (
-                    <p className="text-sm text-primary font-semibold mt-1">
-                      {item.currency} {item.productPrice.toFixed(2)}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      {item.isLoading && (
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      )}
+                      <p className="font-medium truncate">{item.productName}</p>
+                    </div>
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-muted-foreground hover:text-primary flex items-center gap-1 truncate"
+                    >
+                      {item.url.substring(0, 50)}...
+                      <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                    </a>
+                    {item.productPrice && (
+                      <p className="text-sm text-primary font-semibold mt-1">
+                        {item.currency} {item.productPrice.toFixed(2)}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Est. weight: {item.estimatedWeightKg} kg
                     </p>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    Est. weight: {item.estimatedWeightKg} kg
-                  </p>
-                </div>
+                  </div>
 
-                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2">
+                    <Select 
+                      value={item.originRegion || selectedRegion} 
+                      onValueChange={(v: Region) => handleRegionChange(item.id, v)}
+                    >
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(REGIONS).map(([key, { label, flag }]) => (
+                          <SelectItem key={key} value={key}>
+                            {flag} {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
+                      disabled={item.quantity <= 1}
+                    >
+                      -
+                    </Button>
+                    <span className="w-8 text-center font-medium">{item.quantity}</span>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
+                    >
+                      +
+                    </Button>
+                  </div>
+
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="icon"
-                    onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
-                    disabled={item.quantity <= 1}
+                    onClick={() => handleRemoveItem(item.id)}
+                    className="text-destructive hover:text-destructive"
                   >
-                    -
-                  </Button>
-                  <span className="w-8 text-center font-medium">{item.quantity}</span>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
-                  >
-                    +
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
-
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleRemoveItem(item.id)}
-                  className="text-destructive hover:text-destructive"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
               </div>
             ))}
           </CardContent>
         </Card>
       )}
 
-      {/* Order Summary */}
+      {/* Order Summary - Price Breakdown */}
       {items.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Order Summary</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Calculator className="h-5 w-5" />
+              Price Breakdown
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Total Product Cost</span>
-              <span className="font-medium">${totals.totalProductCost.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">
-                Estimated Shipping ({totals.totalWeight.toFixed(2)} kg × ${avgShippingRate.toFixed(2)}/kg)
+            {totals.breakdown.map((item, index) => (
+              <div key={item.key} className="flex justify-between items-center">
+                <span className="text-muted-foreground">
+                  {item.name}
+                  {item.percentage !== undefined && (
+                    <span className="ml-1 text-xs">({item.percentage}%)</span>
+                  )}
+                  {item.key === 'shipping' && (
+                    <span className="ml-1 text-xs">
+                      ({totals.totalWeight.toFixed(2)} kg × {formatCurrency(totals.shippingRate)}/kg)
+                    </span>
+                  )}
+                </span>
+                <span className="font-medium">{formatCurrency(item.amount)}</span>
+              </div>
+            ))}
+            
+            {/* If no shipping in breakdown, show it separately */}
+            {!totals.breakdown.some(b => b.key === 'shipping') && totals.totalWeight > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">
+                  Shipping Charges
+                  <span className="ml-1 text-xs">
+                    ({totals.totalWeight.toFixed(2)} kg × {formatCurrency(totals.shippingRate)}/kg)
+                  </span>
+                </span>
+                <span className="font-medium">
+                  {formatCurrency(totals.totalWeight * totals.shippingRate)}
+                </span>
+              </div>
+            )}
+
+            <Separator className="my-3" />
+            
+            {/* Total in USD */}
+            <div className="flex justify-between items-center">
+              <span className="font-semibold text-lg">Total (USD)</span>
+              <span className="font-bold text-xl text-primary">
+                {formatCurrency(totals.grandTotal)}
               </span>
-              <span className="font-medium">${totals.estimatedShipping.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Handling Fee</span>
-              <span className="font-medium">${totals.handlingFee.toFixed(2)}</span>
-            </div>
-            <div className="border-t pt-3 flex justify-between">
-              <span className="font-semibold">Estimated Total</span>
-              <span className="font-bold text-lg text-primary">
-                ${totals.grandTotal.toFixed(2)}
+
+            {/* Total in TZS */}
+            <div className="flex justify-between items-center bg-primary/10 p-3 rounded-lg -mx-3">
+              <span className="font-semibold">
+                Total (TZS)
+                <span className="text-xs text-muted-foreground ml-2">
+                  @ {totals.exchangeRate.toLocaleString()} TZS/USD
+                </span>
+              </span>
+              <span className="font-bold text-xl">
+                {formatTZS(totals.totalInTZS)}
               </span>
             </div>
           </CardContent>
