@@ -7,11 +7,11 @@ import { Badge } from '@/components/ui/badge';
 import { 
   PackageSearch, UsersRound, BadgeDollarSign, TrendingUp, 
   Plane, ArrowRight, AlertTriangle, MapPinned, ReceiptText,
-  ArrowUpRight, Sparkles
+  ArrowUpRight, Sparkles, ScanBarcode, Clock
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { REGIONS, SHIPMENT_STATUSES, type Region, type ShipmentStatus } from '@/lib/constants';
-import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
+import { format, subMonths, startOfMonth, endOfMonth, startOfDay, endOfDay } from 'date-fns';
 import { Link } from 'react-router-dom';
 import {
   BarChart,
@@ -46,6 +46,8 @@ interface DashboardStats {
   expensesByCategory: Record<string, number>;
   recentShipments: any[];
   monthlyData: Array<{ month: string; shipments: number; revenue: number; expenses: number }>;
+  todayScannedParcels: number;
+  pendingPickups: number;
 }
 
 const CHART_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#6366F1', '#14B8A6'];
@@ -87,6 +89,8 @@ export default function AdminDashboard() {
     expensesByCategory: {},
     recentShipments: [],
     monthlyData: [],
+    todayScannedParcels: 0,
+    pendingPickups: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -100,17 +104,34 @@ export default function AdminDashboard() {
       const thisMonthStart = startOfMonth(now);
       const thisMonthEnd = endOfMonth(now);
 
+      const todayStart = startOfDay(now).toISOString();
+      const todayEnd = endOfDay(now).toISOString();
+
       // Fetch all data in parallel
-      const [shipmentsRes, customersRes, invoicesRes, expensesRes] = await Promise.all([
+      const [shipmentsRes, customersRes, invoicesRes, expensesRes, parcelsRes, arrivedShipmentsRes] = await Promise.all([
         supabase.from('shipments').select('id, origin_region, status, tracking_number, total_weight_kg, created_at'),
         supabase.from('customers').select('id', { count: 'exact' }),
         supabase.from('invoices').select('amount, status, paid_at, created_at'),
         supabase.from('expenses').select('amount, category, created_at'),
+        supabase.from('parcels').select('id, picked_up_at'),
+        supabase.from('shipments').select('id').eq('status', 'arrived'),
       ]);
 
       const shipments = shipmentsRes.data || [];
       const invoices = invoicesRes.data || [];
       const expenses = expensesRes.data || [];
+      const parcels = parcelsRes.data || [];
+      const arrivedShipmentIds = (arrivedShipmentsRes.data || []).map(s => s.id);
+
+      // Calculate today's scanned parcels
+      const todayScannedParcels = parcels.filter(p => {
+        if (!p.picked_up_at) return false;
+        const pickedUpDate = new Date(p.picked_up_at);
+        return pickedUpDate >= new Date(todayStart) && pickedUpDate <= new Date(todayEnd);
+      }).length;
+
+      // Calculate pending pickups (parcels not picked up from arrived shipments)
+      const pendingPickups = parcels.filter(p => !p.picked_up_at).length;
 
       // This month filters
       const thisMonthShipments = shipments.filter(s => {
@@ -199,6 +220,8 @@ export default function AdminDashboard() {
         expensesByCategory,
         recentShipments: shipments.slice(0, 5),
         monthlyData,
+        todayScannedParcels,
+        pendingPickups,
       });
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -266,6 +289,53 @@ export default function AdminDashboard() {
           icon={ReceiptText}
           variant="warning"
         />
+      </div>
+
+      {/* Parcel Scanning Widget */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <Card className="shadow-xl border-0 bg-gradient-to-br from-cyan-500/10 to-blue-500/10 backdrop-blur-sm overflow-hidden">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center shadow-lg">
+                  <ScanBarcode className="w-7 h-7 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground font-medium">Today's Scanned Parcels</p>
+                  <p className="text-3xl font-bold tracking-tight">{stats.todayScannedParcels}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Parcels checked out today</p>
+                </div>
+              </div>
+              <Link to="/admin/shipments">
+                <Button variant="ghost" size="icon" className="rounded-full hover:bg-cyan-500/20">
+                  <ArrowRight className="w-5 h-5" />
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-xl border-0 bg-gradient-to-br from-amber-500/10 to-orange-500/10 backdrop-blur-sm overflow-hidden">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg">
+                  <Clock className="w-7 h-7 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground font-medium">Pending Pickups</p>
+                  <p className="text-3xl font-bold tracking-tight">{stats.pendingPickups}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Parcels awaiting collection</p>
+                </div>
+              </div>
+              <Link to="/admin/shipments">
+                <Button variant="ghost" size="icon" className="rounded-full hover:bg-amber-500/20">
+                  <ArrowRight className="w-5 h-5" />
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Charts Row */}
