@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { StatCard } from '@/components/admin/StatCard';
 import { EmployeeExpensesClarification } from '@/components/admin/EmployeeExpensesClarification';
+import { RoleBasedWidgets } from '@/components/admin/RoleBasedWidgets';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -60,14 +61,28 @@ export default function EmployeeDashboard() {
     invoicesByStatus: {},
   });
   const [loading, setLoading] = useState(true);
+  const [employeeRole, setEmployeeRole] = useState<string | null>(null);
 
   const { data: commissions, isLoading: commissionsLoading } = useEmployeeCommissions(user?.id);
 
   useEffect(() => {
     if (user?.id) {
       fetchMetrics();
+      fetchEmployeeRole();
     }
   }, [user?.id]);
+
+  const fetchEmployeeRole = async () => {
+    if (!user?.id) return;
+    const { data } = await supabase
+      .from('user_roles')
+      .select('employee_role')
+      .eq('user_id', user.id)
+      .in('role', ['employee', 'super_admin'])
+      .maybeSingle();
+    
+    setEmployeeRole(data?.employee_role || null);
+  };
 
   const fetchMetrics = async () => {
     if (!user?.id) return;
@@ -236,6 +251,11 @@ export default function EmployeeDashboard() {
           variant="warning"
         />
       </div>
+
+      {/* Role-Based Widget */}
+      {user?.id && (
+        <RoleBasedWidgets employeeRole={employeeRole} userId={user.id} />
+      )}
 
       {/* Commission Stats */}
       <Card className="mb-8 shadow-lg border-0 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent">
