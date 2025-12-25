@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Trash2, Loader2, ExternalLink, ShoppingCart, Calculator } from 'lucide-react';
+import { Plus, Trash2, Loader2, ExternalLink, ShoppingCart, Calculator, Package, ImageOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,6 +24,8 @@ interface ProductItem {
   id: string;
   url: string;
   productName: string;
+  productDescription: string | null;
+  productImage: string | null;
   productPrice: number | null;
   currency: string;
   estimatedWeightKg: number;
@@ -80,6 +82,8 @@ export function ShoppingAggregator() {
 
     return {
       productName: response.data.product_name || 'Unknown Product',
+      productDescription: response.data.product_description || null,
+      productImage: response.data.product_image || null,
       productPrice: response.data.product_price,
       currency: response.data.currency || 'USD',
       estimatedWeightKg: response.data.estimated_weight_kg || 0.5,
@@ -104,6 +108,8 @@ export function ShoppingAggregator() {
       id: newItemId,
       url: newUrl,
       productName: 'Loading...',
+      productDescription: null,
+      productImage: null,
       productPrice: null,
       currency: 'USD',
       estimatedWeightKg: 0,
@@ -406,91 +412,142 @@ export function ShoppingAggregator() {
             {items.map((item) => (
               <div
                 key={item.id}
-                className="flex flex-col gap-4 p-4 bg-muted/50 rounded-lg"
+                className="border rounded-lg overflow-hidden bg-background"
               >
-                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      {item.isLoading && (
-                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                      )}
-                      <p className="font-medium truncate">{item.productName}</p>
+                {/* Loading state */}
+                {item.isLoading && (
+                  <div className="flex items-center justify-center p-8 bg-muted/30">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    <span className="ml-3 text-muted-foreground">Fetching product details...</span>
+                  </div>
+                )}
+
+                {/* Product details */}
+                {!item.isLoading && (
+                  <div className="flex flex-col md:flex-row gap-4 p-4">
+                    {/* Product Image */}
+                    <div className="w-full md:w-32 h-32 flex-shrink-0 bg-muted rounded-md overflow-hidden">
+                      {item.productImage ? (
+                        <img
+                          src={item.productImage}
+                          alt={item.productName}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                            (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                          }}
+                        />
+                      ) : null}
+                      <div className={`w-full h-full flex items-center justify-center ${item.productImage ? 'hidden' : ''}`}>
+                        <Package className="h-10 w-10 text-muted-foreground/50" />
+                      </div>
                     </div>
-                    <a
-                      href={item.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-muted-foreground hover:text-primary flex items-center gap-1 truncate"
-                    >
-                      {item.url.substring(0, 50)}...
-                      <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                    </a>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-sm text-muted-foreground">{item.currency}</span>
-                      <Input
-                        type="number"
-                        value={item.productPrice ?? ''}
-                        onChange={(e) => handlePriceChange(item.id, e.target.value ? parseFloat(e.target.value) : null)}
-                        placeholder="Enter price"
-                        className="w-24 h-7 text-sm"
-                        min="0"
-                        step="0.01"
-                      />
-                      {!item.productPrice && (
-                        <span className="text-xs text-orange-500">Price required</span>
-                      )}
+
+                    {/* Product Info */}
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <div>
+                        <h4 className="font-semibold text-base line-clamp-2">{item.productName}</h4>
+                        {item.productDescription && (
+                          <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
+                            {item.productDescription}
+                          </p>
+                        )}
+                        <a
+                          href={item.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-primary hover:underline flex items-center gap-1 mt-1"
+                        >
+                          View original
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </div>
+
+                      {/* Price Input */}
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          <Label className="text-sm font-medium">Price:</Label>
+                          <div className="flex items-center gap-1">
+                            <span className="text-sm text-muted-foreground">{REGIONS[item.originRegion || selectedRegion]?.currency || 'USD'}</span>
+                            <Input
+                              type="number"
+                              value={item.productPrice ?? ''}
+                              onChange={(e) => handlePriceChange(item.id, e.target.value ? parseFloat(e.target.value) : null)}
+                              placeholder="0.00"
+                              className="w-24 h-8"
+                              min="0"
+                              step="0.01"
+                            />
+                          </div>
+                          {!item.productPrice && (
+                            <span className="text-xs text-orange-500">Required</span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <Label className="text-sm font-medium">Weight:</Label>
+                          <span className="text-sm">{roundWeight(item.estimatedWeightKg)} kg</span>
+                        </div>
+                      </div>
+
+                      {/* Region and Quantity */}
+                      <div className="flex flex-wrap items-center gap-3 pt-2">
+                        <div className="flex items-center gap-2">
+                          <Label className="text-sm">From:</Label>
+                          <Select 
+                            value={item.originRegion || selectedRegion} 
+                            onValueChange={(v: Region) => handleRegionChange(item.id, v)}
+                          >
+                            <SelectTrigger className="w-36 h-8">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Object.entries(REGIONS).map(([key, { label, flag }]) => (
+                                <SelectItem key={key} value={key}>
+                                  {flag} {label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <Label className="text-sm">Qty:</Label>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
+                              disabled={item.quantity <= 1}
+                            >
+                              -
+                            </Button>
+                            <span className="w-8 text-center font-medium">{item.quantity}</span>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
+                            >
+                              +
+                            </Button>
+                          </div>
+                        </div>
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveItem(item.id)}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10 ml-auto"
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Remove
+                        </Button>
+                      </div>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Est. weight: {roundWeight(item.estimatedWeightKg)} kg
-                    </p>
                   </div>
-
-                  <div className="flex items-center gap-2">
-                    <Select 
-                      value={item.originRegion || selectedRegion} 
-                      onValueChange={(v: Region) => handleRegionChange(item.id, v)}
-                    >
-                      <SelectTrigger className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(REGIONS).map(([key, { label, flag }]) => (
-                          <SelectItem key={key} value={key}>
-                            {flag} {label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
-                      disabled={item.quantity <= 1}
-                    >
-                      -
-                    </Button>
-                    <span className="w-8 text-center font-medium">{item.quantity}</span>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
-                    >
-                      +
-                    </Button>
-                  </div>
-
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleRemoveItem(item.id)}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+                )}
               </div>
             ))}
           </CardContent>

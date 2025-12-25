@@ -159,6 +159,8 @@ Always round up to ensure safe shipping estimates. If the page shows actual weig
 IMPORTANT: Return ONLY valid JSON, no markdown or extra text. Use this exact format:
 {
   "product_name": "string - the full product name",
+  "product_description": "string - a brief 1-2 sentence description of the product",
+  "product_image": "string or null - the main product image URL (look for og:image, product images, or main image)",
   "product_price": number or null - price as a number without currency symbols,
   "currency": "string - 3 letter currency code (USD, EUR, GBP, AED, CNY, INR, TZS)",
   "estimated_weight_kg": number - weight in kg rounded UP to nearest whole number (minimum 1),
@@ -169,7 +171,8 @@ CRITICAL RULES:
 1. If page shows actual weight (in kg, lbs, g, oz), convert to kg and use that
 2. ALWAYS round UP to the nearest whole kilogram (e.g., 0.3 kg → 1 kg, 1.2 kg → 2 kg)
 3. Minimum weight is 1 kg
-4. When in doubt, estimate higher rather than lower for shipping safety`
+4. When in doubt, estimate higher rather than lower for shipping safety
+5. For product_image, look for: og:image meta tag, itemprop="image", product gallery images, or any prominent product photo URL`
           },
           {
             role: 'user',
