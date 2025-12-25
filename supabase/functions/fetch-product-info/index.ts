@@ -46,6 +46,78 @@ serve(async (req) => {
 
     const html = await pageResponse.text();
     
+    // Try to extract price from structured data first (JSON-LD, meta tags)
+    let extractedPrice: number | null = null;
+    let extractedCurrency = 'USD';
+    let extractedImage: string | null = null;
+    let extractedName: string | null = null;
+    
+    // Look for JSON-LD structured data (most reliable)
+    const jsonLdMatches = html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
+    for (const match of jsonLdMatches) {
+      try {
+        const jsonData = JSON.parse(match[1]);
+        const items = Array.isArray(jsonData) ? jsonData : [jsonData];
+        for (const item of items) {
+          // Check for Product schema
+          if (item['@type'] === 'Product' || item['@type']?.includes('Product')) {
+            if (item.name && !extractedName) extractedName = item.name;
+            if (item.image) {
+              const imgData = Array.isArray(item.image) ? item.image[0] : item.image;
+              if (typeof imgData === 'string') {
+                extractedImage = imgData;
+              } else if (imgData && typeof imgData === 'object' && 'url' in imgData) {
+                extractedImage = imgData.url || null;
+              }
+            }
+            const offers = item.offers || item.Offers;
+            if (offers) {
+              const offer = Array.isArray(offers) ? offers[0] : offers;
+              if (offer.price) {
+                extractedPrice = parseFloat(String(offer.price).replace(/[^0-9.]/g, ''));
+                extractedCurrency = offer.priceCurrency || 'USD';
+                console.log('Found price in JSON-LD:', extractedPrice, extractedCurrency);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        // JSON parsing failed, continue
+      }
+    }
+    
+    // Look for Open Graph meta tags
+    const ogPriceMatch = html.match(/<meta[^>]*property=["']product:price:amount["'][^>]*content=["']([^"']+)["']/i) ||
+                         html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']product:price:amount["']/i);
+    const ogCurrencyMatch = html.match(/<meta[^>]*property=["']product:price:currency["'][^>]*content=["']([^"']+)["']/i) ||
+                            html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']product:price:currency["']/i);
+    const ogImageMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
+                         html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
+    const ogTitleMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i) ||
+                         html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:title["']/i);
+    
+    if (!extractedPrice && ogPriceMatch) {
+      extractedPrice = parseFloat(ogPriceMatch[1].replace(/[^0-9.]/g, ''));
+      if (ogCurrencyMatch) extractedCurrency = ogCurrencyMatch[1];
+      console.log('Found price in OG tags:', extractedPrice, extractedCurrency);
+    }
+    if (!extractedImage && ogImageMatch) extractedImage = ogImageMatch[1];
+    if (!extractedName && ogTitleMatch) extractedName = ogTitleMatch[1];
+    
+    // Look for common price patterns in meta/itemprop
+    if (!extractedPrice) {
+      const priceMetaMatch = html.match(/<[^>]*itemprop=["']price["'][^>]*content=["']([^"']+)["']/i) ||
+                             html.match(/data-price=["']([0-9.]+)["']/i);
+      const currencyMetaMatch = html.match(/<[^>]*itemprop=["']priceCurrency["'][^>]*content=["']([^"']+)["']/i);
+      if (priceMetaMatch) {
+        extractedPrice = parseFloat(priceMetaMatch[1].replace(/[^0-9.]/g, ''));
+        if (currencyMetaMatch) extractedCurrency = currencyMetaMatch[1];
+        console.log('Found price in itemprop/data:', extractedPrice, extractedCurrency);
+      }
+    }
+    
+    console.log('Pre-extracted data:', { extractedPrice, extractedCurrency, extractedImage, extractedName });
+    
     // Truncate HTML to avoid token limits (keep first 20000 chars for better context)
     const truncatedHtml = html.substring(0, 20000);
 
@@ -178,6 +250,10 @@ CRITICAL RULES:
             role: 'user',
             content: `Analyze this product page and extract information. Pay special attention to finding the actual weight if listed, otherwise reason about what this specific product should weigh.
 
+${extractedPrice ? `IMPORTANT: We already extracted a price of ${extractedPrice} ${extractedCurrency} from structured data. Use this unless you find a more accurate price.` : 'IMPORTANT: Try hard to find the product price on the page.'}
+${extractedName ? `Product name hint: ${extractedName}` : ''}
+${extractedImage ? `Product image hint: ${extractedImage}` : ''}
+
 URL: ${url}
 
 HTML Content:
@@ -227,6 +303,19 @@ ${truncatedHtml}`
           productInfo.estimated_weight_kg = 1;
         }
         
+        // Use pre-extracted data as fallback/override
+        if (!productInfo.product_price && extractedPrice) {
+          productInfo.product_price = extractedPrice;
+          productInfo.currency = extractedCurrency;
+          console.log('Using pre-extracted price:', extractedPrice);
+        }
+        if (!productInfo.product_image && extractedImage) {
+          productInfo.product_image = extractedImage;
+        }
+        if (productInfo.product_name === 'Unknown Product' && extractedName) {
+          productInfo.product_name = extractedName;
+        }
+        
         console.log('Weight reasoning:', productInfo.weight_reasoning);
       } else {
         throw new Error('No JSON found in response');
@@ -234,9 +323,11 @@ ${truncatedHtml}`
     } catch (parseError) {
       console.error('Failed to parse AI response:', parseError);
       productInfo = {
-        product_name: 'Unknown Product',
-        product_price: null,
-        currency: 'USD',
+        product_name: extractedName || 'Unknown Product',
+        product_description: null,
+        product_image: extractedImage,
+        product_price: extractedPrice,
+        currency: extractedCurrency,
         estimated_weight_kg: 1,
         weight_reasoning: 'Could not analyze product, using default weight'
       };
