@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import { Package, MapPin, Weight, Clock, User, Copy, Check, Box, Plus, Pencil, Trash2, DollarSign } from 'lucide-react';
+import { Package, MapPin, Weight, Clock, User, Copy, Check, Box, Plus, Pencil, Trash2, DollarSign, Printer } from 'lucide-react';
 import { useState } from 'react';
 import {
   Sheet,
@@ -27,6 +27,7 @@ import { Expense, EXPENSE_CATEGORIES, useExpensesByShipment, useDeleteExpense } 
 import { ShipmentStatusBadge } from './ShipmentStatusBadge';
 import { ParcelDialog } from './ParcelDialog';
 import { ExpenseDialog } from './ExpenseDialog';
+import { PrintLabelsDialog } from './PrintLabelsDialog';
 
 interface ShipmentDetailDrawerProps {
   shipment: Shipment | null;
@@ -49,6 +50,7 @@ export function ShipmentDetailDrawer({ shipment, open, onOpenChange }: ShipmentD
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [deleteExpenseId, setDeleteExpenseId] = useState<string | null>(null);
+  const [printLabelsOpen, setPrintLabelsOpen] = useState(false);
   
   const { data: parcels, isLoading: parcelsLoading } = useParcels(shipment?.id ?? null);
   const { data: expenses, isLoading: expensesLoading } = useExpensesByShipment(shipment?.id ?? null);
@@ -234,17 +236,29 @@ export function ShipmentDetailDrawer({ shipment, open, onOpenChange }: ShipmentD
                     <Box className="h-4 w-4" />
                     Parcels ({parcels?.length || 0})
                   </h3>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setEditingParcel(null);
-                      setParcelDialogOpen(true);
-                    }}
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    {parcels && parcels.length > 0 && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setPrintLabelsOpen(true)}
+                      >
+                        <Printer className="h-4 w-4 mr-1" />
+                        Print Labels
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setEditingParcel(null);
+                        setParcelDialogOpen(true);
+                      }}
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add
+                    </Button>
+                  </div>
                 </div>
                 {parcelsLoading ? (
                   <div className="space-y-3">
@@ -464,6 +478,16 @@ export function ShipmentDetailDrawer({ shipment, open, onOpenChange }: ShipmentD
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+
+            {/* Print Labels Dialog */}
+            {parcels && parcels.length > 0 && (
+              <PrintLabelsDialog
+                open={printLabelsOpen}
+                onOpenChange={setPrintLabelsOpen}
+                shipment={shipment}
+                parcels={parcels}
+              />
+            )}
           </>
         ) : (
           <div className="flex items-center justify-center h-full">
