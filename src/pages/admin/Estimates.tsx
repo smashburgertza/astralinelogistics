@@ -92,6 +92,7 @@ const STATUS_CONFIG = {
 
 export default function EstimatesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<'all' | EstimateType>('all');
   const { data: estimates, isLoading } = useEstimates();
   const { data: customers } = useCustomers();
   const { data: shipments } = useShipments();
@@ -100,6 +101,12 @@ export default function EstimatesPage() {
   const updateStatus = useUpdateEstimateStatus();
   const convertToInvoice = useConvertEstimateToInvoice();
   const deleteEstimate = useDeleteEstimate();
+
+  const filteredEstimates = useMemo(() => {
+    if (!estimates) return [];
+    if (typeFilter === 'all') return estimates;
+    return estimates.filter(e => e.estimate_type === typeFilter);
+  }, [estimates, typeFilter]);
 
   const form = useForm({
     resolver: zodResolver(estimateSchema),
@@ -509,8 +516,30 @@ export default function EstimatesPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>All Estimates</CardTitle>
-            <CardDescription>Manage and convert estimates to invoices</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>All Estimates</CardTitle>
+                <CardDescription>Manage and convert estimates to invoices</CardDescription>
+              </div>
+              <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as 'all' | EstimateType)}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filter by type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="shipping">
+                    <div className="flex items-center gap-2">
+                      <Truck className="h-4 w-4" /> Shipping Only
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="purchase_shipping">
+                    <div className="flex items-center gap-2">
+                      <Package className="h-4 w-4" /> Purchase + Shipping
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </CardHeader>
           <CardContent>
             <Table>
@@ -528,14 +557,14 @@ export default function EstimatesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {estimates?.length === 0 ? (
+                {filteredEstimates.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
-                      No estimates yet. Create your first estimate.
+                      {estimates?.length === 0 ? 'No estimates yet. Create your first estimate.' : 'No estimates match the selected filter.'}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  estimates?.map((estimate) => (
+                  filteredEstimates.map((estimate) => (
                     <TableRow key={estimate.id}>
                       <TableCell className="font-mono font-medium">
                         {estimate.estimate_number}
