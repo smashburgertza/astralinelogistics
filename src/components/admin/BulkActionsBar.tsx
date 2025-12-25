@@ -15,9 +15,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Package, Plane, MapPin, CheckCircle, Loader2, X } from 'lucide-react';
+import { Package, Plane, MapPin, CheckCircle, Loader2, X, Printer } from 'lucide-react';
 import { useBulkUpdateShipmentStatus } from '@/hooks/useShipments';
 import { SHIPMENT_STATUSES } from '@/lib/constants';
+import { BulkPrintLabelsDialog } from './BulkPrintLabelsDialog';
 
 interface BulkActionsBarProps {
   selectedCount: number;
@@ -26,7 +27,8 @@ interface BulkActionsBarProps {
 }
 
 export function BulkActionsBar({ selectedCount, onClearSelection, selectedIds }: BulkActionsBarProps) {
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<string>('');
   const bulkUpdate = useBulkUpdateShipmentStatus();
 
@@ -37,7 +39,7 @@ export function BulkActionsBar({ selectedCount, onClearSelection, selectedIds }:
       { ids: selectedIds, status: selectedStatus },
       {
         onSuccess: () => {
-          setDialogOpen(false);
+          setStatusDialogOpen(false);
           setSelectedStatus('');
           onClearSelection();
         },
@@ -72,17 +74,29 @@ export function BulkActionsBar({ selectedCount, onClearSelection, selectedIds }:
         </div>
         
         <div className="flex-1" />
-        
-        <Button
-          variant="default"
-          size="sm"
-          onClick={() => setDialogOpen(true)}
-        >
-          Update Status
-        </Button>
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPrintDialogOpen(true)}
+            className="gap-2"
+          >
+            <Printer className="h-4 w-4" />
+            Print Labels
+          </Button>
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => setStatusDialogOpen(true)}
+          >
+            Update Status
+          </Button>
+        </div>
       </div>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      {/* Status Update Dialog */}
+      <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Bulk Update Status</DialogTitle>
@@ -116,7 +130,7 @@ export function BulkActionsBar({ selectedCount, onClearSelection, selectedIds }:
             <Button
               variant="outline"
               onClick={() => {
-                setDialogOpen(false);
+                setStatusDialogOpen(false);
                 setSelectedStatus('');
               }}
             >
@@ -132,6 +146,13 @@ export function BulkActionsBar({ selectedCount, onClearSelection, selectedIds }:
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Print Labels Dialog */}
+      <BulkPrintLabelsDialog
+        open={printDialogOpen}
+        onOpenChange={setPrintDialogOpen}
+        shipmentIds={selectedIds}
+      />
     </>
   );
 }
