@@ -193,6 +193,9 @@ export function ShoppingAggregator() {
     // Use the first item's region or default to selected region
     const primaryRegion = items[0]?.originRegion || selectedRegion;
     const shippingRate = getShippingRate(primaryRegion);
+    
+    // Get currency based on region
+    const regionCurrency = REGIONS[primaryRegion]?.currency || 'USD';
 
     // Calculate using configurable charges
     const chargeCalc = calculateShopForMeCharges(
@@ -202,8 +205,8 @@ export function ShoppingAggregator() {
       charges || []
     );
 
-    // Get exchange rate
-    const exchangeRate = getExchangeRate('USD');
+    // Get exchange rate based on region currency
+    const exchangeRate = getExchangeRate(regionCurrency);
     const totalInTZS = chargeCalc.total * exchangeRate;
 
     return {
@@ -214,6 +217,7 @@ export function ShoppingAggregator() {
       grandTotal: chargeCalc.total,
       totalInTZS,
       exchangeRate,
+      currency: regionCurrency,
     };
   };
 
@@ -471,11 +475,11 @@ export function ShoppingAggregator() {
                       )}
                       {item.key === 'shipping' && (
                         <span className="ml-1 text-xs">
-                          ({totals.totalWeight} kg × {formatCurrency(totals.shippingRate)}/kg)
+                          ({totals.totalWeight} kg × {formatCurrency(totals.shippingRate, totals.currency)}/kg)
                         </span>
                       )}
                     </span>
-                    <span className="font-medium">{formatCurrency(item.amount)}</span>
+                    <span className="font-medium">{formatCurrency(item.amount, totals.currency)}</span>
                   </div>
                 </div>
               );
@@ -483,11 +487,11 @@ export function ShoppingAggregator() {
 
             <Separator className="my-3" />
             
-            {/* Total in USD */}
+            {/* Total in foreign currency */}
             <div className="flex justify-between items-center">
-              <span className="font-semibold text-lg">Total (USD)</span>
+              <span className="font-semibold text-lg">Total ({totals.currency})</span>
               <span className="font-bold text-xl text-primary">
-                {formatCurrency(totals.grandTotal)}
+                {formatCurrency(totals.grandTotal, totals.currency)}
               </span>
             </div>
 
@@ -496,7 +500,7 @@ export function ShoppingAggregator() {
               <span className="font-semibold">
                 Total (TZS)
                 <span className="text-xs text-muted-foreground ml-2">
-                  @ {totals.exchangeRate.toLocaleString()} TZS/USD
+                  @ {totals.exchangeRate.toLocaleString()} TZS/{totals.currency}
                 </span>
               </span>
               <span className="font-bold text-xl">
