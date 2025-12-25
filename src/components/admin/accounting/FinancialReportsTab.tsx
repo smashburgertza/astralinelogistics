@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Download, RefreshCw } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, startOfYear } from 'date-fns';
 import { useTrialBalance, useIncomeStatement, useBalanceSheet } from '@/hooks/useAccounting';
+import { AgingReportsTab } from './AgingReportsTab';
 
 export function FinancialReportsTab() {
   const [reportTab, setReportTab] = useState('trial-balance');
@@ -40,7 +41,12 @@ export function FinancialReportsTab() {
             <TabsTrigger value="trial-balance">Trial Balance</TabsTrigger>
             <TabsTrigger value="income-statement">Income Statement</TabsTrigger>
             <TabsTrigger value="balance-sheet">Balance Sheet</TabsTrigger>
+            <TabsTrigger value="aging">AR/AP Aging</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="aging">
+            <AgingReportsTab />
+          </TabsContent>
 
           <TabsContent value="trial-balance" className="space-y-4">
             <div className="flex items-end gap-4">
