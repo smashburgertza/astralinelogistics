@@ -9,7 +9,10 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Package, Copy, Eye, Pencil } from 'lucide-react';
+import { Package, Copy, Eye, Pencil, Plane, MapPin, CheckCircle } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { SHIPMENT_STATUSES } from '@/lib/constants';
+import { useUpdateShipmentStatus } from '@/hooks/useShipments';
 import { format } from 'date-fns';
 import { ShipmentStatusBadge } from '@/components/admin/ShipmentStatusBadge';
 import { ShipmentDetailDrawer } from '@/components/admin/ShipmentDetailDrawer';
@@ -28,6 +31,7 @@ export function AgentShipmentTable({ shipments, isLoading }: AgentShipmentTableP
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingShipment, setEditingShipment] = useState<Shipment | null>(null);
+  const updateStatus = useUpdateShipmentStatus();
 
   const copyTrackingNumber = (trackingNumber: string) => {
     navigator.clipboard.writeText(trackingNumber);
@@ -87,7 +91,7 @@ export function AgentShipmentTable({ shipments, isLoading }: AgentShipmentTableP
             <TableHead className="font-semibold">Weight</TableHead>
             <TableHead className="font-semibold">Status</TableHead>
             <TableHead className="font-semibold">Date</TableHead>
-            <TableHead className="w-[100px]"></TableHead>
+            <TableHead className="font-semibold text-right">Quick Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -130,33 +134,79 @@ export function AgentShipmentTable({ shipments, isLoading }: AgentShipmentTableP
                   {format(new Date(shipment.created_at || ''), 'MMM d, yyyy')}
                 </TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center justify-end gap-1">
+                    {/* Quick status buttons */}
+                    {Object.entries(SHIPMENT_STATUSES).map(([key, { label }]) => {
+                      const icons = {
+                        collected: Package,
+                        in_transit: Plane,
+                        arrived: MapPin,
+                        delivered: CheckCircle,
+                      };
+                      const Icon = icons[key as keyof typeof icons];
+                      const isCurrentStatus = shipment.status === key;
+                      
+                      return (
+                        <Tooltip key={key}>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant={isCurrentStatus ? "default" : "outline"}
+                              size="icon"
+                              className={`h-7 w-7 ${isCurrentStatus ? '' : 'opacity-50 hover:opacity-100'}`}
+                              disabled={isCurrentStatus || updateStatus.isPending}
+                              onClick={() => updateStatus.mutate({ id: shipment.id, status: key })}
+                            >
+                              <Icon className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{isCurrentStatus ? `Current: ${label}` : `Set to ${label}`}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      );
+                    })}
+                    
+                    {/* Edit button - only for collected status */}
                     {shipment.status === 'collected' && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => {
-                          setEditingShipment(shipment);
-                          setEditDialogOpen(true);
-                        }}
-                        title="Edit shipment"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => {
+                              setEditingShipment(shipment);
+                              setEditDialogOpen(true);
+                            }}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Edit Shipment</p>
+                        </TooltipContent>
+                      </Tooltip>
                     )}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => {
-                        setSelectedShipment(shipment);
-                        setDrawerOpen(true);
-                      }}
-                      title="View details"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
+                    
+                    {/* View details button */}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => {
+                            setSelectedShipment(shipment);
+                            setDrawerOpen(true);
+                          }}
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>View Details</p>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                 </TableCell>
               </TableRow>
