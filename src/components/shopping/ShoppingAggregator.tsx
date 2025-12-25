@@ -80,6 +80,9 @@ export function ShoppingAggregator() {
       throw new Error(response.error.message);
     }
 
+    // Map the detected region to our Region type
+    const detectedRegion = response.data.origin_region as Region | undefined;
+    
     return {
       productName: response.data.product_name || 'Unknown Product',
       productDescription: response.data.product_description || null,
@@ -87,6 +90,7 @@ export function ShoppingAggregator() {
       productPrice: response.data.product_price,
       currency: response.data.currency || 'USD',
       estimatedWeightKg: response.data.estimated_weight_kg || 0.5,
+      originRegion: detectedRegion,
     };
   };
 
@@ -127,11 +131,21 @@ export function ShoppingAggregator() {
       setItems(prev =>
         prev.map(item =>
           item.id === newItemId
-            ? { ...item, ...productInfo, isLoading: false }
+            ? { 
+                ...item, 
+                ...productInfo, 
+                // Use detected region if available, otherwise fall back to selected region
+                originRegion: productInfo.originRegion || selectedRegion,
+                isLoading: false 
+              }
             : item
         )
       );
-      toast.success('Product info fetched successfully');
+      const regionLabel = productInfo.originRegion ? REGIONS[productInfo.originRegion]?.label : null;
+      toast.success(regionLabel 
+        ? `Product added from ${regionLabel}` 
+        : 'Product info fetched successfully'
+      );
     } catch (error) {
       console.error('Error fetching product:', error);
       setItems(prev =>

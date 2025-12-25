@@ -62,12 +62,30 @@ serve(async (req) => {
     let extractedImage: string | null = null;
     let extractedName: string | null = null;
     
-    // Detect currency from URL domain
-    if (urlLower.includes('.co.uk') || urlLower.includes('.uk')) extractedCurrency = 'GBP';
-    else if (urlLower.includes('.de') || urlLower.includes('.fr') || urlLower.includes('.it') || urlLower.includes('.es')) extractedCurrency = 'EUR';
-    else if (urlLower.includes('.cn') || urlLower.includes('.com.cn')) extractedCurrency = 'CNY';
-    else if (urlLower.includes('.in') || urlLower.includes('.co.in')) extractedCurrency = 'INR';
-    else if (urlLower.includes('.ae')) extractedCurrency = 'AED';
+    // Detect currency and origin region from URL domain
+    let detectedRegion = 'usa'; // default
+    if (urlLower.includes('.co.uk') || urlLower.includes('.uk')) {
+      extractedCurrency = 'GBP';
+      detectedRegion = 'uk';
+    } else if (urlLower.includes('.de') || urlLower.includes('.fr') || urlLower.includes('.it') || urlLower.includes('.es') || urlLower.includes('.eu')) {
+      extractedCurrency = 'EUR';
+      detectedRegion = 'europe';
+    } else if (urlLower.includes('.cn') || urlLower.includes('.com.cn') || isAliExpress || urlLower.includes('taobao') || urlLower.includes('1688.com') || urlLower.includes('jd.com')) {
+      extractedCurrency = 'CNY';
+      detectedRegion = 'china';
+    } else if (urlLower.includes('.in') || urlLower.includes('.co.in') || urlLower.includes('flipkart') || urlLower.includes('myntra')) {
+      extractedCurrency = 'INR';
+      detectedRegion = 'india';
+    } else if (urlLower.includes('.ae') || urlLower.includes('noon.com') || urlLower.includes('dubizzle')) {
+      extractedCurrency = 'AED';
+      detectedRegion = 'dubai';
+    } else if (urlLower.includes('.com') && !urlLower.includes('.co.')) {
+      // Generic .com sites default to USA
+      extractedCurrency = 'USD';
+      detectedRegion = 'usa';
+    }
+    
+    console.log('Detected region:', detectedRegion, 'currency:', extractedCurrency);
     
     // Look for JSON-LD structured data (most reliable)
     const jsonLdMatches = html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
@@ -450,10 +468,16 @@ ${truncatedHtml}`
       };
     }
 
-    // Remove weight_reasoning from response (internal use only)
+    // Remove weight_reasoning from response and add detected region
     const { weight_reasoning, ...responseData } = productInfo;
+    
+    // Add the detected origin region to the response
+    const finalResponse = {
+      ...responseData,
+      origin_region: detectedRegion,
+    };
 
-    return new Response(JSON.stringify(responseData), {
+    return new Response(JSON.stringify(finalResponse), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
