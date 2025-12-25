@@ -11,13 +11,14 @@ import { useExchangeRates, convertToTZS } from '@/hooks/useExchangeRates';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend,
+  LineChart, Line, ComposedChart, Area
 } from 'recharts';
 import { 
   TrendingUp, TrendingDown, Coins, ArrowUpRight, ArrowDownRight, 
-  DollarSign, Receipt, PiggyBank, CalendarIcon 
+  DollarSign, Receipt, PiggyBank, CalendarIcon, LineChartIcon 
 } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, subDays, isWithinInterval, parseISO } from 'date-fns';
+import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, subDays, isWithinInterval, parseISO, eachMonthOfInterval, isSameMonth } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 const REVENUE_COLORS = ['#10B981', '#34D399', '#6EE7B7', '#A7F3D0', '#D1FAE5'];
@@ -220,6 +221,69 @@ export default function FinancialSummaryPage() {
     }).sort((a, b) => b.revenue - a.revenue);
   }, [revenueBreakdown, expenseBreakdown]);
 
+  // Calculate monthly trend data (last 12 months)
+  const monthlyTrendData = useMemo(() => {
+    if (!invoices || !expenses || !exchangeRates) return [];
+    
+    const today = new Date();
+    const startDate = subMonths(startOfMonth(today), 11);
+    const endDate = endOfMonth(today);
+    
+    const months = eachMonthOfInterval({ start: startDate, end: endDate });
+    
+    return months.map(month => {
+      // Calculate revenue for this month
+      const monthRevenue = invoices
+        .filter(inv => {
+          if (inv.status !== 'paid') return false;
+          const invDate = inv.paid_at ? parseISO(inv.paid_at) : parseISO(inv.created_at || '');
+          return isSameMonth(invDate, month);
+        })
+        .reduce((sum, inv) => {
+          const currency = inv.currency || 'USD';
+          return sum + convertToTZS(Number(inv.amount), currency, exchangeRates);
+        }, 0);
+      
+      // Calculate expenses for this month
+      const monthExpenses = expenses
+        .filter(exp => {
+          if (exp.status !== 'approved') return false;
+          const expDate = parseISO(exp.created_at || '');
+          return isSameMonth(expDate, month);
+        })
+        .reduce((sum, exp) => {
+          const currency = exp.currency || 'USD';
+          return sum + convertToTZS(Number(exp.amount), currency, exchangeRates);
+        }, 0);
+      
+      return {
+        month: format(month, 'MMM yyyy'),
+        shortMonth: format(month, 'MMM'),
+        revenue: monthRevenue,
+        expenses: monthExpenses,
+        profit: monthRevenue - monthExpenses,
+      };
+    });
+  }, [invoices, expenses, exchangeRates]);
+
+  const TrendTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-background/95 backdrop-blur-md border rounded-lg p-3 shadow-xl">
+          <p className="font-semibold mb-2">{label}</p>
+          {payload.map((item: any, index: number) => (
+            <p key={index} className="text-sm flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+              <span className="text-muted-foreground">{item.name}:</span>
+              <span className="font-medium">TZS {item.value.toLocaleString()}</span>
+            </p>
+          ))}
+        </div>
+      );
+    }
+    return null;
+  };
+
   const getDateRangeLabel = () => {
     if (datePreset === 'all') return 'All Time';
     if (datePreset === 'custom' && customFromDate && customToDate) {
@@ -386,6 +450,78 @@ export default function FinancialSummaryPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Monthly Trend Chart */}
+        {monthlyTrendData.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <LineChartIcon className="h-5 w-5" />
+                Monthly Financial Trend (Last 12 Months)
+              </CardTitle>
+              <CardDescription>
+                Revenue, expenses, and profit trend over time (in TZS)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={350}>
+                <ComposedChart data={monthlyTrendData}>
+                  <defs>
+                    <linearGradient id="profitGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
+                  <XAxis 
+                    dataKey="shortMonth" 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                  />
+                  <YAxis 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                    tickFormatter={(value) => {
+                      if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+                      if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
+                      return value.toString();
+                    }}
+                  />
+                  <Tooltip content={<TrendTooltip />} />
+                  <Legend />
+                  <Area
+                    type="monotone"
+                    dataKey="profit"
+                    name="Profit"
+                    fill="url(#profitGradient)"
+                    stroke="#3B82F6"
+                    strokeWidth={2}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="revenue" 
+                    name="Revenue"
+                    stroke="#10B981" 
+                    strokeWidth={3}
+                    dot={{ fill: '#10B981', strokeWidth: 2, r: 4 }}
+                    activeDot={{ r: 6, stroke: '#10B981', strokeWidth: 2 }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="expenses" 
+                    name="Expenses"
+                    stroke="#F59E0B" 
+                    strokeWidth={3}
+                    dot={{ fill: '#F59E0B', strokeWidth: 2, r: 4 }}
+                    activeDot={{ r: 6, stroke: '#F59E0B', strokeWidth: 2 }}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Revenue vs Expenses Comparison Chart */}
         {comparisonData.length > 0 && (
