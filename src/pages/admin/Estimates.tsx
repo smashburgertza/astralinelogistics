@@ -66,6 +66,7 @@ import {
 } from '@/hooks/useEstimates';
 import { useCustomers, useShipments } from '@/hooks/useShipments';
 import { useRegionPricing } from '@/hooks/useRegionPricing';
+import { useExchangeRates, convertToTZS } from '@/hooks/useExchangeRates';
 import { REGIONS, CURRENCY_SYMBOLS } from '@/lib/constants';
 
 const estimateSchema = z.object({
@@ -97,6 +98,7 @@ export default function EstimatesPage() {
   const { data: customers } = useCustomers();
   const { data: shipments } = useShipments();
   const { data: pricing } = useRegionPricing();
+  const { data: exchangeRates } = useExchangeRates();
   const createEstimate = useCreateEstimate();
   const updateStatus = useUpdateEstimateStatus();
   const convertToInvoice = useConvertEstimateToInvoice();
@@ -585,8 +587,17 @@ export default function EstimatesPage() {
                         {REGIONS[estimate.origin_region as keyof typeof REGIONS]?.label || estimate.origin_region}
                       </TableCell>
                       <TableCell>{estimate.weight_kg} kg</TableCell>
-                      <TableCell className="font-semibold">
-                        {CURRENCY_SYMBOLS[estimate.currency] || '$'}{estimate.total.toFixed(2)}
+                      <TableCell>
+                        <div>
+                          <span className="font-semibold">
+                            {CURRENCY_SYMBOLS[estimate.currency] || '$'}{estimate.total.toFixed(2)}
+                          </span>
+                          {estimate.currency !== 'TZS' && exchangeRates && (
+                            <p className="text-xs text-muted-foreground">
+                              ≈ TZS {convertToTZS(estimate.total, estimate.currency, exchangeRates).toLocaleString()}
+                            </p>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         {getStatusBadge(estimate.status as keyof typeof STATUS_CONFIG)}

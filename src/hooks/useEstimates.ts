@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { convertToTZS, type ExchangeRate } from './useExchangeRates';
 
 export type EstimateType = 'shipping' | 'purchase_shipping';
 
@@ -157,6 +158,18 @@ export function useConvertEstimateToInvoice() {
       if (fetchError) throw fetchError;
       if (!estimate) throw new Error('Estimate not found');
 
+      // Get exchange rates for TZS conversion
+      const { data: exchangeRates } = await supabase
+        .from('currency_exchange_rates')
+        .select('*');
+
+      // Calculate amount_in_tzs
+      const amountInTzs = estimate.currency === 'TZS' 
+        ? estimate.total 
+        : exchangeRates 
+          ? convertToTZS(estimate.total, estimate.currency, exchangeRates as ExchangeRate[])
+          : estimate.total;
+
       // Generate invoice number
       const { data: invoiceNumber } = await supabase.rpc('generate_document_number', { prefix: 'INV' });
       const { data: user } = await supabase.auth.getUser();
@@ -170,6 +183,7 @@ export function useConvertEstimateToInvoice() {
           shipment_id: estimate.shipment_id,
           estimate_id: estimateId,
           amount: estimate.total,
+          amount_in_tzs: amountInTzs,
           currency: estimate.currency,
           status: 'pending',
           notes: estimate.notes,

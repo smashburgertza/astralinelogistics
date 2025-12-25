@@ -119,15 +119,21 @@ export const InvoicePDFPreview = forwardRef<HTMLDivElement, InvoicePDFPreviewPro
 
         {/* Total */}
         <div className="flex justify-end mb-8">
-          <div className="w-64">
+          <div className="w-72">
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Subtotal</span>
               <span>{currencySymbol}{Number(invoice.amount).toFixed(2)}</span>
             </div>
-            <div className="flex justify-between py-3 text-lg font-bold">
-              <span>Total</span>
-              <span>{currencySymbol}{Number(invoice.amount).toFixed(2)} {invoice.currency}</span>
+            <div className="flex justify-between py-3 text-lg font-bold border-b">
+              <span>Total ({invoice.currency})</span>
+              <span>{currencySymbol}{Number(invoice.amount).toFixed(2)}</span>
             </div>
+            {invoice.currency !== 'TZS' && invoice.amount_in_tzs && (
+              <div className="flex justify-between py-3 text-base font-medium text-muted-foreground">
+                <span>Equivalent (TZS)</span>
+                <span>TZS {Number(invoice.amount_in_tzs).toLocaleString()}</span>
+              </div>
+            )}
           </div>
         </div>
 

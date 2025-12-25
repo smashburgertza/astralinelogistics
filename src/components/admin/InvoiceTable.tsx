@@ -129,9 +129,16 @@ export function InvoiceTable({ invoices, isLoading }: InvoiceTableProps) {
                     )}
                   </TableCell>
                   <TableCell>
-                    <span className="font-medium">
-                      {currencySymbol}{Number(invoice.amount).toFixed(2)}
-                    </span>
+                    <div>
+                      <span className="font-medium">
+                        {currencySymbol}{Number(invoice.amount).toFixed(2)}
+                      </span>
+                      {invoice.currency !== 'TZS' && invoice.amount_in_tzs && (
+                        <p className="text-xs text-muted-foreground">
+                          ≈ TZS {Number(invoice.amount_in_tzs).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <InvoiceStatusBadge status={invoice.status || 'pending'} />
