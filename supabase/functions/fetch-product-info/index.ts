@@ -46,11 +46,28 @@ serve(async (req) => {
 
     const html = await pageResponse.text();
     
+    // Detect the site for targeted extraction
+    const urlLower = url.toLowerCase();
+    const isEbay = urlLower.includes('ebay.');
+    const isAmazon = urlLower.includes('amazon.');
+    const isAliExpress = urlLower.includes('aliexpress.');
+    const isEtsy = urlLower.includes('etsy.');
+    const isWalmart = urlLower.includes('walmart.');
+    const isTarget = urlLower.includes('target.');
+    const isBestBuy = urlLower.includes('bestbuy.');
+    
     // Try to extract price from structured data first (JSON-LD, meta tags)
     let extractedPrice: number | null = null;
     let extractedCurrency = 'USD';
     let extractedImage: string | null = null;
     let extractedName: string | null = null;
+    
+    // Detect currency from URL domain
+    if (urlLower.includes('.co.uk') || urlLower.includes('.uk')) extractedCurrency = 'GBP';
+    else if (urlLower.includes('.de') || urlLower.includes('.fr') || urlLower.includes('.it') || urlLower.includes('.es')) extractedCurrency = 'EUR';
+    else if (urlLower.includes('.cn') || urlLower.includes('.com.cn')) extractedCurrency = 'CNY';
+    else if (urlLower.includes('.in') || urlLower.includes('.co.in')) extractedCurrency = 'INR';
+    else if (urlLower.includes('.ae')) extractedCurrency = 'AED';
     
     // Look for JSON-LD structured data (most reliable)
     const jsonLdMatches = html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
@@ -75,7 +92,7 @@ serve(async (req) => {
               const offer = Array.isArray(offers) ? offers[0] : offers;
               if (offer.price) {
                 extractedPrice = parseFloat(String(offer.price).replace(/[^0-9.]/g, ''));
-                extractedCurrency = offer.priceCurrency || 'USD';
+                extractedCurrency = offer.priceCurrency || extractedCurrency;
                 console.log('Found price in JSON-LD:', extractedPrice, extractedCurrency);
               }
             }
@@ -83,6 +100,107 @@ serve(async (req) => {
         }
       } catch (e) {
         // JSON parsing failed, continue
+      }
+    }
+    
+    // SITE-SPECIFIC PRICE EXTRACTION
+    
+    // eBay-specific extraction
+    if (!extractedPrice && isEbay) {
+      console.log('Attempting eBay-specific price extraction...');
+      
+      // eBay price patterns (multiple formats)
+      const ebayPatterns = [
+        // Main price display patterns
+        /class="x-price-primary"[^>]*>[\s\S]*?<span[^>]*>([£$€]\s*[\d,]+\.?\d*)/i,
+        /class="x-bin-price"[^>]*>[\s\S]*?<span[^>]*>([£$€]\s*[\d,]+\.?\d*)/i,
+        /itemprop="price"[^>]*content="([\d.]+)"/i,
+        /"binPrice":\s*"?([\d.]+)"?/i,
+        /"price":\s*"?([\d.]+)"?/i,
+        /data-testid="x-price-primary"[^>]*>[\s\S]*?([£$€]\s*[\d,]+\.?\d*)/i,
+        /<span[^>]*class="[^"]*ux-textspans[^"]*"[^>]*>([£$€]\s*[\d,]+\.?\d*)<\/span>/i,
+        /class="display-price"[^>]*>([£$€]\s*[\d,]+\.?\d*)/i,
+        // BIN (Buy It Now) price
+        /"BIN_PRICE":"([£$€]?[\d,]+\.?\d*)"/i,
+        /"convertedBinPrice":"([£$€]?[\d,]+\.?\d*)"/i,
+        // Auction current price
+        /"currentPrice":\s*\{[^}]*"value":\s*([\d.]+)/i,
+        // Price in hidden inputs
+        /name="binPriceDouble"[^>]*value="([\d.]+)"/i,
+        // Generic price patterns with currency symbols
+        />([£$€]\s*[\d,]+\.?\d*)<\/span>/g,
+      ];
+      
+      for (const pattern of ebayPatterns) {
+        const match = html.match(pattern);
+        if (match) {
+          const priceStr = match[1].replace(/[£$€,\s]/g, '');
+          const price = parseFloat(priceStr);
+          if (price > 0 && price < 1000000) { // Sanity check
+            extractedPrice = price;
+            console.log('Found eBay price:', extractedPrice, 'from pattern:', pattern.source.substring(0, 50));
+            break;
+          }
+        }
+      }
+      
+      // Try to find currency from eBay page
+      if (html.includes('£') || urlLower.includes('.co.uk')) extractedCurrency = 'GBP';
+      else if (html.includes('€')) extractedCurrency = 'EUR';
+      else extractedCurrency = 'USD';
+    }
+    
+    // Amazon-specific extraction
+    if (!extractedPrice && isAmazon) {
+      console.log('Attempting Amazon-specific price extraction...');
+      
+      const amazonPatterns = [
+        // Price whole and fraction
+        /class="a-price-whole"[^>]*>([\d,]+)/i,
+        /class="a-offscreen"[^>]*>([£$€]\s*[\d,]+\.?\d*)/i,
+        /"priceAmount":\s*([\d.]+)/i,
+        /id="priceblock_ourprice"[^>]*>([£$€]\s*[\d,]+\.?\d*)/i,
+        /id="priceblock_dealprice"[^>]*>([£$€]\s*[\d,]+\.?\d*)/i,
+        /data-a-color="price"[^>]*>[\s\S]*?([£$€]\s*[\d,]+\.?\d*)/i,
+        /"buyingPrice":\s*([\d.]+)/i,
+      ];
+      
+      for (const pattern of amazonPatterns) {
+        const match = html.match(pattern);
+        if (match) {
+          const priceStr = match[1].replace(/[£$€,\s]/g, '');
+          const price = parseFloat(priceStr);
+          if (price > 0 && price < 1000000) {
+            extractedPrice = price;
+            console.log('Found Amazon price:', extractedPrice);
+            break;
+          }
+        }
+      }
+    }
+    
+    // AliExpress-specific extraction
+    if (!extractedPrice && isAliExpress) {
+      console.log('Attempting AliExpress-specific price extraction...');
+      
+      const aliPatterns = [
+        /"formatedActivityPrice":"([£$€]?\s*[\d,]+\.?\d*)"/i,
+        /"formatedPrice":"([£$€]?\s*[\d,]+\.?\d*)"/i,
+        /"minPrice":"([\d.]+)"/i,
+        /class="product-price-value"[^>]*>([£$€]?\s*[\d,]+\.?\d*)/i,
+      ];
+      
+      for (const pattern of aliPatterns) {
+        const match = html.match(pattern);
+        if (match) {
+          const priceStr = match[1].replace(/[£$€,\s]/g, '');
+          const price = parseFloat(priceStr);
+          if (price > 0) {
+            extractedPrice = price;
+            console.log('Found AliExpress price:', extractedPrice);
+            break;
+          }
+        }
       }
     }
     
@@ -116,10 +234,39 @@ serve(async (req) => {
       }
     }
     
+    // GENERIC FALLBACK - look for common price patterns in HTML
+    if (!extractedPrice) {
+      console.log('Attempting generic price pattern extraction...');
+      
+      const genericPatterns = [
+        // Currency symbol followed by numbers
+        /(?:price|cost|amount)[^>]*>[\s]*([£$€]\s*[\d,]+\.?\d*)/gi,
+        /class="[^"]*price[^"]*"[^>]*>[\s]*([£$€]\s*[\d,]+\.?\d*)/gi,
+        /id="[^"]*price[^"]*"[^>]*>[\s]*([£$€]\s*[\d,]+\.?\d*)/gi,
+        // Data attributes with price
+        /data-price="([\d.]+)"/i,
+        /data-product-price="([\d.]+)"/i,
+      ];
+      
+      for (const pattern of genericPatterns) {
+        const matches = html.matchAll(pattern);
+        for (const match of matches) {
+          const priceStr = match[1].replace(/[£$€,\s]/g, '');
+          const price = parseFloat(priceStr);
+          if (price > 0 && price < 100000) { // Reasonable price range
+            extractedPrice = price;
+            console.log('Found generic price:', extractedPrice);
+            break;
+          }
+        }
+        if (extractedPrice) break;
+      }
+    }
+    
     console.log('Pre-extracted data:', { extractedPrice, extractedCurrency, extractedImage, extractedName });
     
-    // Truncate HTML to avoid token limits (keep first 20000 chars for better context)
-    const truncatedHtml = html.substring(0, 20000);
+    // Truncate HTML to avoid token limits (keep first 30000 chars for better context)
+    const truncatedHtml = html.substring(0, 30000);
 
     // Use Lovable AI to extract product info with detailed weight reasoning
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -138,125 +285,95 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are an expert product analyst specializing in logistics and shipping weight estimation. Your task is to extract product information and ACCURATELY estimate the shipping weight in kilograms.
+            content: `You are an expert product analyst specializing in e-commerce price extraction and logistics. Your PRIMARY task is to extract the PRODUCT PRICE and estimate shipping weight.
 
-CRITICAL: You must reason about the actual product weight based on:
-1. Product category and type
-2. Dimensions if mentioned (length x width x height)
-3. Materials (metal, plastic, fabric, wood, glass, etc.)
-4. Any weight specifications on the page
-5. Similar products' typical weights
+## PRICE EXTRACTION - THIS IS CRITICAL
 
-WEIGHT ESTIMATION GUIDE (use these as reference, adjust based on actual product details):
+You MUST find the product price. Look for:
+
+1. **eBay prices**: Look for patterns like:
+   - "x-price-primary" class containing the price
+   - "binPrice" or "BIN_PRICE" in scripts
+   - "currentPrice" or "convertedPrice" 
+   - Price displays near "Buy It Now" or "Buy it now"
+   - Numbers with £, $, € symbols followed by amount
+
+2. **Amazon prices**: Look for:
+   - "a-price-whole" and "a-price-fraction" classes
+   - "priceblock_ourprice" or "priceblock_dealprice"
+   - "a-offscreen" spans with prices
+
+3. **General patterns**:
+   - JSON data with "price", "salePrice", "currentPrice", "amount"
+   - Microdata with itemprop="price"
+   - Meta tags with product:price:amount
+   - Classes containing "price", "cost", "amount"
+   - Currency symbols (£$€) followed by numbers
+
+## WEIGHT ESTIMATION GUIDE
+
+AUTOMOTIVE PARTS:
+- Car engine (complete): 150-300 kg
+- Engine block only: 50-150 kg
+- Transmission: 40-80 kg
+- Alternator: 5-10 kg
+- Starter motor: 3-8 kg
+- Radiator: 5-15 kg
+- Car door: 20-40 kg
+- Exhaust system: 15-30 kg
+- Wheels/tires: 10-25 kg each
+- Car seats: 15-30 kg each
+- Bumper: 5-15 kg
 
 ELECTRONICS:
 - Smartphone: 0.2-0.3 kg
-- Phone case/accessories: 0.1 kg
-- Earbuds/AirPods: 0.1 kg
-- Smartwatch: 0.1-0.2 kg
-- Tablet (iPad size): 0.5-0.8 kg
-- Laptop 13": 1.3-1.8 kg
-- Laptop 15-16": 1.8-2.5 kg
-- Gaming laptop: 2.5-3.5 kg
-- Monitor 24": 3-5 kg
-- Monitor 27"+: 5-8 kg
-- Desktop computer: 8-15 kg
-- TV 32": 5-7 kg
+- Laptop: 1.5-3 kg
 - TV 55": 15-20 kg
-- TV 65"+: 25-35 kg
-- Printer: 5-15 kg
 - Gaming console: 3-5 kg
-- Camera: 0.5-1.5 kg
-- Drone: 0.5-2 kg
 
-CLOTHING & FASHION:
-- T-shirt/Top: 0.2-0.3 kg
-- Dress shirt: 0.25-0.35 kg
+CLOTHING:
+- Shoes: 0.8-1.5 kg
+- Jacket: 0.5-1.5 kg
 - Jeans: 0.5-0.8 kg
-- Dress: 0.3-0.6 kg
-- Jacket (light): 0.5-1 kg
-- Winter coat: 1-2.5 kg
-- Suit: 1-1.5 kg
-- Sweater/Hoodie: 0.4-0.8 kg
-- Shoes (pair): 0.8-1.5 kg
-- Boots: 1.5-2.5 kg
-- Sneakers: 0.8-1.2 kg
-- Bag/Purse: 0.5-2 kg
-- Backpack: 0.8-1.5 kg
 
-HOME & KITCHEN:
-- Small appliance (blender, toaster): 1-3 kg
-- Microwave: 10-15 kg
-- Coffee machine: 3-8 kg
-- Air fryer: 4-7 kg
-- Vacuum cleaner: 3-8 kg
-- Robot vacuum: 3-5 kg
-- Cookware set: 5-15 kg
-- Single pot/pan: 1-3 kg
-- Dishes set: 5-10 kg
-- Bedding/Sheets: 2-4 kg
-- Pillows: 0.5-1 kg each
-- Towels: 0.5-1 kg each
-- Small furniture: 10-30 kg
-- Chair: 5-15 kg
-- Table: 15-50 kg
+## OUTPUT FORMAT
 
-SPORTS & FITNESS:
-- Yoga mat: 1-2 kg
-- Dumbbells (pair): actual weight + 0.5 kg packaging
-- Bicycle: 10-15 kg
-- Treadmill: 50-100 kg
-- Sports equipment: 0.5-5 kg
-
-BOOKS & MEDIA:
-- Paperback book: 0.2-0.4 kg
-- Hardcover book: 0.5-1 kg
-- Textbook: 1-2 kg
-
-TOYS & GAMES:
-- Action figure: 0.1-0.3 kg
-- Board game: 0.5-2 kg
-- LEGO set (small): 0.3-1 kg
-- LEGO set (large): 2-5 kg
-- Video game: 0.1 kg
-
-BEAUTY & PERSONAL CARE:
-- Perfume/Cologne: 0.2-0.5 kg
-- Makeup set: 0.3-1 kg
-- Skincare products: 0.2-0.5 kg
-- Hair dryer: 0.5-1 kg
-
-Always round up to ensure safe shipping estimates. If the page shows actual weight, USE THAT VALUE.
-
-IMPORTANT: Return ONLY valid JSON, no markdown or extra text. Use this exact format:
+Return ONLY valid JSON:
 {
-  "product_name": "string - the full product name",
-  "product_description": "string - a brief 1-2 sentence description of the product",
-  "product_image": "string or null - the main product image URL (look for og:image, product images, or main image)",
-  "product_price": number or null - price as a number without currency symbols,
-  "currency": "string - 3 letter currency code (USD, EUR, GBP, AED, CNY, INR, TZS)",
-  "estimated_weight_kg": number - weight in kg rounded UP to nearest whole number (minimum 1),
-  "weight_reasoning": "string - brief explanation of how you estimated the weight"
+  "product_name": "full product name",
+  "product_description": "1-2 sentence description",
+  "product_image": "main image URL or null",
+  "product_price": number (WITHOUT currency symbol) or null,
+  "currency": "GBP/USD/EUR/etc",
+  "estimated_weight_kg": number (rounded UP, minimum 1),
+  "weight_reasoning": "brief explanation"
 }
 
-CRITICAL RULES:
-1. If page shows actual weight (in kg, lbs, g, oz), convert to kg and use that
-2. ALWAYS round UP to the nearest whole kilogram (e.g., 0.3 kg → 1 kg, 1.2 kg → 2 kg)
-3. Minimum weight is 1 kg
-4. When in doubt, estimate higher rather than lower for shipping safety
-5. For product_image, look for: og:image meta tag, itemprop="image", product gallery images, or any prominent product photo URL`
+CRITICAL: 
+- product_price MUST be a number, not a string
+- Search the ENTIRE HTML for price data, including script tags and data attributes
+- For eBay UK, prices are in GBP (£)
+- For eBay US, prices are in USD ($)
+- If you find ANY price mention, extract it`
           },
           {
             role: 'user',
-            content: `Analyze this product page and extract information. Pay special attention to finding the actual weight if listed, otherwise reason about what this specific product should weigh.
+            content: `EXTRACT THE PRICE from this product page. This is from ${isEbay ? 'eBay' : isAmazon ? 'Amazon' : 'an e-commerce site'}.
 
-${extractedPrice ? `IMPORTANT: We already extracted a price of ${extractedPrice} ${extractedCurrency} from structured data. Use this unless you find a more accurate price.` : 'IMPORTANT: Try hard to find the product price on the page.'}
-${extractedName ? `Product name hint: ${extractedName}` : ''}
-${extractedImage ? `Product image hint: ${extractedImage}` : ''}
+${extractedPrice ? `HINT: We may have found price ${extractedPrice} ${extractedCurrency} - verify this or find correct price.` : 'WARNING: We could not extract the price automatically. You MUST find it in the HTML.'}
+${extractedName ? `Product: ${extractedName}` : ''}
+${extractedImage ? `Image: ${extractedImage}` : ''}
+
+Look carefully for price patterns like:
+- "price": followed by number
+- £ or $ or € followed by numbers  
+- "BIN_PRICE", "binPrice", "currentPrice"
+- class="price" or similar
+- data-price attributes
 
 URL: ${url}
 
-HTML Content:
+HTML (search thoroughly for price):
 ${truncatedHtml}`
           }
         ],
