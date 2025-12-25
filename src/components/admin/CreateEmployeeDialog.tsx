@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus } from 'lucide-react';
+import { Plus, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -29,7 +29,9 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 import { useCreateEmployee, EMPLOYEE_ROLES, PERMISSIONS } from '@/hooks/useEmployees';
+import { usePermissionTemplates } from '@/components/admin/PermissionTemplatesSection';
 
 const formSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -46,6 +48,7 @@ type FormValues = z.infer<typeof formSchema>;
 export function CreateEmployeeDialog() {
   const [open, setOpen] = useState(false);
   const createEmployee = useCreateEmployee();
+  const { templates } = usePermissionTemplates();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -59,6 +62,17 @@ export function CreateEmployeeDialog() {
       permissions: PERMISSIONS.reduce((acc, p) => ({ ...acc, [p.key]: false }), {}),
     },
   });
+
+  const applyTemplate = (templateId: string) => {
+    const template = templates.find(t => t.id === templateId);
+    if (template) {
+      const newPermissions = PERMISSIONS.reduce((acc, p) => ({
+        ...acc,
+        [p.key]: template.permissions[p.key] || false,
+      }), {} as Record<string, boolean>);
+      form.setValue('permissions', newPermissions);
+    }
+  };
 
   const onSubmit = async (values: FormValues) => {
     await createEmployee.mutateAsync({
@@ -189,7 +203,30 @@ export function CreateEmployeeDialog() {
 
             {!form.watch('isSuperAdmin') && (
               <div className="space-y-3">
-                <FormLabel>Permissions</FormLabel>
+                <div className="flex items-center justify-between">
+                  <FormLabel>Permissions</FormLabel>
+                </div>
+                
+                {/* Quick Apply Templates */}
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Zap className="h-3 w-3" />
+                    Quick apply a template:
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    {templates.map((template) => (
+                      <Badge
+                        key={template.id}
+                        variant="outline"
+                        className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors"
+                        onClick={() => applyTemplate(template.id)}
+                      >
+                        {template.name}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="grid gap-2 rounded-lg border p-3">
                   {PERMISSIONS.map((permission) => (
                     <FormField

@@ -1,4 +1,4 @@
-import { Users, ShieldCheck, Shield, FileText, Settings2 } from 'lucide-react';
+import { Users, ShieldCheck, Shield, FileText, Settings2, Key } from 'lucide-react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -7,6 +7,7 @@ import { EmployeeTable } from '@/components/admin/EmployeeTable';
 import { CreateEmployeeDialog } from '@/components/admin/CreateEmployeeDialog';
 import { AuditLogTable } from '@/components/admin/AuditLogTable';
 import { CustomRolesSection } from '@/components/admin/CustomRolesSection';
+import { PermissionTemplatesSection } from '@/components/admin/PermissionTemplatesSection';
 import { useEmployees } from '@/hooks/useEmployees';
 
 export default function AdminEmployeesPage() {
@@ -47,6 +48,10 @@ export default function AdminEmployeesPage() {
               <Settings2 className="h-4 w-4" />
               Custom Roles
             </TabsTrigger>
+            <TabsTrigger value="templates" className="gap-2">
+              <Key className="h-4 w-4" />
+              Permission Templates
+            </TabsTrigger>
             <TabsTrigger value="audit" className="gap-2">
               <FileText className="h-4 w-4" />
               Audit Logs
@@ -67,6 +72,10 @@ export default function AdminEmployeesPage() {
 
           <TabsContent value="roles">
             <CustomRolesSection />
+          </TabsContent>
+
+          <TabsContent value="templates">
+            <PermissionTemplatesSection />
           </TabsContent>
 
           <TabsContent value="audit">
