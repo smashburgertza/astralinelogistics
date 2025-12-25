@@ -54,15 +54,15 @@
 
     --radius: 0.5rem;
 
-    /* Dashboard specific */
-    --sidebar-background: 202 74% 28%;
-    --sidebar-foreground: 202 15% 90%;
-    --sidebar-primary: 42 92% 60%;
+    /* Dashboard specific - Modern white sidebar */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 210 25% 35%;
+    --sidebar-primary: 202 74% 46%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 202 70% 38%;
-    --sidebar-accent-foreground: 202 15% 90%;
-    --sidebar-border: 202 65% 38%;
-    --sidebar-ring: 42 92% 60%;
+    --sidebar-accent: 202 74% 96%;
+    --sidebar-accent-foreground: 202 74% 46%;
+    --sidebar-border: 202 20% 92%;
+    --sidebar-ring: 202 74% 46%;
 
     /* Status colors */
     --status-collected: 202 74% 50%;
