@@ -11,6 +11,30 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DollarSign, TrendingUp, Clock, CheckCircle, AlertCircle, Coins } from 'lucide-react';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+
+const CHART_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4'];
+
+const CurrencyTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="bg-background/95 backdrop-blur-md border rounded-lg p-3 shadow-xl">
+        <p className="font-semibold">{data.currency}</p>
+        <p className="text-sm text-muted-foreground">
+          {data.symbol}{data.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+        </p>
+        <p className="text-xs text-primary font-medium">
+          ≈ TZS {data.amountInTzs.toLocaleString()}
+        </p>
+        <p className="text-xs text-muted-foreground mt-1">
+          {data.percentage.toFixed(1)}% of total
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
 
 export default function AdminExpensesPage() {
   const [search, setSearch] = useState('');
@@ -102,7 +126,7 @@ export default function AdminExpensesPage() {
         />
       </div>
 
-      {/* Currency Summary Widget */}
+      {/* Currency Summary Widget with Pie Chart */}
       {currencyBreakdown.length > 0 && (
         <Card className="mb-6 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
           <CardHeader className="pb-3">
@@ -112,25 +136,73 @@ export default function AdminExpensesPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              {currencyBreakdown.map(({ currency, amount, amountInTzs, symbol }) => (
-                <div 
-                  key={currency} 
-                  className="bg-background/80 rounded-lg p-3 border shadow-sm"
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <Badge variant="outline" className="text-xs font-mono">
-                      {currency}
-                    </Badge>
-                  </div>
-                  <p className="text-lg font-bold">
-                    {symbol}{amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    ≈ TZS {amountInTzs.toLocaleString()}
-                  </p>
+            <div className="flex flex-col lg:flex-row gap-6">
+              {/* Pie Chart */}
+              <div className="flex-shrink-0 flex flex-col items-center">
+                <ResponsiveContainer width={180} height={180}>
+                  <PieChart>
+                    <Pie
+                      data={currencyBreakdown.map((item, index) => ({
+                        ...item,
+                        percentage: (item.amountInTzs / totalInTzs) * 100,
+                        fill: CHART_COLORS[index % CHART_COLORS.length],
+                      }))}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={2}
+                      dataKey="amountInTzs"
+                      strokeWidth={0}
+                    >
+                      {currencyBreakdown.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<CurrencyTooltip />} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex flex-wrap justify-center gap-2 mt-2">
+                  {currencyBreakdown.map((item, index) => (
+                    <div key={item.currency} className="flex items-center gap-1.5 text-xs">
+                      <span 
+                        className="w-2.5 h-2.5 rounded-full" 
+                        style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }} 
+                      />
+                      <span className="font-medium">{item.currency}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
+
+              {/* Currency Cards */}
+              <div className="flex-1 grid grid-cols-2 md:grid-cols-3 gap-3">
+                {currencyBreakdown.map(({ currency, amount, amountInTzs, symbol }, index) => (
+                  <div 
+                    key={currency} 
+                    className="bg-background/80 rounded-lg p-3 border shadow-sm relative overflow-hidden"
+                  >
+                    <div 
+                      className="absolute top-0 left-0 h-1 w-full" 
+                      style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
+                    />
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge variant="outline" className="text-xs font-mono">
+                        {currency}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {((amountInTzs / totalInTzs) * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                    <p className="text-lg font-bold">
+                      {symbol}{amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      ≈ TZS {amountInTzs.toLocaleString()}
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
             <div className="mt-4 pt-4 border-t flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Total in TZS</span>
