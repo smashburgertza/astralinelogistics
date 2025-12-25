@@ -1,14 +1,17 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
 import { 
-  Users, TrendingUp, FileText, Package, 
-  DollarSign, Award, Target
+  Users, FileText, Package, 
+  DollarSign, Award, Eye, Mail, BarChart3
 } from 'lucide-react';
-import { format, subDays, startOfDay, endOfDay } from 'date-fns';
+import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
 
 interface EmployeeMetrics {
   userId: string;
@@ -197,7 +200,7 @@ export function EmployeePerformanceInsights() {
               const activityPercent = (totalActivity / maxActivity) * 100;
 
               return (
-                <div key={employee.userId} className="group">
+                <div key={employee.userId} className="group p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="relative">
                       <Avatar className="h-10 w-10 border-2 border-background shadow-md">
@@ -223,19 +226,73 @@ export function EmployeePerformanceInsights() {
                       <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
                         <span className="flex items-center gap-1">
                           <FileText className="w-3 h-3" />
-                          {employee.estimatesCreated} estimates
+                          {employee.estimatesCreated}
                         </span>
                         <span className="flex items-center gap-1">
                           <DollarSign className="w-3 h-3" />
-                          {employee.invoicesIssued} invoices
+                          {employee.invoicesIssued}
                         </span>
                         <span className="flex items-center gap-1">
                           <Package className="w-3 h-3" />
-                          {employee.shipmentsHandled} shipments
+                          {employee.shipmentsHandled}
                         </span>
                       </div>
                     </div>
-                    <div className="text-right">
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              asChild
+                            >
+                              <Link to="/admin/employees">
+                                <Eye className="h-3.5 w-3.5" />
+                              </Link>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">View Details</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => {
+                                window.location.href = `mailto:${employee.email}`;
+                                toast.success('Opening email client...');
+                              }}
+                            >
+                              <Mail className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">Send Email</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              asChild
+                            >
+                              <Link to="/admin/reports">
+                                <BarChart3 className="h-3.5 w-3.5" />
+                              </Link>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">View Reports</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                    <div className="text-right shrink-0">
                       <p className="text-sm font-semibold text-emerald-600">
                         TZS {employee.revenueGenerated.toLocaleString()}
                       </p>
