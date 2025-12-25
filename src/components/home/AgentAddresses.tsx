@@ -54,21 +54,21 @@ export function AgentAddresses() {
         {/* Section Header */}
         <div 
           ref={headerRef}
-          className={cn("text-center mb-16 scroll-animate", headerVisible && "visible")}
+          className={cn("text-center mb-10 sm:mb-16 scroll-animate", headerVisible && "visible")}
         >
-          <span className="inline-block px-4 py-2 rounded-full bg-primary/20 text-primary font-semibold text-sm uppercase tracking-wide mb-4">
+          <span className="inline-block px-3 sm:px-4 py-2 rounded-full bg-primary/20 text-primary font-semibold text-xs sm:text-sm uppercase tracking-wide mb-4">
             Global Network
           </span>
-          <h2 className="font-heading text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-4">
+          <h2 className="font-heading text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-4">
             Agent Delivery Addresses
           </h2>
-          <p className="text-white/70 max-w-2xl mx-auto text-lg">
+          <p className="text-white/70 max-w-2xl mx-auto text-sm sm:text-base lg:text-lg px-4">
             Send your goods to our trusted agents in these locations. We&apos;ll handle collection, consolidation, and shipping to Tanzania.
           </p>
         </div>
 
         {/* Addresses Grid */}
-        <div ref={gridRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div ref={gridRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
           {addresses.map((address, index) => {
             const regionInfo = REGIONS[address.region];
             return (

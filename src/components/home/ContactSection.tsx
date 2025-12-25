@@ -145,20 +145,20 @@ export function ContactSection() {
         {/* Section Header */}
         <div 
           ref={headerRef}
-          className={cn("text-center mb-16 scroll-animate", headerVisible && "visible")}
+          className={cn("text-center mb-10 sm:mb-16 scroll-animate", headerVisible && "visible")}
         >
-          <span className="inline-block px-4 py-2 rounded-full bg-primary/10 text-primary font-semibold text-sm uppercase tracking-wide mb-4">
+          <span className="inline-block px-3 sm:px-4 py-2 rounded-full bg-primary/10 text-primary font-semibold text-xs sm:text-sm uppercase tracking-wide mb-4">
             {pageContent?.subtitle || 'Get In Touch'}
           </span>
-          <h2 className="font-heading text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4">
+          <h2 className="font-heading text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4">
             {pageContent?.title || 'Contact'} <span className="text-primary">Us</span>
           </h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
+          <p className="text-muted-foreground max-w-2xl mx-auto text-sm sm:text-base lg:text-lg px-4">
             {pageContent?.description || "Have questions about our services? Need a quote? We're here to help."}
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-12">
+        <div className="grid lg:grid-cols-3 gap-8 lg:gap-12">
           {/* Contact Info */}
           <div 
             ref={leftRef}
@@ -190,10 +190,10 @@ export function ContactSection() {
             ref={rightRef}
             className={cn("lg:col-span-2 scroll-animate-right", rightVisible && "visible")}
           >
-            <div className="bg-card border border-border rounded-2xl p-8 shadow-lg">
-              <h3 className="font-heading text-xl font-bold mb-6">Send Us a Message</h3>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid sm:grid-cols-2 gap-6">
+            <div className="bg-card border border-border rounded-xl sm:rounded-2xl p-5 sm:p-8 shadow-lg">
+              <h3 className="font-heading text-lg sm:text-xl font-bold mb-4 sm:mb-6">Send Us a Message</h3>
+              <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="contact-name">Full Name *</Label>
                     <Input
@@ -221,9 +221,9 @@ export function ContactSection() {
                   </div>
                 </div>
 
-                <div className="grid sm:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="contact-phone">Phone Number</Label>
+                    <Label htmlFor="contact-phone" className="text-sm">Phone Number</Label>
                     <Input
                       id="contact-phone"
                       name="phone"

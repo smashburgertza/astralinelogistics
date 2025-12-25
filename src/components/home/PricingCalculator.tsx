@@ -52,37 +52,37 @@ export function PricingCalculator() {
   return (
     <section className="section-padding bg-muted/50 overflow-hidden">
       <div className="container mx-auto px-4">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
+        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
           {/* Left Content */}
           <div
             ref={leftRef}
-            className={cn("scroll-animate-left", leftVisible && "visible")}
+            className={cn("scroll-animate-left text-center lg:text-left", leftVisible && "visible")}
           >
-            <span className="inline-block px-4 py-2 rounded-full bg-primary/10 text-primary font-semibold text-sm uppercase tracking-wide mb-4">
+            <span className="inline-block px-3 sm:px-4 py-2 rounded-full bg-primary/10 text-primary font-semibold text-xs sm:text-sm uppercase tracking-wide mb-4">
               Pricing
             </span>
-            <h2 className="font-heading text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-6">
+            <h2 className="font-heading text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4 sm:mb-6">
               Get an Instant{' '}
               <span className="text-primary">Quote</span>
             </h2>
-            <p className="text-muted-foreground text-lg mb-8 leading-relaxed">
+            <p className="text-muted-foreground text-sm sm:text-base lg:text-lg mb-6 sm:mb-8 leading-relaxed max-w-xl mx-auto lg:mx-0">
               Enter your shipment details to get an instant estimate. Our transparent pricing means no hidden fees – what you see is what you pay.
             </p>
             
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-2 gap-4 sm:gap-6 max-w-sm mx-auto lg:mx-0">
               <div 
-                className={cn("p-4 bg-white rounded-xl shadow-sm scroll-animate", leftVisible && "visible")}
+                className={cn("p-3 sm:p-4 bg-white rounded-xl shadow-sm scroll-animate", leftVisible && "visible")}
                 style={{ transitionDelay: '200ms' }}
               >
-                <p className="text-3xl font-bold text-brand-navy mb-1">6</p>
-                <p className="text-sm text-muted-foreground">Origin Countries</p>
+                <p className="text-2xl sm:text-3xl font-bold text-brand-navy mb-1">6</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Origin Countries</p>
               </div>
               <div 
-                className={cn("p-4 bg-white rounded-xl shadow-sm scroll-animate", leftVisible && "visible")}
+                className={cn("p-3 sm:p-4 bg-white rounded-xl shadow-sm scroll-animate", leftVisible && "visible")}
                 style={{ transitionDelay: '300ms' }}
               >
-                <p className="text-3xl font-bold text-brand-navy mb-1">5+</p>
-                <p className="text-sm text-muted-foreground">Years Experience</p>
+                <p className="text-2xl sm:text-3xl font-bold text-brand-navy mb-1">5+</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Years Experience</p>
               </div>
             </div>
           </div>
@@ -91,22 +91,22 @@ export function PricingCalculator() {
           <div 
             ref={rightRef}
             className={cn(
-              "bg-white rounded-2xl shadow-2xl p-8 border border-border/50 scroll-animate-right",
+              "bg-white rounded-xl sm:rounded-2xl shadow-xl sm:shadow-2xl p-5 sm:p-8 border border-border/50 scroll-animate-right",
               rightVisible && "visible"
             )}
             style={{ transitionDelay: '150ms' }}
           >
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center">
-                <Calculator className="w-6 h-6 text-primary-foreground" />
+            <div className="flex items-center gap-3 mb-5 sm:mb-6">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-primary flex items-center justify-center">
+                <Calculator className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
               </div>
               <div>
-                <h3 className="font-heading text-xl font-semibold">Shipping Calculator</h3>
-                <p className="text-sm text-muted-foreground">Estimate your shipping cost</p>
+                <h3 className="font-heading text-lg sm:text-xl font-semibold">Shipping Calculator</h3>
+                <p className="text-xs sm:text-sm text-muted-foreground">Estimate your shipping cost</p>
               </div>
             </div>
 
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="origin" className="text-sm font-medium">Origin Region</Label>
                 <Select value={region} onValueChange={(v) => setRegion(v as Region)}>

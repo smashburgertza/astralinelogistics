@@ -130,12 +130,12 @@ export function ShopForMeSection() {
         {/* How It Works - Steps */}
         <div 
           ref={stepsRef}
-          className={cn("mb-20 scroll-animate", stepsVisible && "visible")}
+          className={cn("mb-12 sm:mb-20 scroll-animate", stepsVisible && "visible")}
         >
-          <h3 className="text-2xl md:text-3xl font-bold text-center text-foreground mb-12">
+          <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-center text-foreground mb-8 sm:mb-12">
             How It Works
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
             {steps.map((step, index) => (
               <div 
                 key={step.title}
@@ -170,24 +170,24 @@ export function ShopForMeSection() {
         {/* Features */}
         <div 
           ref={featuresRef}
-          className={cn("mb-16 scroll-animate", featuresVisible && "visible")}
+          className={cn("mb-12 sm:mb-16 scroll-animate", featuresVisible && "visible")}
         >
-          <div className="bg-primary/5 border border-primary/10 rounded-3xl p-8 md:p-12">
-            <h3 className="text-2xl font-bold text-center text-foreground mb-8">
+          <div className="bg-primary/5 border border-primary/10 rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-12">
+            <h3 className="text-xl sm:text-2xl font-bold text-center text-foreground mb-6 sm:mb-8">
               Why Use Shop For Me?
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8">
               {features.map((feature, index) => (
                 <div 
                   key={feature.title}
                   className="text-center"
                   style={{ animationDelay: `${index * 100}ms` }}
                 >
-                  <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <feature.icon className="w-7 h-7 text-primary" />
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 bg-primary/10 rounded-xl sm:rounded-2xl flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                    <feature.icon className="w-6 h-6 sm:w-7 sm:h-7 text-primary" />
                   </div>
-                  <h4 className="text-lg font-semibold text-foreground mb-2">{feature.title}</h4>
-                  <p className="text-muted-foreground text-sm">{feature.description}</p>
+                  <h4 className="text-base sm:text-lg font-semibold text-foreground mb-2">{feature.title}</h4>
+                  <p className="text-muted-foreground text-xs sm:text-sm">{feature.description}</p>
                 </div>
               ))}
             </div>
