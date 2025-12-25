@@ -4,7 +4,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from 'date-fns';
 import { 
-  Plus, FileText, ArrowRight, Trash2, CheckCircle, XCircle, Clock
+  Plus, FileText, ArrowRight, Trash2, CheckCircle, XCircle, Clock,
+  Package, Truck
 } from 'lucide-react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -60,12 +61,15 @@ import {
   useUpdateEstimateStatus,
   useConvertEstimateToInvoice,
   useDeleteEstimate,
+  ESTIMATE_TYPES,
+  type EstimateType,
 } from '@/hooks/useEstimates';
 import { useCustomers, useShipments } from '@/hooks/useShipments';
 import { useRegionPricing } from '@/hooks/useRegionPricing';
 import { REGIONS, CURRENCY_SYMBOLS } from '@/lib/constants';
 
 const estimateSchema = z.object({
+  estimate_type: z.enum(['shipping', 'purchase_shipping']).default('shipping'),
   customer_id: z.string().min(1, 'Customer is required'),
   shipment_id: z.string().optional(),
   origin_region: z.string().min(1, 'Origin region is required'),
@@ -75,6 +79,8 @@ const estimateSchema = z.object({
   currency: z.string().default('USD'),
   notes: z.string().optional(),
   valid_days: z.coerce.number().min(1).default(30),
+  product_cost: z.coerce.number().min(0).default(0),
+  purchase_fee: z.coerce.number().min(0).default(0),
 });
 
 const STATUS_CONFIG = {
@@ -98,6 +104,7 @@ export default function EstimatesPage() {
   const form = useForm({
     resolver: zodResolver(estimateSchema),
     defaultValues: {
+      estimate_type: 'shipping' as EstimateType,
       customer_id: '',
       shipment_id: '',
       origin_region: '',
@@ -107,14 +114,19 @@ export default function EstimatesPage() {
       currency: 'USD',
       notes: '',
       valid_days: 30,
+      product_cost: 0,
+      purchase_fee: 0,
     },
   });
 
+  const estimateType = form.watch('estimate_type');
   const selectedRegion = form.watch('origin_region');
   const selectedShipment = form.watch('shipment_id');
   const weightKg = form.watch('weight_kg');
   const ratePerKg = form.watch('rate_per_kg');
   const handlingFee = form.watch('handling_fee');
+  const productCost = form.watch('product_cost');
+  const purchaseFee = form.watch('purchase_fee');
 
   // Auto-fill rate when region changes
   useMemo(() => {
@@ -142,9 +154,11 @@ export default function EstimatesPage() {
   }, [selectedShipment, shipments]);
 
   const calculatedTotal = useMemo(() => {
-    const subtotal = weightKg * ratePerKg;
-    return subtotal + handlingFee;
-  }, [weightKg, ratePerKg, handlingFee]);
+    const shippingSubtotal = weightKg * ratePerKg;
+    const totalProductCost = estimateType === 'purchase_shipping' ? productCost : 0;
+    const totalPurchaseFee = estimateType === 'purchase_shipping' ? purchaseFee : 0;
+    return shippingSubtotal + handlingFee + totalProductCost + totalPurchaseFee;
+  }, [weightKg, ratePerKg, handlingFee, productCost, purchaseFee, estimateType]);
 
   const onSubmit = async (data: z.infer<typeof estimateSchema>) => {
     await createEstimate.mutateAsync({
@@ -157,6 +171,9 @@ export default function EstimatesPage() {
       currency: data.currency,
       notes: data.notes,
       valid_days: data.valid_days,
+      estimate_type: data.estimate_type as EstimateType,
+      product_cost: data.estimate_type === 'purchase_shipping' ? data.product_cost : 0,
+      purchase_fee: data.estimate_type === 'purchase_shipping' ? data.purchase_fee : 0,
     });
     form.reset();
     setDialogOpen(false);
@@ -201,6 +218,52 @@ export default function EstimatesPage() {
               </DialogHeader>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  {/* Estimate Type Selector */}
+                  <FormField
+                    control={form.control}
+                    name="estimate_type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Estimate Type</FormLabel>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div
+                            className={`cursor-pointer rounded-lg border-2 p-3 transition-all ${
+                              field.value === 'shipping'
+                                ? 'border-primary bg-primary/5'
+                                : 'border-border hover:border-muted-foreground/50'
+                            }`}
+                            onClick={() => field.onChange('shipping')}
+                          >
+                            <div className="flex items-center gap-2">
+                              <Truck className="h-5 w-5 text-primary" />
+                              <span className="font-medium">Shipping Only</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Freight and handling charges
+                            </p>
+                          </div>
+                          <div
+                            className={`cursor-pointer rounded-lg border-2 p-3 transition-all ${
+                              field.value === 'purchase_shipping'
+                                ? 'border-primary bg-primary/5'
+                                : 'border-border hover:border-muted-foreground/50'
+                            }`}
+                            onClick={() => field.onChange('purchase_shipping')}
+                          >
+                            <div className="flex items-center gap-2">
+                              <Package className="h-5 w-5 text-amber-500" />
+                              <span className="font-medium">Purchase + Shipping</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Product cost plus freight
+                            </p>
+                          </div>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
                   <FormField
                     control={form.control}
                     name="shipment_id"
@@ -347,9 +410,54 @@ export default function EstimatesPage() {
                     />
                   </div>
 
+                  {/* Purchase Cost Fields - Only for purchase_shipping */}
+                  {estimateType === 'purchase_shipping' && (
+                    <div className="grid grid-cols-2 gap-4 p-4 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                      <FormField
+                        control={form.control}
+                        name="product_cost"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Product Cost</FormLabel>
+                            <FormControl>
+                              <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="purchase_fee"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Purchase/Sourcing Fee</FormLabel>
+                            <FormControl>
+                              <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  )}
+
                   <div className="p-4 bg-muted rounded-lg">
-                    <div className="flex justify-between text-sm">
-                      <span>Subtotal ({weightKg} kg × {ratePerKg})</span>
+                    {estimateType === 'purchase_shipping' && (
+                      <>
+                        <div className="flex justify-between text-sm">
+                          <span>Product Cost</span>
+                          <span>{CURRENCY_SYMBOLS[form.watch('currency')] || '$'}{productCost.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm mt-1">
+                          <span>Purchase Fee</span>
+                          <span>{CURRENCY_SYMBOLS[form.watch('currency')] || '$'}{purchaseFee.toFixed(2)}</span>
+                        </div>
+                      </>
+                    )}
+                    <div className="flex justify-between text-sm mt-1">
+                      <span>Shipping ({weightKg} kg × {ratePerKg})</span>
                       <span>{CURRENCY_SYMBOLS[form.watch('currency')] || '$'}{(weightKg * ratePerKg).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-sm mt-1">
@@ -409,6 +517,7 @@ export default function EstimatesPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Estimate #</TableHead>
+                  <TableHead>Type</TableHead>
                   <TableHead>Customer</TableHead>
                   <TableHead>Region</TableHead>
                   <TableHead>Weight</TableHead>
@@ -421,7 +530,7 @@ export default function EstimatesPage() {
               <TableBody>
                 {estimates?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                       No estimates yet. Create your first estimate.
                     </TableCell>
                   </TableRow>
@@ -430,6 +539,15 @@ export default function EstimatesPage() {
                     <TableRow key={estimate.id}>
                       <TableCell className="font-mono font-medium">
                         {estimate.estimate_number}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={estimate.estimate_type === 'purchase_shipping' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'}>
+                          {estimate.estimate_type === 'purchase_shipping' ? (
+                            <><Package className="h-3 w-3 mr-1" /> Purchase</>
+                          ) : (
+                            <><Truck className="h-3 w-3 mr-1" /> Shipping</>
+                          )}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         {estimate.customers?.name || '-'}

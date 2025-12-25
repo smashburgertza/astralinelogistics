@@ -4,12 +4,22 @@ import { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/type
 import { toast } from 'sonner';
 import { createInvoicePaymentJournalEntry, createInvoiceJournalEntry } from '@/lib/journalEntryUtils';
 
+export type InvoiceType = 'shipping' | 'purchase_shipping';
+
 export type Invoice = Tables<'invoices'> & {
   customers?: Tables<'customers'> | null;
   shipments?: Tables<'shipments'> | null;
   amount_in_tzs?: number | null;
   payment_currency?: string | null;
+  invoice_type?: InvoiceType;
+  product_cost?: number;
+  purchase_fee?: number;
 };
+
+export const INVOICE_TYPES = {
+  shipping: { label: 'Shipping', description: 'Freight and handling charges only' },
+  purchase_shipping: { label: 'Purchase + Shipping', description: 'Product purchase plus freight charges' },
+} as const;
 
 export function useInvoices(filters?: {
   status?: string;

@@ -489,10 +489,13 @@ export type Database = {
           currency: string | null
           customer_id: string | null
           estimate_number: string
+          estimate_type: string
           handling_fee: number | null
           id: string
           notes: string | null
           origin_region: Database["public"]["Enums"]["agent_region"]
+          product_cost: number | null
+          purchase_fee: number | null
           rate_per_kg: number
           shipment_id: string | null
           status: string | null
@@ -507,10 +510,13 @@ export type Database = {
           currency?: string | null
           customer_id?: string | null
           estimate_number: string
+          estimate_type?: string
           handling_fee?: number | null
           id?: string
           notes?: string | null
           origin_region: Database["public"]["Enums"]["agent_region"]
+          product_cost?: number | null
+          purchase_fee?: number | null
           rate_per_kg: number
           shipment_id?: string | null
           status?: string | null
@@ -525,10 +531,13 @@ export type Database = {
           currency?: string | null
           customer_id?: string | null
           estimate_number?: string
+          estimate_type?: string
           handling_fee?: number | null
           id?: string
           notes?: string | null
           origin_region?: Database["public"]["Enums"]["agent_region"]
+          product_cost?: number | null
+          purchase_fee?: number | null
           rate_per_kg?: number
           shipment_id?: string | null
           status?: string | null
@@ -673,10 +682,13 @@ export type Database = {
           estimate_id: string | null
           id: string
           invoice_number: string
+          invoice_type: string
           notes: string | null
           paid_at: string | null
           payment_currency: string | null
           payment_method: string | null
+          product_cost: number | null
+          purchase_fee: number | null
           shipment_id: string | null
           status: string | null
           stripe_payment_id: string | null
@@ -692,10 +704,13 @@ export type Database = {
           estimate_id?: string | null
           id?: string
           invoice_number: string
+          invoice_type?: string
           notes?: string | null
           paid_at?: string | null
           payment_currency?: string | null
           payment_method?: string | null
+          product_cost?: number | null
+          purchase_fee?: number | null
           shipment_id?: string | null
           status?: string | null
           stripe_payment_id?: string | null
@@ -711,10 +726,13 @@ export type Database = {
           estimate_id?: string | null
           id?: string
           invoice_number?: string
+          invoice_type?: string
           notes?: string | null
           paid_at?: string | null
           payment_currency?: string | null
           payment_method?: string | null
+          product_cost?: number | null
+          purchase_fee?: number | null
           shipment_id?: string | null
           status?: string | null
           stripe_payment_id?: string | null

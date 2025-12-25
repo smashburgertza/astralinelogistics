@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+export type EstimateType = 'shipping' | 'purchase_shipping';
+
 export interface Estimate {
   id: string;
   estimate_number: string;
@@ -19,9 +21,17 @@ export interface Estimate {
   valid_until: string | null;
   created_at: string;
   created_by: string | null;
+  estimate_type: EstimateType;
+  product_cost: number;
+  purchase_fee: number;
   customers?: { id: string; name: string; email: string | null; company_name: string | null } | null;
   shipments?: { id: string; tracking_number: string; total_weight_kg: number } | null;
 }
+
+export const ESTIMATE_TYPES = {
+  shipping: { label: 'Shipping Only', description: 'Freight and handling charges only' },
+  purchase_shipping: { label: 'Purchase + Shipping', description: 'Product purchase plus freight charges' },
+} as const;
 
 export function useEstimates() {
   return useQuery({
@@ -56,12 +66,18 @@ export function useCreateEstimate() {
       currency: string;
       notes?: string;
       valid_days?: number;
+      estimate_type?: EstimateType;
+      product_cost?: number;
+      purchase_fee?: number;
     }) => {
       const { data: estimateNumber } = await supabase.rpc('generate_document_number', { prefix: 'EST' });
       const { data: user } = await supabase.auth.getUser();
 
-      const subtotal = data.weight_kg * data.rate_per_kg;
-      const total = subtotal + data.handling_fee;
+      const productCost = data.product_cost || 0;
+      const purchaseFee = data.purchase_fee || 0;
+      const shippingSubtotal = data.weight_kg * data.rate_per_kg;
+      const subtotal = shippingSubtotal + productCost;
+      const total = subtotal + data.handling_fee + purchaseFee;
 
       const validUntil = data.valid_days
         ? new Date(Date.now() + data.valid_days * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
@@ -84,6 +100,9 @@ export function useCreateEstimate() {
           notes: data.notes || null,
           valid_until: validUntil,
           created_by: user.user?.id || null,
+          estimate_type: data.estimate_type || 'shipping',
+          product_cost: productCost,
+          purchase_fee: purchaseFee,
         })
         .select()
         .single();
@@ -156,6 +175,9 @@ export function useConvertEstimateToInvoice() {
           notes: estimate.notes,
           due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           created_by: user.user?.id || null,
+          invoice_type: estimate.estimate_type || 'shipping',
+          product_cost: estimate.product_cost || 0,
+          purchase_fee: estimate.purchase_fee || 0,
         })
         .select()
         .single();
