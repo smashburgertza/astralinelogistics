@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Calculator, PackageSearch, MoveRight, Ship, Plane, Container, Package, Car, Link2, Loader2 } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Calculator, PackageSearch, MoveRight, Ship, Plane, Container, Package, Car, Link2, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,9 +9,9 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { supabase } from '@/integrations/supabase/client';
 import { REGIONS, CURRENCY_SYMBOLS, type Region } from '@/lib/constants';
 import { useScrollAnimation } from '@/hooks/useScrollAnimation';
+import { useVehicleDutyRates } from '@/hooks/useVehicleDutyRates';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-
 interface RegionPricing {
   region: Region;
   customer_rate_per_kg: number;
@@ -43,6 +43,7 @@ interface VehicleInfo {
   vehicle_type: 'motorcycle' | 'sedan' | 'suv' | 'truck';
   mileage: string | null;
   engine: string | null;
+  engine_cc?: number | null;
   transmission: string | null;
   fuel_type: string | null;
   color: string | null;
@@ -54,6 +55,18 @@ interface VehicleInfo {
   image_url: string | null;
   origin_region: string;
 }
+
+// Currency exchange rates to TZS (approximate)
+const EXCHANGE_RATES_TO_TZS: Record<string, number> = {
+  USD: 2500,
+  GBP: 3150,
+  EUR: 2700,
+  AED: 680,
+  JPY: 17,
+  CNY: 345,
+  INR: 30,
+  TZS: 1,
+};
 
 export function PricingCalculator() {
   const [activeTab, setActiveTab] = useState('sea-cargo');
@@ -73,6 +86,7 @@ export function PricingCalculator() {
   const [vehicleLoading, setVehicleLoading] = useState(false);
   const [vehicleShippingMethod, setVehicleShippingMethod] = useState<'roro' | 'container'>('roro');
   const [vehiclePriceType, setVehiclePriceType] = useState<'cif' | 'duty_paid'>('cif');
+  const [showDutyBreakdown, setShowDutyBreakdown] = useState(false);
   
   // Air cargo state
   const [airRegion, setAirRegion] = useState<Region>('dubai');
@@ -83,6 +97,9 @@ export function PricingCalculator() {
   const [containerPricing, setContainerPricing] = useState<ContainerPricing[]>([]);
   const [vehiclePricing, setVehiclePricing] = useState<VehiclePricing[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Duty rates hook
+  const { calculateDuties, dutyRates } = useVehicleDutyRates();
 
   const { ref: leftRef, isVisible: leftVisible } = useScrollAnimation();
   const { ref: rightRef, isVisible: rightVisible } = useScrollAnimation();
@@ -121,32 +138,92 @@ export function PricingCalculator() {
   const containerCurrency = containerPricingItem?.currency || 'USD';
   const containerSymbol = CURRENCY_SYMBOLS[containerCurrency] || '$';
 
-  // Vehicle calculations
-  const getVehiclePrice = () => {
+  // Parse engine CC from vehicle info
+  const parseEngineCc = (engineStr?: string | null): number | undefined => {
+    if (!engineStr) return undefined;
+    // Match patterns like "2.0L", "2000cc", "2.0 Litre", etc.
+    const match = engineStr.match(/(\d+\.?\d*)\s*(L|litre|liter|cc)/i);
+    if (match) {
+      const value = parseFloat(match[1]);
+      const unit = match[2].toLowerCase();
+      // Convert liters to cc (1L = 1000cc)
+      return unit === 'cc' ? value : value * 1000;
+    }
+    // Try pure number (assume cc)
+    const numMatch = engineStr.match(/(\d{3,4})/);
+    if (numMatch) return parseInt(numMatch[1]);
+    return undefined;
+  };
+
+  // Vehicle calculations with proper duty calculation
+  const vehicleCalculation = useMemo(() => {
     if (!vehicleInfo) return null;
     
     const region = vehicleInfo.origin_region as Region || 'usa';
     const vehicleType = vehicleInfo.vehicle_type || 'sedan';
     
-    const pricing = vehiclePricing.find(
+    // Get shipping pricing
+    const shippingPricing = vehiclePricing.find(
       p => p.region === region && 
            p.vehicle_type === vehicleType && 
            p.shipping_method === vehicleShippingMethod
     );
     
-    if (!pricing) return null;
+    if (!shippingPricing) return null;
     
-    // For duty paid, add 25% import duty estimate
-    const dutyMultiplier = vehiclePriceType === 'duty_paid' ? 1.25 : 1;
+    const shippingCost = shippingPricing.price;
+    const shippingCurrency = shippingPricing.currency;
+    const shippingSymbol = CURRENCY_SYMBOLS[shippingCurrency] || '$';
+    
+    // If CIF only, just return shipping cost
+    if (vehiclePriceType === 'cif') {
+      return {
+        shippingCost,
+        shippingCurrency,
+        shippingSymbol,
+        vehiclePrice: vehicleInfo.price,
+        vehicleCurrency: vehicleInfo.currency,
+        totalCif: shippingCost + (vehicleInfo.price || 0),
+        dutyCalculation: null,
+      };
+    }
+    
+    // For Duty Paid, calculate CIF value in TZS then apply duties
+    const vehiclePriceInCurrency = vehicleInfo.price || 0;
+    const vehicleCurrencyRate = EXCHANGE_RATES_TO_TZS[vehicleInfo.currency] || 1;
+    const shippingCurrencyRate = EXCHANGE_RATES_TO_TZS[shippingCurrency] || 1;
+    
+    // CIF value in TZS = Vehicle Price + Shipping (converted to TZS)
+    const vehiclePriceTzs = vehiclePriceInCurrency * vehicleCurrencyRate;
+    const shippingCostTzs = shippingCost * shippingCurrencyRate;
+    const cifValueTzs = vehiclePriceTzs + shippingCostTzs;
+    
+    // Parse engine CC
+    const engineCc = vehicleInfo.engine_cc || parseEngineCc(vehicleInfo.engine);
+    
+    // Determine if utility vehicle (trucks, vans)
+    const isUtility = vehicleType === 'truck';
+    
+    // Calculate duties using the hook
+    const dutyCalc = calculateDuties(
+      cifValueTzs,
+      engineCc,
+      vehicleInfo.year || undefined,
+      isUtility
+    );
     
     return {
-      shippingCost: pricing.price * dutyMultiplier,
-      currency: pricing.currency,
-      symbol: CURRENCY_SYMBOLS[pricing.currency] || '$'
+      shippingCost,
+      shippingCurrency,
+      shippingSymbol,
+      vehiclePrice: vehicleInfo.price,
+      vehicleCurrency: vehicleInfo.currency,
+      cifValueTzs,
+      totalCif: shippingCost + (vehicleInfo.price || 0),
+      dutyCalculation: dutyCalc,
+      totalDutyPaidTzs: cifValueTzs + dutyCalc.totalDuties,
     };
-  };
-
-  const vehiclePriceData = getVehiclePrice();
+  }, [vehicleInfo, vehiclePricing, vehicleShippingMethod, vehiclePriceType, calculateDuties]);
 
   // Air cargo calculations
   const airPricing = pricing.find(p => p.region === airRegion);
@@ -607,30 +684,72 @@ export function PricingCalculator() {
                         </div>
 
                         {/* Vehicle Pricing */}
-                        {vehiclePriceData && (
+                        {vehicleCalculation && (
                           <div className="pt-4 border-t border-border space-y-3 animate-fade-in">
-                            {vehicleInfo.price && (
+                            {vehicleCalculation.vehiclePrice && (
                               <div className="flex justify-between text-sm">
                                 <span className="text-muted-foreground">Vehicle Price</span>
                                 <span className="font-medium">
-                                  {CURRENCY_SYMBOLS[vehicleInfo.currency] || '$'}{vehicleInfo.price.toLocaleString()} {vehicleInfo.currency}
+                                  {CURRENCY_SYMBOLS[vehicleCalculation.vehicleCurrency] || '$'}{vehicleCalculation.vehiclePrice.toLocaleString()} {vehicleCalculation.vehicleCurrency}
                                 </span>
                               </div>
                             )}
                             <div className="flex justify-between text-sm">
                               <span className="text-muted-foreground">
-                                Shipping ({vehicleShippingMethod.toUpperCase()}) {vehiclePriceType === 'duty_paid' && '+ Duty'}
+                                Shipping ({vehicleShippingMethod.toUpperCase()})
                               </span>
                               <span className="font-medium">
-                                {vehiclePriceData.symbol}{vehiclePriceData.shippingCost.toLocaleString()} {vehiclePriceData.currency}
+                                {vehicleCalculation.shippingSymbol}{vehicleCalculation.shippingCost.toLocaleString()} {vehicleCalculation.shippingCurrency}
                               </span>
                             </div>
+
+                            {/* Duty Breakdown for Duty Paid option */}
+                            {vehiclePriceType === 'duty_paid' && vehicleCalculation.dutyCalculation && (
+                              <>
+                                <div 
+                                  className="flex items-center justify-between text-sm cursor-pointer hover:bg-muted/50 -mx-2 px-2 py-1 rounded"
+                                  onClick={() => setShowDutyBreakdown(!showDutyBreakdown)}
+                                >
+                                  <span className="text-muted-foreground flex items-center gap-1">
+                                    Import Duties & Taxes
+                                    {showDutyBreakdown ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                  </span>
+                                  <span className="font-medium">
+                                    TZS {vehicleCalculation.dutyCalculation.totalDuties.toLocaleString()}
+                                  </span>
+                                </div>
+                                
+                                {showDutyBreakdown && (
+                                  <div className="ml-4 space-y-1.5 text-xs border-l-2 border-primary/20 pl-3 animate-fade-in">
+                                    {vehicleCalculation.dutyCalculation.breakdown.map((item, idx) => (
+                                      <div key={idx} className="flex justify-between text-muted-foreground">
+                                        <span>{item.name} {item.rate && `(${item.rate})`}</span>
+                                        <span>TZS {item.amount.toLocaleString()}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </>
+                            )}
+
                             <div className="flex justify-between text-xl font-bold pt-3 border-t border-border">
-                              <span>Est. Shipping Cost</span>
+                              <span>{vehiclePriceType === 'cif' ? 'CIF Total' : 'Duty Paid Total'}</span>
                               <span className="text-primary">
-                                {vehiclePriceData.symbol}{vehiclePriceData.shippingCost.toLocaleString()} {vehiclePriceData.currency}
+                                {vehiclePriceType === 'cif' ? (
+                                  <>
+                                    {vehicleCalculation.shippingSymbol}{vehicleCalculation.totalCif.toLocaleString()} {vehicleCalculation.shippingCurrency}
+                                  </>
+                                ) : (
+                                  <>TZS {vehicleCalculation.totalDutyPaidTzs?.toLocaleString()}</>
+                                )}
                               </span>
                             </div>
+
+                            {vehiclePriceType === 'duty_paid' && (
+                              <p className="text-xs text-muted-foreground italic">
+                                Based on Tanzania TRA duty rates. Actual duties may vary.
+                              </p>
+                            )}
                           </div>
                         )}
                       </div>
