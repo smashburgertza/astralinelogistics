@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
-import { Calculator, PackageSearch, MoveRight, Ship, Plane } from 'lucide-react';
+import { Calculator, PackageSearch, MoveRight, Ship, Plane, Container, Package, Car, Link2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { supabase } from '@/integrations/supabase/client';
 import { REGIONS, CURRENCY_SYMBOLS, type Region } from '@/lib/constants';
 import { useScrollAnimation } from '@/hooks/useScrollAnimation';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface RegionPricing {
   region: Region;
@@ -17,43 +19,136 @@ interface RegionPricing {
   currency: string;
 }
 
+interface ContainerPricing {
+  id: string;
+  container_size: '20ft' | '40ft';
+  region: Region;
+  price: number;
+  currency: string;
+}
+
+interface VehiclePricing {
+  id: string;
+  vehicle_type: 'motorcycle' | 'sedan' | 'suv' | 'truck';
+  shipping_method: 'roro' | 'container';
+  region: Region;
+  price: number;
+  currency: string;
+}
+
+interface VehicleInfo {
+  make: string | null;
+  model: string | null;
+  year: number | null;
+  vehicle_type: 'motorcycle' | 'sedan' | 'suv' | 'truck';
+  mileage: string | null;
+  engine: string | null;
+  transmission: string | null;
+  fuel_type: string | null;
+  color: string | null;
+  vin: string | null;
+  price: number | null;
+  currency: string;
+  condition: string | null;
+  title: string | null;
+  image_url: string | null;
+  origin_region: string;
+}
+
 export function PricingCalculator() {
-  const [seaRegion, setSeaRegion] = useState<Region>('china');
-  const [seaWeight, setSeaWeight] = useState<string>('');
+  const [activeTab, setActiveTab] = useState('sea-cargo');
+  const [seaSubTab, setSeaSubTab] = useState('loose-cargo');
+  
+  // Loose cargo state
+  const [looseRegion, setLooseRegion] = useState<Region>('china');
+  const [looseWeight, setLooseWeight] = useState<string>('');
+  
+  // Full container state
+  const [containerRegion, setContainerRegion] = useState<Region>('china');
+  const [containerSize, setContainerSize] = useState<'20ft' | '40ft'>('20ft');
+  
+  // Vehicle state
+  const [vehicleUrl, setVehicleUrl] = useState('');
+  const [vehicleInfo, setVehicleInfo] = useState<VehicleInfo | null>(null);
+  const [vehicleLoading, setVehicleLoading] = useState(false);
+  const [vehicleShippingMethod, setVehicleShippingMethod] = useState<'roro' | 'container'>('roro');
+  const [vehiclePriceType, setVehiclePriceType] = useState<'cif' | 'duty_paid'>('cif');
+  
+  // Air cargo state
   const [airRegion, setAirRegion] = useState<Region>('dubai');
   const [airWeight, setAirWeight] = useState<string>('');
+  
+  // Pricing data
   const [pricing, setPricing] = useState<RegionPricing[]>([]);
+  const [containerPricing, setContainerPricing] = useState<ContainerPricing[]>([]);
+  const [vehiclePricing, setVehiclePricing] = useState<VehiclePricing[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('sea-cargo');
 
   const { ref: leftRef, isVisible: leftVisible } = useScrollAnimation();
   const { ref: rightRef, isVisible: rightVisible } = useScrollAnimation();
 
   useEffect(() => {
-    fetchPricing();
+    fetchAllPricing();
   }, []);
 
-  const fetchPricing = async () => {
-    const { data } = await supabase
-      .from('region_pricing')
-      .select('region, customer_rate_per_kg, handling_fee, currency');
+  const fetchAllPricing = async () => {
+    const [regionData, containerData, vehicleData] = await Promise.all([
+      supabase.from('region_pricing').select('region, customer_rate_per_kg, handling_fee, currency'),
+      supabase.from('container_pricing').select('*'),
+      supabase.from('vehicle_pricing').select('*'),
+    ]);
     
-    if (data) {
-      setPricing(data as RegionPricing[]);
-    }
+    if (regionData.data) setPricing(regionData.data as RegionPricing[]);
+    if (containerData.data) setContainerPricing(containerData.data as ContainerPricing[]);
+    if (vehicleData.data) setVehiclePricing(vehicleData.data as VehiclePricing[]);
     setLoading(false);
   };
 
-  // Sea cargo calculations
-  const seaPricing = pricing.find(p => p.region === seaRegion);
-  const seaWeightNum = parseFloat(seaWeight) || 0;
-  const seaShippingCost = seaPricing ? seaWeightNum * seaPricing.customer_rate_per_kg : 0;
-  const seaHandlingFee = seaPricing?.handling_fee || 0;
-  const seaTotal = seaShippingCost + seaHandlingFee;
-  const seaCurrency = seaPricing?.currency || 'USD';
-  const seaSymbol = CURRENCY_SYMBOLS[seaCurrency] || '$';
+  // Loose cargo calculations
+  const loosePricing = pricing.find(p => p.region === looseRegion);
+  const looseWeightNum = parseFloat(looseWeight) || 0;
+  const looseShippingCost = loosePricing ? looseWeightNum * loosePricing.customer_rate_per_kg : 0;
+  const looseHandlingFee = loosePricing?.handling_fee || 0;
+  const looseTotal = looseShippingCost + looseHandlingFee;
+  const looseCurrency = loosePricing?.currency || 'USD';
+  const looseSymbol = CURRENCY_SYMBOLS[looseCurrency] || '$';
 
-  // Air cargo calculations (using same pricing structure but could be different rates in future)
+  // Full container calculations
+  const containerPricingItem = containerPricing.find(
+    p => p.region === containerRegion && p.container_size === containerSize
+  );
+  const containerTotal = containerPricingItem?.price || 0;
+  const containerCurrency = containerPricingItem?.currency || 'USD';
+  const containerSymbol = CURRENCY_SYMBOLS[containerCurrency] || '$';
+
+  // Vehicle calculations
+  const getVehiclePrice = () => {
+    if (!vehicleInfo) return null;
+    
+    const region = vehicleInfo.origin_region as Region || 'usa';
+    const vehicleType = vehicleInfo.vehicle_type || 'sedan';
+    
+    const pricing = vehiclePricing.find(
+      p => p.region === region && 
+           p.vehicle_type === vehicleType && 
+           p.shipping_method === vehicleShippingMethod
+    );
+    
+    if (!pricing) return null;
+    
+    // For duty paid, add 25% import duty estimate
+    const dutyMultiplier = vehiclePriceType === 'duty_paid' ? 1.25 : 1;
+    
+    return {
+      shippingCost: pricing.price * dutyMultiplier,
+      currency: pricing.currency,
+      symbol: CURRENCY_SYMBOLS[pricing.currency] || '$'
+    };
+  };
+
+  const vehiclePriceData = getVehiclePrice();
+
+  // Air cargo calculations
   const airPricing = pricing.find(p => p.region === airRegion);
   const airWeightNum = parseFloat(airWeight) || 0;
   const airShippingCost = airPricing ? airWeightNum * airPricing.customer_rate_per_kg : 0;
@@ -61,6 +156,42 @@ export function PricingCalculator() {
   const airTotal = airShippingCost + airHandlingFee;
   const airCurrency = airPricing?.currency || 'USD';
   const airSymbol = CURRENCY_SYMBOLS[airCurrency] || '$';
+
+  const fetchVehicleInfo = async () => {
+    if (!vehicleUrl.trim()) {
+      toast.error('Please enter a vehicle URL');
+      return;
+    }
+
+    setVehicleLoading(true);
+    setVehicleInfo(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('fetch-vehicle-info', {
+        body: { url: vehicleUrl }
+      });
+
+      if (error) throw error;
+
+      if (data.error) {
+        toast.error(data.error);
+        return;
+      }
+
+      setVehicleInfo(data);
+      toast.success('Vehicle information extracted successfully');
+    } catch (error: any) {
+      console.error('Error fetching vehicle info:', error);
+      toast.error('Failed to fetch vehicle information');
+    } finally {
+      setVehicleLoading(false);
+    }
+  };
+
+  const clearVehicle = () => {
+    setVehicleUrl('');
+    setVehicleInfo(null);
+  };
 
   return (
     <section className="section-padding bg-muted/50 overflow-hidden">
@@ -132,77 +263,391 @@ export function PricingCalculator() {
               </TabsList>
 
               {/* Sea Cargo Tab */}
-              <TabsContent value="sea-cargo" className="space-y-4 sm:space-y-6 mt-0">
-                <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg border border-blue-100">
-                  <Ship className="w-5 h-5 text-blue-600" />
-                  <p className="text-sm text-blue-700">Ocean freight - economical for larger shipments</p>
-                </div>
+              <TabsContent value="sea-cargo" className="mt-0">
+                {/* Sea Cargo Sub-tabs */}
+                <Tabs value={seaSubTab} onValueChange={setSeaSubTab} className="w-full">
+                  <TabsList className="grid w-full grid-cols-3 mb-4 h-auto">
+                    <TabsTrigger value="full-container" className="flex items-center gap-1.5 text-xs sm:text-sm py-2">
+                      <Container className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Full</span> Container
+                    </TabsTrigger>
+                    <TabsTrigger value="loose-cargo" className="flex items-center gap-1.5 text-xs sm:text-sm py-2">
+                      <Package className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Loose</span> Cargo
+                    </TabsTrigger>
+                    <TabsTrigger value="vehicles" className="flex items-center gap-1.5 text-xs sm:text-sm py-2">
+                      <Car className="w-3.5 h-3.5" />
+                      Vehicles
+                    </TabsTrigger>
+                  </TabsList>
 
-                <div className="space-y-2">
-                  <Label htmlFor="sea-origin" className="text-sm font-medium">Origin Region</Label>
-                  <Select value={seaRegion} onValueChange={(v) => setSeaRegion(v as Region)}>
-                    <SelectTrigger className="h-12">
-                      <SelectValue placeholder="Select origin" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(REGIONS).map(([key, value]) => (
-                        <SelectItem key={key} value={key}>
-                          <span className="flex items-center gap-2">
-                            <span className="text-lg">{value.flag}</span>
-                            {value.label}
+                  {/* Full Container Sub-tab */}
+                  <TabsContent value="full-container" className="space-y-4 mt-0">
+                    <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                      <Container className="w-5 h-5 text-blue-600 shrink-0" />
+                      <p className="text-sm text-blue-700">FCL shipping for large volume cargo</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Container Size</Label>
+                        <Select value={containerSize} onValueChange={(v) => setContainerSize(v as '20ft' | '40ft')}>
+                          <SelectTrigger className="h-12">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="20ft">20ft Container</SelectItem>
+                            <SelectItem value="40ft">40ft Container</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Origin Region</Label>
+                        <Select value={containerRegion} onValueChange={(v) => setContainerRegion(v as Region)}>
+                          <SelectTrigger className="h-12">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(REGIONS).map(([key, value]) => (
+                              <SelectItem key={key} value={key}>
+                                <span className="flex items-center gap-2">
+                                  <span className="text-lg">{value.flag}</span>
+                                  {value.label}
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {containerPricingItem && (
+                      <div className="pt-4 border-t border-border space-y-3 animate-fade-in">
+                        <div className="flex justify-between text-xl font-bold">
+                          <span>Estimated Cost</span>
+                          <span className="text-primary">{containerSymbol}{containerTotal.toLocaleString()} {containerCurrency}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    <Button className="w-full h-12 text-base btn-gold group" asChild>
+                      <a href="/auth?mode=signup">
+                        Request Full Quote
+                        <MoveRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
+                      </a>
+                    </Button>
+                  </TabsContent>
+
+                  {/* Loose Cargo Sub-tab */}
+                  <TabsContent value="loose-cargo" className="space-y-4 mt-0">
+                    <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                      <Package className="w-5 h-5 text-blue-600 shrink-0" />
+                      <p className="text-sm text-blue-700">LCL shipping - share container space</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Origin Region</Label>
+                      <Select value={looseRegion} onValueChange={(v) => setLooseRegion(v as Region)}>
+                        <SelectTrigger className="h-12">
+                          <SelectValue placeholder="Select origin" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(REGIONS).map(([key, value]) => (
+                            <SelectItem key={key} value={key}>
+                              <span className="flex items-center gap-2">
+                                <span className="text-lg">{value.flag}</span>
+                                {value.label}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Weight (kg)</Label>
+                      <div className="relative">
+                        <PackageSearch className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                        <Input
+                          type="number"
+                          placeholder="Enter weight in kg"
+                          className="h-12 pl-12 text-base"
+                          value={looseWeight}
+                          onChange={(e) => setLooseWeight(e.target.value)}
+                          min="0"
+                          step="0.1"
+                        />
+                      </div>
+                    </div>
+
+                    {looseWeightNum > 0 && loosePricing && (
+                      <div className="pt-4 border-t border-border space-y-3 animate-fade-in">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">
+                            Shipping ({looseSymbol}{loosePricing.customer_rate_per_kg}/kg × {looseWeightNum}kg)
                           </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                          <span className="font-medium">{looseSymbol}{looseShippingCost.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Handling Fee</span>
+                          <span className="font-medium">{looseSymbol}{looseHandlingFee.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-xl font-bold pt-3 border-t border-border">
+                          <span>Estimated Total</span>
+                          <span className="text-primary">{looseSymbol}{looseTotal.toFixed(2)} {looseCurrency}</span>
+                        </div>
+                      </div>
+                    )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="sea-weight" className="text-sm font-medium">Weight (kg)</Label>
-                  <div className="relative">
-                    <PackageSearch className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                    <Input
-                      id="sea-weight"
-                      type="number"
-                      placeholder="Enter weight in kg"
-                      className="h-12 pl-12 text-base"
-                      value={seaWeight}
-                      onChange={(e) => setSeaWeight(e.target.value)}
-                      min="0"
-                      step="0.1"
-                    />
-                  </div>
-                </div>
+                    <Button className="w-full h-12 text-base btn-gold group" asChild>
+                      <a href="/auth?mode=signup">
+                        Request Full Quote
+                        <MoveRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
+                      </a>
+                    </Button>
+                  </TabsContent>
 
-                {seaWeightNum > 0 && seaPricing && (
-                  <div className="pt-4 border-t border-border space-y-3 animate-fade-in">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">
-                        Shipping ({seaSymbol}{seaPricing.customer_rate_per_kg}/kg × {seaWeightNum}kg)
-                      </span>
-                      <span className="font-medium">{seaSymbol}{seaShippingCost.toFixed(2)}</span>
+                  {/* Vehicles Sub-tab */}
+                  <TabsContent value="vehicles" className="space-y-4 mt-0">
+                    <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                      <Car className="w-5 h-5 text-blue-600 shrink-0" />
+                      <p className="text-sm text-blue-700">Ship vehicles via RoRo or container</p>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Handling Fee</span>
-                      <span className="font-medium">{seaSymbol}{seaHandlingFee.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-xl font-bold pt-3 border-t border-border">
-                      <span>Estimated Total</span>
-                      <span className="text-primary">{seaSymbol}{seaTotal.toFixed(2)} {seaCurrency}</span>
-                    </div>
-                  </div>
-                )}
 
-                <Button className="w-full h-12 text-base btn-gold group" asChild>
-                  <a href="/auth?mode=signup">
-                    Request Full Quote
-                    <MoveRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
-                  </a>
-                </Button>
-                
-                <p className="text-xs text-center text-muted-foreground">
-                  * Final cost may vary based on actual weight, volume, and customs duties.
-                </p>
+                    {/* Vehicle URL Input */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Vehicle Listing URL</Label>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <Link2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                          <Input
+                            type="url"
+                            placeholder="Paste vehicle listing link..."
+                            className="h-12 pl-12 text-base"
+                            value={vehicleUrl}
+                            onChange={(e) => setVehicleUrl(e.target.value)}
+                            disabled={vehicleLoading}
+                          />
+                        </div>
+                        <Button 
+                          onClick={fetchVehicleInfo} 
+                          disabled={vehicleLoading || !vehicleUrl.trim()}
+                          className="h-12 px-4"
+                        >
+                          {vehicleLoading ? (
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                          ) : (
+                            'Fetch'
+                          )}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Paste a link from AutoTrader, eBay Motors, Copart, CarGurus, etc.
+                      </p>
+                    </div>
+
+                    {/* Vehicle Info Display */}
+                    {vehicleInfo && (
+                      <div className="space-y-4 animate-fade-in">
+                        <div className="p-4 bg-muted/50 rounded-lg border border-border space-y-3">
+                          {/* Vehicle Image */}
+                          {vehicleInfo.image_url && (
+                            <div className="relative w-full h-32 rounded-lg overflow-hidden bg-muted">
+                              <img 
+                                src={vehicleInfo.image_url} 
+                                alt="Vehicle" 
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                }}
+                              />
+                            </div>
+                          )}
+                          
+                          {/* Vehicle Details */}
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            {vehicleInfo.year && vehicleInfo.make && vehicleInfo.model && (
+                              <div className="col-span-2">
+                                <span className="font-semibold text-base">
+                                  {vehicleInfo.year} {vehicleInfo.make} {vehicleInfo.model}
+                                </span>
+                              </div>
+                            )}
+                            {vehicleInfo.vehicle_type && (
+                              <div>
+                                <span className="text-muted-foreground">Type: </span>
+                                <span className="font-medium capitalize">{vehicleInfo.vehicle_type}</span>
+                              </div>
+                            )}
+                            {vehicleInfo.mileage && (
+                              <div>
+                                <span className="text-muted-foreground">Mileage: </span>
+                                <span className="font-medium">{vehicleInfo.mileage}</span>
+                              </div>
+                            )}
+                            {vehicleInfo.engine && (
+                              <div>
+                                <span className="text-muted-foreground">Engine: </span>
+                                <span className="font-medium">{vehicleInfo.engine}</span>
+                              </div>
+                            )}
+                            {vehicleInfo.transmission && (
+                              <div>
+                                <span className="text-muted-foreground">Trans: </span>
+                                <span className="font-medium">{vehicleInfo.transmission}</span>
+                              </div>
+                            )}
+                            {vehicleInfo.fuel_type && (
+                              <div>
+                                <span className="text-muted-foreground">Fuel: </span>
+                                <span className="font-medium">{vehicleInfo.fuel_type}</span>
+                              </div>
+                            )}
+                            {vehicleInfo.color && (
+                              <div>
+                                <span className="text-muted-foreground">Color: </span>
+                                <span className="font-medium">{vehicleInfo.color}</span>
+                              </div>
+                            )}
+                            {vehicleInfo.price && (
+                              <div className="col-span-2">
+                                <span className="text-muted-foreground">Price: </span>
+                                <span className="font-semibold text-primary">
+                                  {CURRENCY_SYMBOLS[vehicleInfo.currency] || '$'}{vehicleInfo.price.toLocaleString()} {vehicleInfo.currency}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          
+                          <Button variant="ghost" size="sm" onClick={clearVehicle} className="text-xs">
+                            Clear & Try Another
+                          </Button>
+                        </div>
+
+                        {/* Shipping Options */}
+                        <div className="space-y-3">
+                          <Label className="text-sm font-medium">Shipping Method</Label>
+                          <RadioGroup 
+                            value={vehicleShippingMethod} 
+                            onValueChange={(v) => setVehicleShippingMethod(v as 'roro' | 'container')}
+                            className="grid grid-cols-2 gap-3"
+                          >
+                            <Label 
+                              htmlFor="roro" 
+                              className={cn(
+                                "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all",
+                                vehicleShippingMethod === 'roro' 
+                                  ? "border-primary bg-primary/5" 
+                                  : "border-border hover:border-muted-foreground"
+                              )}
+                            >
+                              <RadioGroupItem value="roro" id="roro" />
+                              <div>
+                                <p className="font-medium text-sm">RoRo</p>
+                                <p className="text-xs text-muted-foreground">Roll-on/Roll-off</p>
+                              </div>
+                            </Label>
+                            <Label 
+                              htmlFor="container-vehicle" 
+                              className={cn(
+                                "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all",
+                                vehicleShippingMethod === 'container' 
+                                  ? "border-primary bg-primary/5" 
+                                  : "border-border hover:border-muted-foreground"
+                              )}
+                            >
+                              <RadioGroupItem value="container" id="container-vehicle" />
+                              <div>
+                                <p className="font-medium text-sm">Container</p>
+                                <p className="text-xs text-muted-foreground">Enclosed shipping</p>
+                              </div>
+                            </Label>
+                          </RadioGroup>
+                        </div>
+
+                        <div className="space-y-3">
+                          <Label className="text-sm font-medium">Price Type</Label>
+                          <RadioGroup 
+                            value={vehiclePriceType} 
+                            onValueChange={(v) => setVehiclePriceType(v as 'cif' | 'duty_paid')}
+                            className="grid grid-cols-2 gap-3"
+                          >
+                            <Label 
+                              htmlFor="cif" 
+                              className={cn(
+                                "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all",
+                                vehiclePriceType === 'cif' 
+                                  ? "border-primary bg-primary/5" 
+                                  : "border-border hover:border-muted-foreground"
+                              )}
+                            >
+                              <RadioGroupItem value="cif" id="cif" />
+                              <div>
+                                <p className="font-medium text-sm">CIF</p>
+                                <p className="text-xs text-muted-foreground">Cost, Insurance, Freight</p>
+                              </div>
+                            </Label>
+                            <Label 
+                              htmlFor="duty_paid" 
+                              className={cn(
+                                "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all",
+                                vehiclePriceType === 'duty_paid' 
+                                  ? "border-primary bg-primary/5" 
+                                  : "border-border hover:border-muted-foreground"
+                              )}
+                            >
+                              <RadioGroupItem value="duty_paid" id="duty_paid" />
+                              <div>
+                                <p className="font-medium text-sm">Duty Paid</p>
+                                <p className="text-xs text-muted-foreground">Includes import taxes</p>
+                              </div>
+                            </Label>
+                          </RadioGroup>
+                        </div>
+
+                        {/* Vehicle Pricing */}
+                        {vehiclePriceData && (
+                          <div className="pt-4 border-t border-border space-y-3 animate-fade-in">
+                            {vehicleInfo.price && (
+                              <div className="flex justify-between text-sm">
+                                <span className="text-muted-foreground">Vehicle Price</span>
+                                <span className="font-medium">
+                                  {CURRENCY_SYMBOLS[vehicleInfo.currency] || '$'}{vehicleInfo.price.toLocaleString()} {vehicleInfo.currency}
+                                </span>
+                              </div>
+                            )}
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">
+                                Shipping ({vehicleShippingMethod.toUpperCase()}) {vehiclePriceType === 'duty_paid' && '+ Duty'}
+                              </span>
+                              <span className="font-medium">
+                                {vehiclePriceData.symbol}{vehiclePriceData.shippingCost.toLocaleString()} {vehiclePriceData.currency}
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-xl font-bold pt-3 border-t border-border">
+                              <span>Est. Shipping Cost</span>
+                              <span className="text-primary">
+                                {vehiclePriceData.symbol}{vehiclePriceData.shippingCost.toLocaleString()} {vehiclePriceData.currency}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <Button className="w-full h-12 text-base btn-gold group" asChild>
+                      <a href="/auth?mode=signup">
+                        Request Full Quote
+                        <MoveRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
+                      </a>
+                    </Button>
+                    
+                    <p className="text-xs text-center text-muted-foreground">
+                      * Final cost may vary based on vehicle dimensions and port fees.
+                    </p>
+                  </TabsContent>
+                </Tabs>
               </TabsContent>
 
               {/* Air Cargo Tab */}
