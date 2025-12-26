@@ -908,14 +908,7 @@ export function ShoppingAggregator() {
 
             {/* Total in TZS */}
             <div className="flex justify-between items-center bg-primary/10 p-3 rounded-lg -mx-3">
-              <span className="font-semibold">
-                Total (TZS)
-                {totals.isSingleRegion && totals.regionBreakdowns[0] && (
-                  <span className="text-xs text-muted-foreground ml-2">
-                    @ {totals.regionBreakdowns[0].exchangeRate.toLocaleString()} TZS/{totals.regionBreakdowns[0].currency}
-                  </span>
-                )}
-              </span>
+              <span className="font-semibold">Total (TZS)</span>
               <span className="font-bold text-xl">
                 {formatTZS(totals.grandTotalInTZS)}
               </span>
