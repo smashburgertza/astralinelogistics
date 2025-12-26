@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Building2, Mail, Shield, Settings, Save, Loader2, Upload, Trash2, ImageIcon, RefreshCw, ShoppingBag, Container, Car, Package, MapPin, Receipt, Clock } from 'lucide-react';
+import { Building2, Mail, Shield, Settings, Save, Loader2, Upload, Trash2, ImageIcon, RefreshCw, ShoppingBag, Calculator } from 'lucide-react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -356,29 +356,13 @@ export default function AdminSettingsPage() {
               <RefreshCw className="h-4 w-4 hidden sm:inline" />
               Currency
             </TabsTrigger>
-            <TabsTrigger value="regions" className="gap-2">
-              <MapPin className="h-4 w-4 hidden sm:inline" />
-              Regions
-            </TabsTrigger>
-            <TabsTrigger value="containers" className="gap-2">
-              <Container className="h-4 w-4 hidden sm:inline" />
-              Containers
-            </TabsTrigger>
-            <TabsTrigger value="vehicles" className="gap-2">
-              <Car className="h-4 w-4 hidden sm:inline" />
-              Vehicles
-            </TabsTrigger>
-            <TabsTrigger value="duties" className="gap-2">
-              <Receipt className="h-4 w-4 hidden sm:inline" />
-              Duties
-            </TabsTrigger>
             <TabsTrigger value="shopforme" className="gap-2">
               <ShoppingBag className="h-4 w-4 hidden sm:inline" />
               Shop For Me
             </TabsTrigger>
-            <TabsTrigger value="delivery" className="gap-2">
-              <Clock className="h-4 w-4 hidden sm:inline" />
-              Delivery
+            <TabsTrigger value="shipping" className="gap-2">
+              <Calculator className="h-4 w-4 hidden sm:inline" />
+              Shipping Calculator
             </TabsTrigger>
             <TabsTrigger value="notifications" className="gap-2">
               <Mail className="h-4 w-4 hidden sm:inline" />
@@ -400,13 +384,23 @@ export default function AdminSettingsPage() {
           <ExchangeRateManagement />
         </TabsContent>
 
-        {/* Region Pricing (Sea/Air Cargo) */}
-        <TabsContent value="regions">
-          <RegionManagement />
+        {/* Shop For Me - All related settings */}
+        <TabsContent value="shopforme" className="space-y-6">
+          <ShopForMeChargesManagement />
+          <Card>
+            <CardHeader>
+              <CardTitle>Shop For Me Delivery Times</CardTitle>
+              <CardDescription>Configure estimated delivery time for Shop For Me orders</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <DeliveryTimesManagement filterKeys={['shop_for_me']} />
+            </CardContent>
+          </Card>
         </TabsContent>
 
-        {/* Container Pricing */}
-        <TabsContent value="containers">
+        {/* Shipping Calculator - All related settings */}
+        <TabsContent value="shipping" className="space-y-6">
+          <RegionManagement />
           <Card>
             <CardHeader>
               <CardTitle>Container Shipping Pricing</CardTitle>
@@ -416,10 +410,6 @@ export default function AdminSettingsPage() {
               <ContainerPricingManagement />
             </CardContent>
           </Card>
-        </TabsContent>
-
-        {/* Vehicle Shipping Pricing */}
-        <TabsContent value="vehicles">
           <Card>
             <CardHeader>
               <CardTitle>Vehicle Shipping Pricing</CardTitle>
@@ -429,21 +419,16 @@ export default function AdminSettingsPage() {
               <VehiclePricingManagement />
             </CardContent>
           </Card>
-        </TabsContent>
-
-        {/* Vehicle Import Duty Rates */}
-        <TabsContent value="duties">
           <VehicleDutyRatesManagement />
-        </TabsContent>
-
-        {/* Shop For Me Charges */}
-        <TabsContent value="shopforme">
-          <ShopForMeChargesManagement />
-        </TabsContent>
-
-        {/* Delivery Times */}
-        <TabsContent value="delivery">
-          <DeliveryTimesManagement />
+          <Card>
+            <CardHeader>
+              <CardTitle>Shipping Delivery Times</CardTitle>
+              <CardDescription>Configure estimated delivery times for shipping methods</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <DeliveryTimesManagement filterKeys={['sea_cargo', 'air_cargo', 'full_container', 'vehicle_roro', 'vehicle_container']} />
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="company">
