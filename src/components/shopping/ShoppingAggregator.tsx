@@ -913,6 +913,11 @@ export function ShoppingAggregator() {
                 {formatTZS(totals.grandTotalInTZS)}
               </span>
             </div>
+
+            {/* Disclaimer */}
+            <p className="text-xs text-muted-foreground text-center mt-4">
+              Final costs may vary based on actual product weight and current exchange rates at the time of purchase.
+            </p>
           </CardContent>
         </Card>
       )}
