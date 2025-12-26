@@ -865,17 +865,7 @@ export function ShoppingAggregator() {
                     <div key={`${regionData.region}-${charge.key}`}>
                       {showSeparator && <Separator className="my-2" />}
                       <div className="flex justify-between items-center">
-                        <span className="text-muted-foreground">
-                          {charge.name}
-                          {charge.percentage !== undefined && (
-                            <span className="ml-1 text-xs">({charge.percentage}%)</span>
-                          )}
-                          {charge.key === 'shipping' && (
-                            <span className="ml-1 text-xs">
-                              ({regionData.weight} kg × {formatCurrency(regionData.shippingRate, regionData.currency)}/kg)
-                            </span>
-                          )}
-                        </span>
+                        <span className="text-muted-foreground">{charge.name}</span>
                         <span className="font-medium">{formatCurrency(charge.amount, regionData.currency)}</span>
                       </div>
                     </div>
