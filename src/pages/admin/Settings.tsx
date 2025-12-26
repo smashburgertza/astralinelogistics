@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Building2, Mail, Shield, Settings, Save, Loader2, Upload, Trash2, ImageIcon, RefreshCw, ShoppingBag, Calculator } from 'lucide-react';
+import { Building2, Mail, Shield, Settings, Save, Loader2, Upload, Trash2, ImageIcon, RefreshCw, ShoppingBag, Calculator, Eye } from 'lucide-react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -38,6 +38,15 @@ import { VehiclePricingManagement } from '@/components/admin/VehiclePricingManag
 import { VehicleDutyRatesManagement } from '@/components/admin/VehicleDutyRatesManagement';
 import { RegionManagement } from '@/components/admin/RegionManagement';
 import { DeliveryTimesManagement } from '@/components/admin/DeliveryTimesManagement';
+import { PricingCalculator } from '@/components/home/PricingCalculator';
+import { ShoppingAggregator } from '@/components/shopping/ShoppingAggregator';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 
 // Schemas
 const companySchema = z.object({
@@ -386,6 +395,24 @@ export default function AdminSettingsPage() {
 
         {/* Shop For Me - All related settings */}
         <TabsContent value="shopforme" className="space-y-6">
+          <div className="flex justify-end">
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <Eye className="h-4 w-4" />
+                  Preview Shop For Me
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Shop For Me Preview</DialogTitle>
+                </DialogHeader>
+                <div className="mt-4">
+                  <ShoppingAggregator />
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
           <ShopForMeChargesManagement />
           <Card>
             <CardHeader>
@@ -400,6 +427,24 @@ export default function AdminSettingsPage() {
 
         {/* Shipping Calculator - All related settings */}
         <TabsContent value="shipping" className="space-y-6">
+          <div className="flex justify-end">
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <Eye className="h-4 w-4" />
+                  Preview Shipping Calculator
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Shipping Calculator Preview</DialogTitle>
+                </DialogHeader>
+                <div className="mt-4">
+                  <PricingCalculator />
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
           <RegionManagement />
           <Card>
             <CardHeader>
