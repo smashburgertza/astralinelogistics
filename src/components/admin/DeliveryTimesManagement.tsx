@@ -35,7 +35,11 @@ const DELIVERY_TIME_FIELDS = [
   { key: 'shop_for_me', label: 'Shop For Me', icon: ShoppingBag, description: 'Product sourcing and delivery' },
 ] as const;
 
-export function DeliveryTimesManagement() {
+interface DeliveryTimesManagementProps {
+  filterKeys?: string[];
+}
+
+export function DeliveryTimesManagement({ filterKeys }: DeliveryTimesManagementProps) {
   const { data: settings, isLoading } = useSettings('delivery_times');
   const updateSettings = useUpdateSettings();
   const [times, setTimes] = useState<DeliveryTimes>(DEFAULT_TIMES);
@@ -110,7 +114,9 @@ export function DeliveryTimesManagement() {
       </CardHeader>
       <CardContent>
         <div className="grid gap-4 md:grid-cols-2">
-          {DELIVERY_TIME_FIELDS.map(({ key, label, icon: Icon, description }) => (
+          {DELIVERY_TIME_FIELDS
+            .filter(field => !filterKeys || filterKeys.includes(field.key))
+            .map(({ key, label, icon: Icon, description }) => (
             <div 
               key={key} 
               className="flex items-start gap-4 p-4 border rounded-lg bg-muted/30"
