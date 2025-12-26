@@ -413,6 +413,36 @@ export type Database = {
         }
         Relationships: []
       }
+      container_pricing: {
+        Row: {
+          container_size: string
+          created_at: string | null
+          currency: string
+          id: string
+          price: number
+          region: Database["public"]["Enums"]["agent_region"]
+          updated_at: string | null
+        }
+        Insert: {
+          container_size: string
+          created_at?: string | null
+          currency?: string
+          id?: string
+          price: number
+          region: Database["public"]["Enums"]["agent_region"]
+          updated_at?: string | null
+        }
+        Update: {
+          container_size?: string
+          created_at?: string | null
+          currency?: string
+          id?: string
+          price?: number
+          region?: Database["public"]["Enums"]["agent_region"]
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       currency_exchange_rates: {
         Row: {
           currency_code: string
@@ -1454,6 +1484,39 @@ export type Database = {
           region?: Database["public"]["Enums"]["agent_region"] | null
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      vehicle_pricing: {
+        Row: {
+          created_at: string | null
+          currency: string
+          id: string
+          price: number
+          region: Database["public"]["Enums"]["agent_region"]
+          shipping_method: string
+          updated_at: string | null
+          vehicle_type: string
+        }
+        Insert: {
+          created_at?: string | null
+          currency?: string
+          id?: string
+          price: number
+          region: Database["public"]["Enums"]["agent_region"]
+          shipping_method: string
+          updated_at?: string | null
+          vehicle_type: string
+        }
+        Update: {
+          created_at?: string | null
+          currency?: string
+          id?: string
+          price?: number
+          region?: Database["public"]["Enums"]["agent_region"]
+          shipping_method?: string
+          updated_at?: string | null
+          vehicle_type?: string
         }
         Relationships: []
       }

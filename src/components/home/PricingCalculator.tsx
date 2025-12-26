@@ -17,27 +17,22 @@ interface RegionPricing {
   currency: string;
 }
 
-// Container pricing estimates (base rates)
-const CONTAINER_PRICING = {
-  '20ft': {
-    europe: { price: 2500, currency: 'GBP' },
-    dubai: { price: 1800, currency: 'USD' },
-    china: { price: 2200, currency: 'USD' },
-    india: { price: 1900, currency: 'USD' },
-    usa: { price: 3500, currency: 'USD' },
-    uk: { price: 2400, currency: 'GBP' },
-  },
-  '40ft': {
-    europe: { price: 4200, currency: 'GBP' },
-    dubai: { price: 3200, currency: 'USD' },
-    china: { price: 3800, currency: 'USD' },
-    india: { price: 3400, currency: 'USD' },
-    usa: { price: 5800, currency: 'USD' },
-    uk: { price: 4000, currency: 'GBP' },
-  },
-} as const;
+interface ContainerPricingData {
+  container_size: '20ft' | '40ft';
+  region: Region;
+  price: number;
+  currency: string;
+}
 
-// Vehicle shipping pricing estimates
+interface VehiclePricingData {
+  vehicle_type: VehicleType;
+  shipping_method: ShippingMethod;
+  region: Region;
+  price: number;
+  currency: string;
+}
+
+// Vehicle type labels for display
 const VEHICLE_TYPES = {
   motorcycle: { label: 'Motorcycle', icon: 'bike', baseWeight: 200 },
   sedan: { label: 'Sedan / Hatchback', icon: 'car', baseWeight: 1400 },
@@ -45,29 +40,16 @@ const VEHICLE_TYPES = {
   truck: { label: 'Truck / Pickup', icon: 'truck', baseWeight: 2500 },
 } as const;
 
-const VEHICLE_PRICING = {
-  roro: {
-    motorcycle: { europe: 800, dubai: 600, china: 700, india: 650, usa: 1200, uk: 750, currency: 'USD' },
-    sedan: { europe: 1500, dubai: 1100, china: 1300, india: 1200, usa: 2200, uk: 1400, currency: 'USD' },
-    suv: { europe: 1800, dubai: 1400, china: 1600, india: 1500, usa: 2600, uk: 1700, currency: 'USD' },
-    truck: { europe: 2200, dubai: 1800, china: 2000, india: 1900, usa: 3200, uk: 2100, currency: 'USD' },
-  },
-  container: {
-    motorcycle: { europe: 1200, dubai: 900, china: 1000, india: 950, usa: 1600, uk: 1100, currency: 'USD' },
-    sedan: { europe: 2500, dubai: 1900, china: 2200, india: 2000, usa: 3500, uk: 2400, currency: 'USD' },
-    suv: { europe: 3000, dubai: 2400, china: 2700, india: 2500, usa: 4200, uk: 2900, currency: 'USD' },
-    truck: { europe: 3800, dubai: 3000, china: 3400, india: 3200, usa: 5000, uk: 3600, currency: 'USD' },
-  },
-} as const;
-
 type ContainerSize = '20ft' | '40ft';
-type VehicleType = keyof typeof VEHICLE_TYPES;
+type VehicleType = 'motorcycle' | 'sedan' | 'suv' | 'truck';
 type ShippingMethod = 'roro' | 'container';
 
 export function PricingCalculator() {
   const [region, setRegion] = useState<Region>('europe');
   const [weight, setWeight] = useState<string>('');
   const [pricing, setPricing] = useState<RegionPricing[]>([]);
+  const [containerPricingData, setContainerPricingData] = useState<ContainerPricingData[]>([]);
+  const [vehiclePricingData, setVehiclePricingData] = useState<VehiclePricingData[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('loose-cargo');
   const [containerSize, setContainerSize] = useState<ContainerSize>('20ft');
@@ -80,16 +62,24 @@ export function PricingCalculator() {
   const { ref: rightRef, isVisible: rightVisible } = useScrollAnimation();
 
   useEffect(() => {
-    fetchPricing();
+    fetchAllPricing();
   }, []);
 
-  const fetchPricing = async () => {
-    const { data } = await supabase
-      .from('region_pricing')
-      .select('region, customer_rate_per_kg, handling_fee, currency');
+  const fetchAllPricing = async () => {
+    const [regionResult, containerResult, vehicleResult] = await Promise.all([
+      supabase.from('region_pricing').select('region, customer_rate_per_kg, handling_fee, currency'),
+      supabase.from('container_pricing').select('container_size, region, price, currency'),
+      supabase.from('vehicle_pricing').select('vehicle_type, shipping_method, region, price, currency'),
+    ]);
     
-    if (data) {
-      setPricing(data as RegionPricing[]);
+    if (regionResult.data) {
+      setPricing(regionResult.data as RegionPricing[]);
+    }
+    if (containerResult.data) {
+      setContainerPricingData(containerResult.data as ContainerPricingData[]);
+    }
+    if (vehicleResult.data) {
+      setVehiclePricingData(vehicleResult.data as VehiclePricingData[]);
     }
     setLoading(false);
   };
@@ -104,14 +94,21 @@ export function PricingCalculator() {
   const currency = selectedPricing?.currency || 'USD';
   const symbol = CURRENCY_SYMBOLS[currency] || '$';
 
-  // Container calculations
-  const containerPricing = CONTAINER_PRICING[containerSize][containerRegion];
-  const containerSymbol = CURRENCY_SYMBOLS[containerPricing.currency] || '$';
+  // Container calculations - from database
+  const selectedContainerPricing = containerPricingData.find(
+    p => p.container_size === containerSize && p.region === containerRegion
+  );
+  const containerPrice = selectedContainerPricing?.price || 0;
+  const containerCurrency = selectedContainerPricing?.currency || 'USD';
+  const containerSymbol = CURRENCY_SYMBOLS[containerCurrency] || '$';
 
-  // Vehicle calculations
-  const vehiclePricing = VEHICLE_PRICING[shippingMethod][vehicleType];
-  const vehiclePrice = vehiclePricing[vehicleRegion];
-  const vehicleSymbol = CURRENCY_SYMBOLS[vehiclePricing.currency] || '$';
+  // Vehicle calculations - from database
+  const selectedVehiclePricing = vehiclePricingData.find(
+    p => p.vehicle_type === vehicleType && p.shipping_method === shippingMethod && p.region === vehicleRegion
+  );
+  const vehiclePrice = selectedVehiclePricing?.price || 0;
+  const vehicleCurrency = selectedVehiclePricing?.currency || 'USD';
+  const vehicleSymbol = CURRENCY_SYMBOLS[vehicleCurrency] || '$';
 
   return (
     <section className="section-padding bg-muted/50 overflow-hidden">
@@ -328,7 +325,7 @@ export function PricingCalculator() {
                   <div className="flex justify-between text-xl font-bold pt-3 border-t border-border">
                     <span>Estimated Cost</span>
                     <span className="text-primary">
-                      {containerSymbol}{containerPricing.price.toLocaleString()} {containerPricing.currency}
+                      {containerSymbol}{containerPrice.toLocaleString()} {containerCurrency}
                     </span>
                   </div>
                 </div>
@@ -444,7 +441,7 @@ export function PricingCalculator() {
                   <div className="flex justify-between text-xl font-bold pt-3 border-t border-border">
                     <span>Estimated Cost</span>
                     <span className="text-primary">
-                      {vehicleSymbol}{vehiclePrice.toLocaleString()} {vehiclePricing.currency}
+                      {vehicleSymbol}{vehiclePrice.toLocaleString()} {vehicleCurrency}
                     </span>
                   </div>
                 </div>
