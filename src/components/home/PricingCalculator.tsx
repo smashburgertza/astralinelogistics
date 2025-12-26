@@ -17,12 +17,36 @@ interface RegionPricing {
   currency: string;
 }
 
+// Container pricing estimates (base rates)
+const CONTAINER_PRICING = {
+  '20ft': {
+    europe: { price: 2500, currency: 'GBP' },
+    dubai: { price: 1800, currency: 'USD' },
+    china: { price: 2200, currency: 'USD' },
+    india: { price: 1900, currency: 'USD' },
+    usa: { price: 3500, currency: 'USD' },
+    uk: { price: 2400, currency: 'GBP' },
+  },
+  '40ft': {
+    europe: { price: 4200, currency: 'GBP' },
+    dubai: { price: 3200, currency: 'USD' },
+    china: { price: 3800, currency: 'USD' },
+    india: { price: 3400, currency: 'USD' },
+    usa: { price: 5800, currency: 'USD' },
+    uk: { price: 4000, currency: 'GBP' },
+  },
+} as const;
+
+type ContainerSize = '20ft' | '40ft';
+
 export function PricingCalculator() {
   const [region, setRegion] = useState<Region>('europe');
   const [weight, setWeight] = useState<string>('');
   const [pricing, setPricing] = useState<RegionPricing[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('loose-cargo');
+  const [containerSize, setContainerSize] = useState<ContainerSize>('20ft');
+  const [containerRegion, setContainerRegion] = useState<Region>('china');
 
   const { ref: leftRef, isVisible: leftVisible } = useScrollAnimation();
   const { ref: rightRef, isVisible: rightVisible } = useScrollAnimation();
@@ -42,6 +66,7 @@ export function PricingCalculator() {
     setLoading(false);
   };
 
+  // Loose cargo calculations
   const selectedPricing = pricing.find(p => p.region === region);
   const weightNum = parseFloat(weight) || 0;
   
@@ -50,6 +75,10 @@ export function PricingCalculator() {
   const total = shippingCost + handlingFee;
   const currency = selectedPricing?.currency || 'USD';
   const symbol = CURRENCY_SYMBOLS[currency] || '$';
+
+  // Container calculations
+  const containerPricing = CONTAINER_PRICING[containerSize][containerRegion];
+  const containerSymbol = CURRENCY_SYMBOLS[containerPricing.currency] || '$';
 
   return (
     <section className="section-padding bg-muted/50 overflow-hidden">
@@ -197,19 +226,90 @@ export function PricingCalculator() {
 
               {/* Full Containers Tab */}
               <TabsContent value="full-containers" className="space-y-4 sm:space-y-6 mt-0">
-                <div className="text-center py-8">
-                  <Container className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                  <h4 className="font-semibold text-lg mb-2">Full Container Shipping</h4>
-                  <p className="text-sm text-muted-foreground mb-6 max-w-xs mx-auto">
-                    For 20ft and 40ft container shipments, please contact us for a customized quote based on your specific requirements.
-                  </p>
-                  <Button className="btn-gold group" asChild>
-                    <a href="/contact">
-                      Request Container Quote
-                      <MoveRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
-                    </a>
-                  </Button>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Container Size</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setContainerSize('20ft')}
+                      className={cn(
+                        "p-4 rounded-lg border-2 transition-all text-left",
+                        containerSize === '20ft'
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-primary/50"
+                      )}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <Container className="w-5 h-5 text-primary" />
+                        <span className="font-semibold">20ft Container</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Up to 28 CBM / 21,700 kg</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setContainerSize('40ft')}
+                      className={cn(
+                        "p-4 rounded-lg border-2 transition-all text-left",
+                        containerSize === '40ft'
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-primary/50"
+                      )}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <Container className="w-6 h-6 text-primary" />
+                        <span className="font-semibold">40ft Container</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Up to 67 CBM / 26,500 kg</p>
+                    </button>
+                  </div>
                 </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Origin Region</Label>
+                  <Select value={containerRegion} onValueChange={(v) => setContainerRegion(v as Region)}>
+                    <SelectTrigger className="h-12">
+                      <SelectValue placeholder="Select origin" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(REGIONS).map(([key, value]) => (
+                        <SelectItem key={key} value={key}>
+                          <span className="flex items-center gap-2">
+                            <span className="text-lg">{value.flag}</span>
+                            {value.label}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="pt-4 border-t border-border space-y-3 animate-fade-in">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Container Type</span>
+                    <span className="font-medium">{containerSize} Standard</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Origin</span>
+                    <span className="font-medium">{REGIONS[containerRegion].label}</span>
+                  </div>
+                  <div className="flex justify-between text-xl font-bold pt-3 border-t border-border">
+                    <span>Estimated Cost</span>
+                    <span className="text-primary">
+                      {containerSymbol}{containerPricing.price.toLocaleString()} {containerPricing.currency}
+                    </span>
+                  </div>
+                </div>
+
+                <Button className="w-full h-12 text-base btn-gold group" asChild>
+                  <a href="/contact">
+                    Request Container Quote
+                    <MoveRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
+                  </a>
+                </Button>
+                
+                <p className="text-xs text-center text-muted-foreground">
+                  * Prices are estimates. Final cost depends on cargo type, destination, and current rates.
+                </p>
               </TabsContent>
 
               {/* Vehicles Tab */}
