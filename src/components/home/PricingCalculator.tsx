@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Calculator, PackageSearch, MoveRight, Container, Car, Bike, Truck } from 'lucide-react';
+import { Calculator, PackageSearch, MoveRight, Ship, Plane } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,98 +17,50 @@ interface RegionPricing {
   currency: string;
 }
 
-interface ContainerPricingData {
-  container_size: '20ft' | '40ft';
-  region: Region;
-  price: number;
-  currency: string;
-}
-
-interface VehiclePricingData {
-  vehicle_type: VehicleType;
-  shipping_method: ShippingMethod;
-  region: Region;
-  price: number;
-  currency: string;
-}
-
-// Vehicle type labels for display
-const VEHICLE_TYPES = {
-  motorcycle: { label: 'Motorcycle', icon: 'bike', baseWeight: 200 },
-  sedan: { label: 'Sedan / Hatchback', icon: 'car', baseWeight: 1400 },
-  suv: { label: 'SUV / Crossover', icon: 'car', baseWeight: 2000 },
-  truck: { label: 'Truck / Pickup', icon: 'truck', baseWeight: 2500 },
-} as const;
-
-type ContainerSize = '20ft' | '40ft';
-type VehicleType = 'motorcycle' | 'sedan' | 'suv' | 'truck';
-type ShippingMethod = 'roro' | 'container';
-
 export function PricingCalculator() {
-  const [region, setRegion] = useState<Region>('europe');
-  const [weight, setWeight] = useState<string>('');
+  const [seaRegion, setSeaRegion] = useState<Region>('china');
+  const [seaWeight, setSeaWeight] = useState<string>('');
+  const [airRegion, setAirRegion] = useState<Region>('dubai');
+  const [airWeight, setAirWeight] = useState<string>('');
   const [pricing, setPricing] = useState<RegionPricing[]>([]);
-  const [containerPricingData, setContainerPricingData] = useState<ContainerPricingData[]>([]);
-  const [vehiclePricingData, setVehiclePricingData] = useState<VehiclePricingData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('loose-cargo');
-  const [containerSize, setContainerSize] = useState<ContainerSize>('20ft');
-  const [containerRegion, setContainerRegion] = useState<Region>('china');
-  const [vehicleType, setVehicleType] = useState<VehicleType>('sedan');
-  const [shippingMethod, setShippingMethod] = useState<ShippingMethod>('roro');
-  const [vehicleRegion, setVehicleRegion] = useState<Region>('dubai');
+  const [activeTab, setActiveTab] = useState('sea-cargo');
 
   const { ref: leftRef, isVisible: leftVisible } = useScrollAnimation();
   const { ref: rightRef, isVisible: rightVisible } = useScrollAnimation();
 
   useEffect(() => {
-    fetchAllPricing();
+    fetchPricing();
   }, []);
 
-  const fetchAllPricing = async () => {
-    const [regionResult, containerResult, vehicleResult] = await Promise.all([
-      supabase.from('region_pricing').select('region, customer_rate_per_kg, handling_fee, currency'),
-      supabase.from('container_pricing').select('container_size, region, price, currency'),
-      supabase.from('vehicle_pricing').select('vehicle_type, shipping_method, region, price, currency'),
-    ]);
+  const fetchPricing = async () => {
+    const { data } = await supabase
+      .from('region_pricing')
+      .select('region, customer_rate_per_kg, handling_fee, currency');
     
-    if (regionResult.data) {
-      setPricing(regionResult.data as RegionPricing[]);
-    }
-    if (containerResult.data) {
-      setContainerPricingData(containerResult.data as ContainerPricingData[]);
-    }
-    if (vehicleResult.data) {
-      setVehiclePricingData(vehicleResult.data as VehiclePricingData[]);
+    if (data) {
+      setPricing(data as RegionPricing[]);
     }
     setLoading(false);
   };
 
-  // Loose cargo calculations
-  const selectedPricing = pricing.find(p => p.region === region);
-  const weightNum = parseFloat(weight) || 0;
-  
-  const shippingCost = selectedPricing ? weightNum * selectedPricing.customer_rate_per_kg : 0;
-  const handlingFee = selectedPricing?.handling_fee || 0;
-  const total = shippingCost + handlingFee;
-  const currency = selectedPricing?.currency || 'USD';
-  const symbol = CURRENCY_SYMBOLS[currency] || '$';
+  // Sea cargo calculations
+  const seaPricing = pricing.find(p => p.region === seaRegion);
+  const seaWeightNum = parseFloat(seaWeight) || 0;
+  const seaShippingCost = seaPricing ? seaWeightNum * seaPricing.customer_rate_per_kg : 0;
+  const seaHandlingFee = seaPricing?.handling_fee || 0;
+  const seaTotal = seaShippingCost + seaHandlingFee;
+  const seaCurrency = seaPricing?.currency || 'USD';
+  const seaSymbol = CURRENCY_SYMBOLS[seaCurrency] || '$';
 
-  // Container calculations - from database
-  const selectedContainerPricing = containerPricingData.find(
-    p => p.container_size === containerSize && p.region === containerRegion
-  );
-  const containerPrice = selectedContainerPricing?.price || 0;
-  const containerCurrency = selectedContainerPricing?.currency || 'USD';
-  const containerSymbol = CURRENCY_SYMBOLS[containerCurrency] || '$';
-
-  // Vehicle calculations - from database
-  const selectedVehiclePricing = vehiclePricingData.find(
-    p => p.vehicle_type === vehicleType && p.shipping_method === shippingMethod && p.region === vehicleRegion
-  );
-  const vehiclePrice = selectedVehiclePricing?.price || 0;
-  const vehicleCurrency = selectedVehiclePricing?.currency || 'USD';
-  const vehicleSymbol = CURRENCY_SYMBOLS[vehicleCurrency] || '$';
+  // Air cargo calculations (using same pricing structure but could be different rates in future)
+  const airPricing = pricing.find(p => p.region === airRegion);
+  const airWeightNum = parseFloat(airWeight) || 0;
+  const airShippingCost = airPricing ? airWeightNum * airPricing.customer_rate_per_kg : 0;
+  const airHandlingFee = airPricing?.handling_fee || 0;
+  const airTotal = airShippingCost + airHandlingFee;
+  const airCurrency = airPricing?.currency || 'USD';
+  const airSymbol = CURRENCY_SYMBOLS[airCurrency] || '$';
 
   return (
     <section className="section-padding bg-muted/50 overflow-hidden">
@@ -168,28 +120,27 @@ export function PricingCalculator() {
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-3 mb-6">
-                <TabsTrigger value="loose-cargo" className="flex items-center gap-1.5 text-xs sm:text-sm">
-                  <PackageSearch className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  <span className="hidden sm:inline">Loose Cargo</span>
-                  <span className="sm:hidden">Loose</span>
+              <TabsList className="grid w-full grid-cols-2 mb-6">
+                <TabsTrigger value="sea-cargo" className="flex items-center gap-2 text-sm">
+                  <Ship className="w-4 h-4" />
+                  <span>Sea Cargo</span>
                 </TabsTrigger>
-                <TabsTrigger value="full-containers" className="flex items-center gap-1.5 text-xs sm:text-sm">
-                  <Container className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  <span className="hidden sm:inline">Full Containers</span>
-                  <span className="sm:hidden">Container</span>
-                </TabsTrigger>
-                <TabsTrigger value="vehicles" className="flex items-center gap-1.5 text-xs sm:text-sm">
-                  <Car className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  <span>Vehicles</span>
+                <TabsTrigger value="air-cargo" className="flex items-center gap-2 text-sm">
+                  <Plane className="w-4 h-4" />
+                  <span>Air Cargo</span>
                 </TabsTrigger>
               </TabsList>
 
-              {/* Loose Cargo Tab */}
-              <TabsContent value="loose-cargo" className="space-y-4 sm:space-y-6 mt-0">
+              {/* Sea Cargo Tab */}
+              <TabsContent value="sea-cargo" className="space-y-4 sm:space-y-6 mt-0">
+                <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                  <Ship className="w-5 h-5 text-blue-600" />
+                  <p className="text-sm text-blue-700">Ocean freight - economical for larger shipments</p>
+                </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="origin" className="text-sm font-medium">Origin Region</Label>
-                  <Select value={region} onValueChange={(v) => setRegion(v as Region)}>
+                  <Label htmlFor="sea-origin" className="text-sm font-medium">Origin Region</Label>
+                  <Select value={seaRegion} onValueChange={(v) => setSeaRegion(v as Region)}>
                     <SelectTrigger className="h-12">
                       <SelectValue placeholder="Select origin" />
                     </SelectTrigger>
@@ -207,37 +158,37 @@ export function PricingCalculator() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="weight" className="text-sm font-medium">Weight (kg)</Label>
+                  <Label htmlFor="sea-weight" className="text-sm font-medium">Weight (kg)</Label>
                   <div className="relative">
                     <PackageSearch className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                     <Input
-                      id="weight"
+                      id="sea-weight"
                       type="number"
                       placeholder="Enter weight in kg"
                       className="h-12 pl-12 text-base"
-                      value={weight}
-                      onChange={(e) => setWeight(e.target.value)}
+                      value={seaWeight}
+                      onChange={(e) => setSeaWeight(e.target.value)}
                       min="0"
                       step="0.1"
                     />
                   </div>
                 </div>
 
-                {weightNum > 0 && selectedPricing && (
+                {seaWeightNum > 0 && seaPricing && (
                   <div className="pt-4 border-t border-border space-y-3 animate-fade-in">
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">
-                        Shipping ({symbol}{selectedPricing.customer_rate_per_kg}/kg × {weightNum}kg)
+                        Shipping ({seaSymbol}{seaPricing.customer_rate_per_kg}/kg × {seaWeightNum}kg)
                       </span>
-                      <span className="font-medium">{symbol}{shippingCost.toFixed(2)}</span>
+                      <span className="font-medium">{seaSymbol}{seaShippingCost.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Handling Fee</span>
-                      <span className="font-medium">{symbol}{handlingFee.toFixed(2)}</span>
+                      <span className="font-medium">{seaSymbol}{seaHandlingFee.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-xl font-bold pt-3 border-t border-border">
                       <span>Estimated Total</span>
-                      <span className="text-primary">{symbol}{total.toFixed(2)} {currency}</span>
+                      <span className="text-primary">{seaSymbol}{seaTotal.toFixed(2)} {seaCurrency}</span>
                     </div>
                   </div>
                 )}
@@ -250,53 +201,20 @@ export function PricingCalculator() {
                 </Button>
                 
                 <p className="text-xs text-center text-muted-foreground">
-                  * Final cost may vary based on actual weight and customs duties.
+                  * Final cost may vary based on actual weight, volume, and customs duties.
                 </p>
               </TabsContent>
 
-              {/* Full Containers Tab */}
-              <TabsContent value="full-containers" className="space-y-4 sm:space-y-6 mt-0">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Container Size</Label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setContainerSize('20ft')}
-                      className={cn(
-                        "p-4 rounded-lg border-2 transition-all text-left",
-                        containerSize === '20ft'
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-primary/50"
-                      )}
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        <Container className="w-5 h-5 text-primary" />
-                        <span className="font-semibold">20ft Container</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">Up to 28 CBM / 21,700 kg</p>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setContainerSize('40ft')}
-                      className={cn(
-                        "p-4 rounded-lg border-2 transition-all text-left",
-                        containerSize === '40ft'
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-primary/50"
-                      )}
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        <Container className="w-6 h-6 text-primary" />
-                        <span className="font-semibold">40ft Container</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">Up to 67 CBM / 26,500 kg</p>
-                    </button>
-                  </div>
+              {/* Air Cargo Tab */}
+              <TabsContent value="air-cargo" className="space-y-4 sm:space-y-6 mt-0">
+                <div className="flex items-center gap-2 p-3 bg-amber-50 rounded-lg border border-amber-100">
+                  <Plane className="w-5 h-5 text-amber-600" />
+                  <p className="text-sm text-amber-700">Air freight - fast delivery for urgent shipments</p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">Origin Region</Label>
-                  <Select value={containerRegion} onValueChange={(v) => setContainerRegion(v as Region)}>
+                  <Label htmlFor="air-origin" className="text-sm font-medium">Origin Region</Label>
+                  <Select value={airRegion} onValueChange={(v) => setAirRegion(v as Region)}>
                     <SelectTrigger className="h-12">
                       <SelectValue placeholder="Select origin" />
                     </SelectTrigger>
@@ -313,148 +231,51 @@ export function PricingCalculator() {
                   </Select>
                 </div>
 
-                <div className="pt-4 border-t border-border space-y-3 animate-fade-in">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Container Type</span>
-                    <span className="font-medium">{containerSize} Standard</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Origin</span>
-                    <span className="font-medium">{REGIONS[containerRegion].label}</span>
-                  </div>
-                  <div className="flex justify-between text-xl font-bold pt-3 border-t border-border">
-                    <span>Estimated Cost</span>
-                    <span className="text-primary">
-                      {containerSymbol}{containerPrice.toLocaleString()} {containerCurrency}
-                    </span>
+                <div className="space-y-2">
+                  <Label htmlFor="air-weight" className="text-sm font-medium">Weight (kg)</Label>
+                  <div className="relative">
+                    <PackageSearch className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input
+                      id="air-weight"
+                      type="number"
+                      placeholder="Enter weight in kg"
+                      className="h-12 pl-12 text-base"
+                      value={airWeight}
+                      onChange={(e) => setAirWeight(e.target.value)}
+                      min="0"
+                      step="0.1"
+                    />
                   </div>
                 </div>
 
+                {airWeightNum > 0 && airPricing && (
+                  <div className="pt-4 border-t border-border space-y-3 animate-fade-in">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        Shipping ({airSymbol}{airPricing.customer_rate_per_kg}/kg × {airWeightNum}kg)
+                      </span>
+                      <span className="font-medium">{airSymbol}{airShippingCost.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Handling Fee</span>
+                      <span className="font-medium">{airSymbol}{airHandlingFee.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-xl font-bold pt-3 border-t border-border">
+                      <span>Estimated Total</span>
+                      <span className="text-primary">{airSymbol}{airTotal.toFixed(2)} {airCurrency}</span>
+                    </div>
+                  </div>
+                )}
+
                 <Button className="w-full h-12 text-base btn-gold group" asChild>
-                  <a href="/contact">
-                    Request Container Quote
+                  <a href="/auth?mode=signup">
+                    Request Full Quote
                     <MoveRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
                   </a>
                 </Button>
                 
                 <p className="text-xs text-center text-muted-foreground">
-                  * Prices are estimates. Final cost depends on cargo type, destination, and current rates.
-                </p>
-              </TabsContent>
-
-              {/* Vehicles Tab */}
-              <TabsContent value="vehicles" className="space-y-4 sm:space-y-6 mt-0">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Vehicle Type</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {(Object.entries(VEHICLE_TYPES) as [VehicleType, typeof VEHICLE_TYPES[VehicleType]][]).map(([key, value]) => (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => setVehicleType(key)}
-                        className={cn(
-                          "p-3 rounded-lg border-2 transition-all text-left",
-                          vehicleType === key
-                            ? "border-primary bg-primary/5"
-                            : "border-border hover:border-primary/50"
-                        )}
-                      >
-                        <div className="flex items-center gap-2">
-                          {key === 'motorcycle' ? (
-                            <Bike className="w-4 h-4 text-primary" />
-                          ) : key === 'truck' ? (
-                            <Truck className="w-4 h-4 text-primary" />
-                          ) : (
-                            <Car className="w-4 h-4 text-primary" />
-                          )}
-                          <span className="font-medium text-sm">{value.label}</span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Shipping Method</Label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setShippingMethod('roro')}
-                      className={cn(
-                        "p-4 rounded-lg border-2 transition-all text-left",
-                        shippingMethod === 'roro'
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-primary/50"
-                      )}
-                    >
-                      <span className="font-semibold text-sm">RoRo (Roll-on/Roll-off)</span>
-                      <p className="text-xs text-muted-foreground mt-1">Drive on/off ship. More economical.</p>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShippingMethod('container')}
-                      className={cn(
-                        "p-4 rounded-lg border-2 transition-all text-left",
-                        shippingMethod === 'container'
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-primary/50"
-                      )}
-                    >
-                      <span className="font-semibold text-sm">Container Shipping</span>
-                      <p className="text-xs text-muted-foreground mt-1">Enclosed container. More protected.</p>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Origin Region</Label>
-                  <Select value={vehicleRegion} onValueChange={(v) => setVehicleRegion(v as Region)}>
-                    <SelectTrigger className="h-12">
-                      <SelectValue placeholder="Select origin" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(REGIONS).map(([key, value]) => (
-                        <SelectItem key={key} value={key}>
-                          <span className="flex items-center gap-2">
-                            <span className="text-lg">{value.flag}</span>
-                            {value.label}
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="pt-4 border-t border-border space-y-3 animate-fade-in">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Vehicle</span>
-                    <span className="font-medium">{VEHICLE_TYPES[vehicleType].label}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Method</span>
-                    <span className="font-medium">{shippingMethod === 'roro' ? 'RoRo' : 'Container'}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Origin</span>
-                    <span className="font-medium">{REGIONS[vehicleRegion].label}</span>
-                  </div>
-                  <div className="flex justify-between text-xl font-bold pt-3 border-t border-border">
-                    <span>Estimated Cost</span>
-                    <span className="text-primary">
-                      {vehicleSymbol}{vehiclePrice.toLocaleString()} {vehicleCurrency}
-                    </span>
-                  </div>
-                </div>
-
-                <Button className="w-full h-12 text-base btn-gold group" asChild>
-                  <a href="/contact">
-                    Request Vehicle Quote
-                    <MoveRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
-                  </a>
-                </Button>
-                
-                <p className="text-xs text-center text-muted-foreground">
-                  * Prices are estimates. Final cost depends on vehicle condition, exact dimensions, and current rates.
+                  * Final cost may vary based on actual weight, volumetric weight, and customs duties.
                 </p>
               </TabsContent>
             </Tabs>
