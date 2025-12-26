@@ -496,7 +496,10 @@ export function ShoppingAggregator() {
 
       if (itemsError) throw itemsError;
 
-      toast.success('Order request submitted successfully! We will contact you soon.');
+      toast.success('Order request submitted successfully! We will contact you soon.', {
+        description: 'You can track your order status at /order-tracking',
+        duration: 5000,
+      });
       
       setItems([]);
       setCustomerDetails({ name: '', email: '', phone: '', address: '' });

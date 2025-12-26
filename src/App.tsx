@@ -10,6 +10,7 @@ import AuthPage from "./pages/Auth";
 import SystemAuthPage from "./pages/SystemAuth";
 import TrackingPage from "./pages/Tracking";
 import ShopForMe from "./pages/ShopForMe";
+import OrderTracking from "./pages/OrderTracking";
 import AboutPage from "./pages/About";
 import ContactPage from "./pages/Contact";
 import CustomerDashboard from "./pages/customer/Dashboard";
@@ -58,6 +59,7 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/tracking" element={<TrackingPage />} />
               <Route path="/shop-for-me" element={<ShopForMe />} />
+              <Route path="/order-tracking" element={<OrderTracking />} />
               <Route path="/about" element={<AboutPage />} />
               <Route path="/contact" element={<ContactPage />} />
             </Route>
