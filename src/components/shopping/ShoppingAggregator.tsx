@@ -840,7 +840,7 @@ export function ShoppingAggregator() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calculator className="h-5 w-5" />
-              Price Breakdown
+              Estimated Cost
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
