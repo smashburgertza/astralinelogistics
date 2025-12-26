@@ -1,11 +1,13 @@
-import { useState } from 'react';
-import { Plus, Trash2, Loader2, ExternalLink, ShoppingCart, Calculator, Package, ImageOff } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Trash2, Loader2, ExternalLink, ShoppingCart, Calculator, Package, CheckCircle2, Globe, Search, Sparkles, Edit3, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import {
   Select,
   SelectContent,
@@ -13,12 +15,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useRegionPricing } from '@/hooks/useRegionPricing';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useShopForMeCharges, calculateShopForMeCharges } from '@/hooks/useShopForMeCharges';
 import { REGIONS, type Region } from '@/lib/constants';
+
+type LoadingStep = 'fetching' | 'extracting' | 'analyzing' | 'complete' | 'error';
 
 interface ProductItem {
   id: string;
@@ -31,8 +43,13 @@ interface ProductItem {
   estimatedWeightKg: number;
   quantity: number;
   isLoading: boolean;
+  loadingStep?: LoadingStep;
   error?: string;
   originRegion?: Region;
+  detectedRegion?: Region;
+  isRegionConfirmed?: boolean;
+  isPriceManual?: boolean;
+  isWeightManual?: boolean;
 }
 
 interface CustomerDetails {
@@ -42,12 +59,26 @@ interface CustomerDetails {
   address: string;
 }
 
+interface RegionConfirmDialogData {
+  itemId: string;
+  detectedRegion: Region;
+  productName: string;
+}
+
+const LOADING_STEPS: { step: LoadingStep; label: string; progress: number }[] = [
+  { step: 'fetching', label: 'Fetching page...', progress: 25 },
+  { step: 'extracting', label: 'Extracting data...', progress: 50 },
+  { step: 'analyzing', label: 'Analyzing product...', progress: 75 },
+  { step: 'complete', label: 'Complete', progress: 100 },
+];
+
 export function ShoppingAggregator() {
   const [items, setItems] = useState<ProductItem[]>([]);
   const [newUrl, setNewUrl] = useState('');
   const [isAddingUrl, setIsAddingUrl] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedRegion, setSelectedRegion] = useState<Region>('usa');
+  const [regionConfirmDialog, setRegionConfirmDialog] = useState<RegionConfirmDialogData | null>(null);
   const [customerDetails, setCustomerDetails] = useState<CustomerDetails>({
     name: '',
     email: '',
@@ -62,25 +93,41 @@ export function ShoppingAggregator() {
   // Get shipping rate for selected region
   const getShippingRate = (region: Region) => {
     const pricing = regionPricing?.find(r => r.region === region);
-    return pricing?.customer_rate_per_kg ?? 8; // Default $8/kg
+    return pricing?.customer_rate_per_kg ?? 8;
   };
 
   // Get exchange rate to TZS
   const getExchangeRate = (currency: string) => {
     const rate = exchangeRates?.find(r => r.currency_code === currency);
-    return rate?.rate_to_tzs ?? 2500; // Default USD rate
+    return rate?.rate_to_tzs ?? 2500;
   };
 
-  const fetchProductInfo = async (url: string): Promise<Partial<ProductItem>> => {
+  const updateItemLoadingStep = (itemId: string, step: LoadingStep) => {
+    setItems(prev =>
+      prev.map(item =>
+        item.id === itemId ? { ...item, loadingStep: step } : item
+      )
+    );
+  };
+
+  const fetchProductInfo = async (url: string, itemId: string): Promise<Partial<ProductItem>> => {
+    // Simulate progressive loading steps
+    updateItemLoadingStep(itemId, 'fetching');
+    await new Promise(r => setTimeout(r, 500));
+    
+    updateItemLoadingStep(itemId, 'extracting');
+    
     const response = await supabase.functions.invoke('fetch-product-info', {
       body: { url },
     });
+
+    updateItemLoadingStep(itemId, 'analyzing');
+    await new Promise(r => setTimeout(r, 300));
 
     if (response.error) {
       throw new Error(response.error.message);
     }
 
-    // Map the detected region to our Region type
     const detectedRegion = response.data.origin_region as Region | undefined;
     
     return {
@@ -91,6 +138,7 @@ export function ShoppingAggregator() {
       currency: response.data.currency || 'USD',
       estimatedWeightKg: response.data.estimated_weight_kg || 0.5,
       originRegion: detectedRegion,
+      detectedRegion: detectedRegion,
     };
   };
 
@@ -119,7 +167,9 @@ export function ShoppingAggregator() {
       estimatedWeightKg: 0,
       quantity: 1,
       isLoading: true,
+      loadingStep: 'fetching',
       originRegion: selectedRegion,
+      isRegionConfirmed: false,
     };
 
     setItems(prev => [...prev, newItem]);
@@ -127,27 +177,45 @@ export function ShoppingAggregator() {
     setIsAddingUrl(true);
 
     try {
-      const productInfo = await fetchProductInfo(newUrl);
+      const productInfo = await fetchProductInfo(newUrl, newItemId);
+      
+      updateItemLoadingStep(newItemId, 'complete');
+      
+      const finalRegion = productInfo.originRegion || selectedRegion;
+      const shouldConfirmRegion = productInfo.originRegion && productInfo.originRegion !== selectedRegion;
+      
       setItems(prev =>
         prev.map(item =>
           item.id === newItemId
             ? { 
                 ...item, 
                 ...productInfo, 
-                // Use detected region if available, otherwise fall back to selected region
-                originRegion: productInfo.originRegion || selectedRegion,
-                isLoading: false 
+                originRegion: finalRegion,
+                isLoading: false,
+                loadingStep: 'complete',
+                isRegionConfirmed: !shouldConfirmRegion,
               }
             : item
         )
       );
-      const regionLabel = productInfo.originRegion ? REGIONS[productInfo.originRegion]?.label : null;
-      toast.success(regionLabel 
-        ? `Product added from ${regionLabel}` 
-        : 'Product info fetched successfully'
-      );
+      
+      // Show region confirmation dialog if detected region differs from selected
+      if (shouldConfirmRegion && productInfo.originRegion) {
+        setRegionConfirmDialog({
+          itemId: newItemId,
+          detectedRegion: productInfo.originRegion,
+          productName: productInfo.productName || 'this product',
+        });
+      } else {
+        const regionLabel = productInfo.originRegion ? REGIONS[productInfo.originRegion]?.label : null;
+        toast.success(regionLabel 
+          ? `Product added from ${regionLabel}` 
+          : 'Product info fetched successfully'
+        );
+      }
     } catch (error) {
       console.error('Error fetching product:', error);
+      updateItemLoadingStep(newItemId, 'error');
       setItems(prev =>
         prev.map(item =>
           item.id === newItemId
@@ -155,15 +223,86 @@ export function ShoppingAggregator() {
                 ...item, 
                 productName: 'Failed to load', 
                 isLoading: false,
+                loadingStep: 'error',
                 error: error instanceof Error ? error.message : 'Failed to fetch'
               }
             : item
         )
       );
-      toast.error('Failed to fetch product info');
+      toast.error('Failed to fetch product info. You can enter details manually.');
     } finally {
       setIsAddingUrl(false);
     }
+  };
+
+  const handleRetryFetch = async (itemId: string) => {
+    const item = items.find(i => i.id === itemId);
+    if (!item) return;
+    
+    setItems(prev =>
+      prev.map(i =>
+        i.id === itemId
+          ? { ...i, isLoading: true, loadingStep: 'fetching', error: undefined }
+          : i
+      )
+    );
+    
+    try {
+      const productInfo = await fetchProductInfo(item.url, itemId);
+      updateItemLoadingStep(itemId, 'complete');
+      
+      setItems(prev =>
+        prev.map(i =>
+          i.id === itemId
+            ? { 
+                ...i, 
+                ...productInfo, 
+                originRegion: productInfo.originRegion || i.originRegion,
+                isLoading: false,
+                loadingStep: 'complete',
+              }
+            : i
+        )
+      );
+      toast.success('Product info updated');
+    } catch (error) {
+      updateItemLoadingStep(itemId, 'error');
+      setItems(prev =>
+        prev.map(i =>
+          i.id === itemId
+            ? { 
+                ...i, 
+                isLoading: false,
+                loadingStep: 'error',
+                error: error instanceof Error ? error.message : 'Failed to fetch'
+              }
+            : i
+        )
+      );
+      toast.error('Failed to refresh product info');
+    }
+  };
+
+  const handleConfirmRegion = (useDetected: boolean) => {
+    if (!regionConfirmDialog) return;
+    
+    const { itemId, detectedRegion } = regionConfirmDialog;
+    
+    setItems(prev =>
+      prev.map(item =>
+        item.id === itemId
+          ? { 
+              ...item, 
+              originRegion: useDetected ? detectedRegion : item.originRegion,
+              isRegionConfirmed: true,
+            }
+          : item
+      )
+    );
+    
+    const finalRegion = useDetected ? detectedRegion : items.find(i => i.id === itemId)?.originRegion;
+    toast.success(`Region set to ${REGIONS[finalRegion || 'usa']?.label}`);
+    setRegionConfirmDialog(null);
   };
 
   const handleRemoveItem = (id: string) => {
@@ -182,7 +321,7 @@ export function ShoppingAggregator() {
   const handleRegionChange = (id: string, region: Region) => {
     setItems(prev =>
       prev.map(item =>
-        item.id === id ? { ...item, originRegion: region } : item
+        item.id === id ? { ...item, originRegion: region, isRegionConfirmed: true } : item
       )
     );
   };
@@ -190,7 +329,23 @@ export function ShoppingAggregator() {
   const handlePriceChange = (id: string, price: number | null) => {
     setItems(prev =>
       prev.map(item =>
-        item.id === id ? { ...item, productPrice: price } : item
+        item.id === id ? { ...item, productPrice: price, isPriceManual: true } : item
+      )
+    );
+  };
+
+  const handleWeightChange = (id: string, weight: number) => {
+    setItems(prev =>
+      prev.map(item =>
+        item.id === id ? { ...item, estimatedWeightKg: Math.max(0.1, weight), isWeightManual: true } : item
+      )
+    );
+  };
+
+  const handleNameChange = (id: string, name: string) => {
+    setItems(prev =>
+      prev.map(item =>
+        item.id === id ? { ...item, productName: name } : item
       )
     );
   };
@@ -207,7 +362,6 @@ export function ShoppingAggregator() {
       return acc;
     }, {} as Record<Region, ProductItem[]>);
 
-    // Calculate per-region breakdowns
     const regionBreakdowns: {
       region: Region;
       currency: string;
@@ -239,7 +393,6 @@ export function ShoppingAggregator() {
         return sum + roundWeight(item.estimatedWeightKg) * item.quantity;
       }, 0);
 
-      // Calculate charges for this region
       const chargeCalc = calculateShopForMeCharges(
         productCost,
         weight,
@@ -267,7 +420,6 @@ export function ShoppingAggregator() {
       return sum + roundWeight(item.estimatedWeightKg) * item.quantity;
     }, 0);
 
-    // Check if it's a single-region order
     const isSingleRegion = regionBreakdowns.length === 1;
 
     return {
@@ -289,11 +441,17 @@ export function ShoppingAggregator() {
       return;
     }
 
+    // Check if any items are missing price
+    const itemsMissingPrice = items.filter(item => !item.productPrice);
+    if (itemsMissingPrice.length > 0) {
+      toast.error('Please enter a price for all products');
+      return;
+    }
+
     setIsSubmitting(true);
     const totals = calculateTotals();
 
     try {
-      // Sum up totals from all regions
       const totalProductCost = totals.regionBreakdowns.reduce((sum, rb) => sum + rb.productCost, 0);
       const totalShipping = totals.regionBreakdowns.reduce((sum, rb) => {
         const shipping = rb.charges.find(c => c.key === 'shipping');
@@ -370,8 +528,56 @@ export function ShoppingAggregator() {
     }).format(amount);
   };
 
+  const getLoadingProgress = (step?: LoadingStep) => {
+    if (!step) return 0;
+    return LOADING_STEPS.find(s => s.step === step)?.progress || 0;
+  };
+
+  const getLoadingLabel = (step?: LoadingStep) => {
+    if (!step) return '';
+    return LOADING_STEPS.find(s => s.step === step)?.label || '';
+  };
+
   return (
     <div className="space-y-6">
+      {/* Region Confirmation Dialog */}
+      <Dialog open={!!regionConfirmDialog} onOpenChange={() => setRegionConfirmDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Globe className="h-5 w-5 text-primary" />
+              Confirm Product Region
+            </DialogTitle>
+            <DialogDescription>
+              We detected that <strong>{regionConfirmDialog?.productName}</strong> is from{' '}
+              <strong>{regionConfirmDialog?.detectedRegion && REGIONS[regionConfirmDialog.detectedRegion]?.label}</strong>.
+              This affects shipping rates and currency.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-3 py-4">
+            <Card className="flex-1 p-4 border-2 border-primary cursor-pointer hover:bg-primary/5 transition-colors" onClick={() => handleConfirmRegion(true)}>
+              <div className="text-center">
+                <span className="text-3xl">{regionConfirmDialog?.detectedRegion && REGIONS[regionConfirmDialog.detectedRegion]?.flag}</span>
+                <p className="font-semibold mt-2">{regionConfirmDialog?.detectedRegion && REGIONS[regionConfirmDialog.detectedRegion]?.label}</p>
+                <p className="text-xs text-muted-foreground">Detected</p>
+              </div>
+            </Card>
+            <Card className="flex-1 p-4 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleConfirmRegion(false)}>
+              <div className="text-center">
+                <span className="text-3xl">{REGIONS[selectedRegion]?.flag}</span>
+                <p className="font-semibold mt-2">{REGIONS[selectedRegion]?.label}</p>
+                <p className="text-xs text-muted-foreground">Selected</p>
+              </div>
+            </Card>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRegionConfirmDialog(null)}>
+              Decide Later
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Add Product URL */}
       <Card>
         <CardHeader>
@@ -382,7 +588,7 @@ export function ShoppingAggregator() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label>Select Origin Region</Label>
+            <Label>Default Origin Region</Label>
             <Select value={selectedRegion} onValueChange={(v: Region) => setSelectedRegion(v)}>
               <SelectTrigger className="w-full md:w-64">
                 <SelectValue />
@@ -395,6 +601,7 @@ export function ShoppingAggregator() {
                 ))}
               </SelectContent>
             </Select>
+            <p className="text-xs text-muted-foreground">We'll auto-detect the region from the URL when possible</p>
           </div>
           <div className="flex gap-2">
             <Input
@@ -428,11 +635,34 @@ export function ShoppingAggregator() {
                 key={item.id}
                 className="border rounded-lg overflow-hidden bg-background"
               >
-                {/* Loading state */}
+                {/* Loading state with progress */}
                 {item.isLoading && (
-                  <div className="flex items-center justify-center p-8 bg-muted/30">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                    <span className="ml-3 text-muted-foreground">Fetching product details...</span>
+                  <div className="p-6 space-y-4">
+                    <div className="flex items-center gap-3">
+                      {item.loadingStep === 'fetching' && <Globe className="h-5 w-5 text-primary animate-pulse" />}
+                      {item.loadingStep === 'extracting' && <Search className="h-5 w-5 text-primary animate-pulse" />}
+                      {item.loadingStep === 'analyzing' && <Sparkles className="h-5 w-5 text-primary animate-pulse" />}
+                      <span className="text-muted-foreground font-medium">{getLoadingLabel(item.loadingStep)}</span>
+                    </div>
+                    <Progress value={getLoadingProgress(item.loadingStep)} className="h-2" />
+                    <p className="text-xs text-muted-foreground truncate">{item.url}</p>
+                  </div>
+                )}
+
+                {/* Error state */}
+                {!item.isLoading && item.error && (
+                  <div className="p-4 bg-destructive/10 border-b border-destructive/20">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <span className="text-sm font-medium">Could not fetch product info automatically</span>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={() => handleRetryFetch(item.id)}>
+                        <RefreshCw className="h-3 w-3 mr-1" />
+                        Retry
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">You can enter the details manually below</p>
                   </div>
                 )}
 
@@ -458,9 +688,17 @@ export function ShoppingAggregator() {
                     </div>
 
                     {/* Product Info */}
-                    <div className="flex-1 min-w-0 space-y-2">
+                    <div className="flex-1 min-w-0 space-y-3">
+                      {/* Product Name - Editable */}
                       <div>
-                        <h4 className="font-semibold text-base line-clamp-2">{item.productName}</h4>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            value={item.productName}
+                            onChange={(e) => handleNameChange(item.id, e.target.value)}
+                            className="font-semibold text-base h-8 border-dashed"
+                            placeholder="Enter product name"
+                          />
+                        </div>
                         {item.productDescription && (
                           <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
                             {item.productDescription}
@@ -477,10 +715,10 @@ export function ShoppingAggregator() {
                         </a>
                       </div>
 
-                      {/* Price Input */}
-                      <div className="flex flex-wrap items-center gap-3">
+                      {/* Price and Weight Inputs */}
+                      <div className="flex flex-wrap items-center gap-4">
                         <div className="flex items-center gap-2">
-                          <Label className="text-sm font-medium">Price:</Label>
+                          <Label className="text-sm font-medium whitespace-nowrap">Price:</Label>
                           <div className="flex items-center gap-1">
                             <span className="text-sm text-muted-foreground">{REGIONS[item.originRegion || selectedRegion]?.currency || 'USD'}</span>
                             <Input
@@ -488,24 +726,46 @@ export function ShoppingAggregator() {
                               value={item.productPrice ?? ''}
                               onChange={(e) => handlePriceChange(item.id, e.target.value ? parseFloat(e.target.value) : null)}
                               placeholder="0.00"
-                              className="w-24 h-8"
+                              className={`w-24 h-8 ${item.isPriceManual ? 'border-primary' : ''}`}
                               min="0"
                               step="0.01"
                             />
                           </div>
+                          {item.isPriceManual && (
+                            <Badge variant="secondary" className="text-xs">
+                              <Edit3 className="h-2.5 w-2.5 mr-1" />
+                              Manual
+                            </Badge>
+                          )}
                           {!item.productPrice && (
                             <span className="text-xs text-orange-500">Required</span>
                           )}
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <Label className="text-sm font-medium">Weight:</Label>
-                          <span className="text-sm">{roundWeight(item.estimatedWeightKg)} kg</span>
+                          <Label className="text-sm font-medium whitespace-nowrap">Weight:</Label>
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              value={item.estimatedWeightKg}
+                              onChange={(e) => handleWeightChange(item.id, parseFloat(e.target.value) || 0.1)}
+                              className={`w-20 h-8 ${item.isWeightManual ? 'border-primary' : ''}`}
+                              min="0.1"
+                              step="0.1"
+                            />
+                            <span className="text-sm text-muted-foreground">kg</span>
+                          </div>
+                          {item.isWeightManual && (
+                            <Badge variant="secondary" className="text-xs">
+                              <Edit3 className="h-2.5 w-2.5 mr-1" />
+                              Manual
+                            </Badge>
+                          )}
                         </div>
                       </div>
 
                       {/* Region and Quantity */}
-                      <div className="flex flex-wrap items-center gap-3 pt-2">
+                      <div className="flex flex-wrap items-center gap-3 pt-1">
                         <div className="flex items-center gap-2">
                           <Label className="text-sm">From:</Label>
                           <Select 
@@ -523,6 +783,12 @@ export function ShoppingAggregator() {
                               ))}
                             </SelectContent>
                           </Select>
+                          {item.detectedRegion && item.detectedRegion === item.originRegion && (
+                            <Badge variant="outline" className="text-xs text-green-600 border-green-200 bg-green-50">
+                              <CheckCircle2 className="h-2.5 w-2.5 mr-1" />
+                              Auto-detected
+                            </Badge>
+                          )}
                         </div>
 
                         <div className="flex items-center gap-2">
