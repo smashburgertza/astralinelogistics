@@ -920,6 +920,7 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
               }
               title="Sign in to see your quote"
               description="Create a free account to view the complete cost breakdown."
+              source="shop_for_me"
             />
           </CardContent>
         </Card>
