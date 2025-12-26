@@ -2,12 +2,11 @@ import { ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, PackageSearch, UsersRound, FileStack, Wallet,
-  ChartSpline, Settings2, LogOut, BellRing, Search, ChevronDown, UserCircle2,
+  ChartSpline, Settings2, LogOut, ChevronDown, UserCircle2,
   Container, UserCog, ReceiptText, TrendingUp, ShoppingCart, FileText, User, Calculator, BarChart3, PiggyBank
 } from 'lucide-react';
 import astralineLogo from '@/assets/astraline-logo-horizontal.svg';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -34,6 +33,8 @@ import {
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
+import { NotificationDropdown } from '@/components/admin/NotificationDropdown';
+import { GlobalSearch } from '@/components/admin/GlobalSearch';
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -243,20 +244,11 @@ export function AdminLayout({ children, title, subtitle }: AdminLayoutProps) {
             <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
             
             <div className="flex-1 flex items-center gap-4">
-              <div className="hidden md:flex relative max-w-md flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search shipments, customers..."
-                  className="pl-10 bg-muted/50 border-0 focus-visible:ring-1"
-                />
-              </div>
+              <GlobalSearch />
             </div>
 
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-accent">
-                <BellRing className="w-5 h-5" />
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full animate-pulse" />
-              </Button>
+              <NotificationDropdown />
             </div>
           </header>
 

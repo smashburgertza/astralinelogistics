@@ -39,6 +39,8 @@ import AdminEmployeeDashboard from "./pages/admin/EmployeeDashboard";
 import AdminAccountingPage from "./pages/admin/Accounting";
 import AdminAnalyticsPage from "./pages/admin/Analytics";
 import AdminFinancialSummaryPage from "./pages/admin/FinancialSummary";
+import AdminProfilePage from "./pages/admin/Profile";
+import AdminNotificationsPage from "./pages/admin/Notifications";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -96,6 +98,8 @@ const App = () => (
             <Route path="/admin/accounting" element={<AdminAccountingPage />} />
             <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
             <Route path="/admin/financial-summary" element={<AdminFinancialSummaryPage />} />
+            <Route path="/admin/profile" element={<AdminProfilePage />} />
+            <Route path="/admin/notifications" element={<AdminNotificationsPage />} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>
