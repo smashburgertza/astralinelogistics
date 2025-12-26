@@ -1,5 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export interface VehicleDutyRate {
   id: string;
@@ -162,4 +163,70 @@ export function useVehicleDutyRates() {
     isLoading,
     calculateDuties,
   };
+}
+
+// Admin hooks for managing duty rates
+export function useAllVehicleDutyRates() {
+  return useQuery({
+    queryKey: ['vehicle-duty-rates-all'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('vehicle_duty_rates')
+        .select('*')
+        .order('display_order');
+      if (error) throw error;
+      return data as VehicleDutyRate[];
+    },
+  });
+}
+
+export function useCreateVehicleDutyRate() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (data: Omit<VehicleDutyRate, 'id'>) => {
+      const { error } = await supabase.from('vehicle_duty_rates').insert(data);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vehicle-duty-rates'] });
+      queryClient.invalidateQueries({ queryKey: ['vehicle-duty-rates-all'] });
+      toast.success('Duty rate created');
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+}
+
+export function useUpdateVehicleDutyRate() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ id, ...data }: Partial<VehicleDutyRate> & { id: string }) => {
+      const { error } = await supabase.from('vehicle_duty_rates').update(data).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vehicle-duty-rates'] });
+      queryClient.invalidateQueries({ queryKey: ['vehicle-duty-rates-all'] });
+      toast.success('Duty rate updated');
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+}
+
+export function useDeleteVehicleDutyRate() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('vehicle_duty_rates').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vehicle-duty-rates'] });
+      queryClient.invalidateQueries({ queryKey: ['vehicle-duty-rates-all'] });
+      toast.success('Duty rate deleted');
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
 }
