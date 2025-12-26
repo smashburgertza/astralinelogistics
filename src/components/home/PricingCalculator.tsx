@@ -11,6 +11,8 @@ import { REGIONS, CURRENCY_SYMBOLS, type Region } from '@/lib/constants';
 import { useScrollAnimation } from '@/hooks/useScrollAnimation';
 import { useVehicleDutyRates } from '@/hooks/useVehicleDutyRates';
 import { useDeliveryTimes } from '@/hooks/useDeliveryTimes';
+import { useAuth } from '@/hooks/useAuth';
+import { InlineAuthGate } from '@/components/auth/InlineAuthGate';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 interface RegionPricing {
@@ -402,24 +404,50 @@ export function PricingCalculator() {
                     </div>
 
                     {containerPricingItem && (
-                      <div className="pt-4 border-t border-border space-y-3 animate-fade-in">
-                        <div className="flex justify-between text-xl font-bold">
-                          <span>Estimated Cost</span>
-                          <span className="text-primary">{containerSymbol}{containerTotal.toLocaleString()} {containerCurrency}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Clock className="h-4 w-4" />
-                          <span>Est. Delivery: {deliveryTimes.full_container}</span>
-                        </div>
-                      </div>
+                      <InlineAuthGate
+                        teaserContent={
+                          <div className="pt-4 border-t border-border space-y-3">
+                            <div className="flex justify-between text-xl font-bold">
+                              <span>Estimated Cost</span>
+                              <span className="text-primary">Starting from {containerSymbol}XXX</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Clock className="h-4 w-4" />
+                              <span>Est. Delivery: {deliveryTimes.full_container}</span>
+                            </div>
+                          </div>
+                        }
+                        fullContent={
+                          <div className="pt-4 border-t border-border space-y-3 animate-fade-in">
+                            <div className="flex justify-between text-xl font-bold">
+                              <span>Estimated Cost</span>
+                              <span className="text-primary">{containerSymbol}{containerTotal.toLocaleString()} {containerCurrency}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Clock className="h-4 w-4" />
+                              <span>Est. Delivery: {deliveryTimes.full_container}</span>
+                            </div>
+                            <Button className="w-full h-12 text-base btn-gold group" asChild>
+                              <a href="/customer">
+                                Request Full Quote
+                                <MoveRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
+                              </a>
+                            </Button>
+                          </div>
+                        }
+                        title="Sign in to see exact pricing"
+                        description="Create a free account to view your full container shipping quote."
+                      />
                     )}
 
-                    <Button className="w-full h-12 text-base btn-gold group" asChild>
-                      <a href="/auth?mode=signup">
-                        Request Full Quote
-                        <MoveRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
-                      </a>
-                    </Button>
+                    {!containerPricingItem && (
+                      <Button className="w-full h-12 text-base btn-gold group" asChild>
+                        <a href="/auth?mode=signup">
+                          Request Full Quote
+                          <MoveRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
+                        </a>
+                      </Button>
+                    )}
                   </TabsContent>
 
                   {/* Loose Cargo Sub-tab */}
@@ -465,34 +493,64 @@ export function PricingCalculator() {
                     </div>
 
                     {looseWeightNum > 0 && loosePricing && (
-                      <div className="pt-4 border-t border-border space-y-3 animate-fade-in">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">
-                            Shipping ({looseSymbol}{loosePricing.customer_rate_per_kg}/kg × {looseWeightNum}kg)
-                          </span>
-                          <span className="font-medium">{looseSymbol}{looseShippingCost.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Handling Fee</span>
-                          <span className="font-medium">{looseSymbol}{looseHandlingFee.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between text-xl font-bold pt-3 border-t border-border">
-                          <span>Estimated Total</span>
-                          <span className="text-primary">{looseSymbol}{looseTotal.toFixed(2)} {looseCurrency}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Clock className="h-4 w-4" />
-                          <span>Est. Delivery: {deliveryTimes.sea_cargo}</span>
-                        </div>
-                      </div>
+                      <InlineAuthGate
+                        teaserContent={
+                          <div className="pt-4 border-t border-border space-y-3">
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Shipping ({looseSymbol}X.XX/kg × {looseWeightNum}kg)</span>
+                              <span className="font-medium">{looseSymbol}XXX.XX</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Handling Fee</span>
+                              <span className="font-medium">{looseSymbol}XX.XX</span>
+                            </div>
+                            <div className="flex justify-between text-xl font-bold pt-3 border-t border-border">
+                              <span>Estimated Total</span>
+                              <span className="text-primary">From {looseSymbol}XXX {looseCurrency}</span>
+                            </div>
+                          </div>
+                        }
+                        fullContent={
+                          <div className="pt-4 border-t border-border space-y-3 animate-fade-in">
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">
+                                Shipping ({looseSymbol}{loosePricing.customer_rate_per_kg}/kg × {looseWeightNum}kg)
+                              </span>
+                              <span className="font-medium">{looseSymbol}{looseShippingCost.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Handling Fee</span>
+                              <span className="font-medium">{looseSymbol}{looseHandlingFee.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-xl font-bold pt-3 border-t border-border">
+                              <span>Estimated Total</span>
+                              <span className="text-primary">{looseSymbol}{looseTotal.toFixed(2)} {looseCurrency}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Clock className="h-4 w-4" />
+                              <span>Est. Delivery: {deliveryTimes.sea_cargo}</span>
+                            </div>
+                            <Button className="w-full h-12 text-base btn-gold group" asChild>
+                              <a href="/customer">
+                                Request Full Quote
+                                <MoveRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
+                              </a>
+                            </Button>
+                          </div>
+                        }
+                        title="Sign in to see your quote"
+                        description="Create a free account to view exact shipping costs."
+                      />
                     )}
 
-                    <Button className="w-full h-12 text-base btn-gold group" asChild>
-                      <a href="/auth?mode=signup">
-                        Request Full Quote
-                        <MoveRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
-                      </a>
-                    </Button>
+                    {!(looseWeightNum > 0 && loosePricing) && (
+                      <Button className="w-full h-12 text-base btn-gold group" asChild>
+                        <a href="/auth?mode=signup">
+                          Request Full Quote
+                          <MoveRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
+                        </a>
+                      </Button>
+                    )}
                   </TabsContent>
 
                   {/* Vehicles Sub-tab */}
@@ -704,87 +762,122 @@ export function PricingCalculator() {
 
                         {/* Vehicle Pricing */}
                         {vehicleCalculation && (
-                          <div className="pt-4 border-t border-border space-y-3 animate-fade-in">
-                            {vehicleCalculation.vehiclePrice && (
-                              <div className="flex justify-between text-sm">
-                                <span className="text-muted-foreground">Vehicle Price</span>
-                                <span className="font-medium">
-                                  {CURRENCY_SYMBOLS[vehicleCalculation.vehicleCurrency] || '$'}{vehicleCalculation.vehiclePrice.toLocaleString()} {vehicleCalculation.vehicleCurrency}
-                                </span>
-                              </div>
-                            )}
-                            <div className="flex justify-between text-sm">
-                              <span className="text-muted-foreground">
-                                Shipping ({vehicleShippingMethod.toUpperCase()})
-                              </span>
-                              <span className="font-medium">
-                                {vehicleCalculation.shippingSymbol}{vehicleCalculation.shippingCost.toLocaleString()} {vehicleCalculation.shippingCurrency}
-                              </span>
-                            </div>
-
-                            {/* Duty Breakdown for Duty Paid option */}
-                            {vehiclePriceType === 'duty_paid' && vehicleCalculation.dutyCalculation && (
-                              <>
-                                <div 
-                                  className="flex items-center justify-between text-sm cursor-pointer hover:bg-muted/50 -mx-2 px-2 py-1 rounded"
-                                  onClick={() => setShowDutyBreakdown(!showDutyBreakdown)}
-                                >
-                                  <span className="text-muted-foreground flex items-center gap-1">
-                                    Import Duties & Taxes
-                                    {showDutyBreakdown ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                                  </span>
-                                  <span className="font-medium">
-                                    TZS {vehicleCalculation.dutyCalculation.totalDuties.toLocaleString()}
-                                  </span>
-                                </div>
-                                
-                                {showDutyBreakdown && (
-                                  <div className="ml-4 space-y-1.5 text-xs border-l-2 border-primary/20 pl-3 animate-fade-in">
-                                    {vehicleCalculation.dutyCalculation.breakdown.map((item, idx) => (
-                                      <div key={idx} className="flex justify-between text-muted-foreground">
-                                        <span>{item.name} {item.rate && `(${item.rate})`}</span>
-                                        <span>TZS {item.amount.toLocaleString()}</span>
-                                      </div>
-                                    ))}
+                          <InlineAuthGate
+                            teaserContent={
+                              <div className="pt-4 border-t border-border space-y-3">
+                                {vehicleCalculation.vehiclePrice && (
+                                  <div className="flex justify-between text-sm">
+                                    <span className="text-muted-foreground">Vehicle Price</span>
+                                    <span className="font-medium">
+                                      {CURRENCY_SYMBOLS[vehicleCalculation.vehicleCurrency] || '$'}{vehicleCalculation.vehiclePrice.toLocaleString()} {vehicleCalculation.vehicleCurrency}
+                                    </span>
                                   </div>
                                 )}
-                              </>
-                            )}
-
-                            <div className="flex justify-between text-xl font-bold pt-3 border-t border-border">
-                              <span>{vehiclePriceType === 'cif' ? 'CIF Total' : 'Duty Paid Total'}</span>
-                              <span className="text-primary">
-                                {vehiclePriceType === 'cif' ? (
-                                  <>
-                                    {vehicleCalculation.shippingSymbol}{vehicleCalculation.totalCif.toLocaleString()} {vehicleCalculation.shippingCurrency}
-                                  </>
-                                ) : (
-                                  <>TZS {vehicleCalculation.totalDutyPaidTzs?.toLocaleString()}</>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-muted-foreground">Shipping ({vehicleShippingMethod.toUpperCase()})</span>
+                                  <span className="font-medium">XXX.XX</span>
+                                </div>
+                                <div className="flex justify-between text-xl font-bold pt-3 border-t border-border">
+                                  <span>{vehiclePriceType === 'cif' ? 'CIF Total' : 'Duty Paid Total'}</span>
+                                  <span className="text-primary">From $X,XXX</span>
+                                </div>
+                              </div>
+                            }
+                            fullContent={
+                              <div className="pt-4 border-t border-border space-y-3 animate-fade-in">
+                                {vehicleCalculation.vehiclePrice && (
+                                  <div className="flex justify-between text-sm">
+                                    <span className="text-muted-foreground">Vehicle Price</span>
+                                    <span className="font-medium">
+                                      {CURRENCY_SYMBOLS[vehicleCalculation.vehicleCurrency] || '$'}{vehicleCalculation.vehiclePrice.toLocaleString()} {vehicleCalculation.vehicleCurrency}
+                                    </span>
+                                  </div>
                                 )}
-                              </span>
-                            </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-muted-foreground">
+                                    Shipping ({vehicleShippingMethod.toUpperCase()})
+                                  </span>
+                                  <span className="font-medium">
+                                    {vehicleCalculation.shippingSymbol}{vehicleCalculation.shippingCost.toLocaleString()} {vehicleCalculation.shippingCurrency}
+                                  </span>
+                                </div>
 
-                            {vehiclePriceType === 'duty_paid' && (
-                              <p className="text-xs text-muted-foreground italic">
-                                Based on Tanzania TRA duty rates. Actual duties may vary.
-                              </p>
-                            )}
+                                {/* Duty Breakdown for Duty Paid option */}
+                                {vehiclePriceType === 'duty_paid' && vehicleCalculation.dutyCalculation && (
+                                  <>
+                                    <div 
+                                      className="flex items-center justify-between text-sm cursor-pointer hover:bg-muted/50 -mx-2 px-2 py-1 rounded"
+                                      onClick={() => setShowDutyBreakdown(!showDutyBreakdown)}
+                                    >
+                                      <span className="text-muted-foreground flex items-center gap-1">
+                                        Import Duties & Taxes
+                                        {showDutyBreakdown ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                      </span>
+                                      <span className="font-medium">
+                                        TZS {vehicleCalculation.dutyCalculation.totalDuties.toLocaleString()}
+                                      </span>
+                                    </div>
+                                    
+                                    {showDutyBreakdown && (
+                                      <div className="ml-4 space-y-1.5 text-xs border-l-2 border-primary/20 pl-3 animate-fade-in">
+                                        {vehicleCalculation.dutyCalculation.breakdown.map((item, idx) => (
+                                          <div key={idx} className="flex justify-between text-muted-foreground">
+                                            <span>{item.name} {item.rate && `(${item.rate})`}</span>
+                                            <span>TZS {item.amount.toLocaleString()}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </>
+                                )}
 
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2">
-                              <Clock className="h-4 w-4" />
-                              <span>Est. Delivery: {vehicleShippingMethod === 'roro' ? deliveryTimes.vehicle_roro : deliveryTimes.vehicle_container}</span>
-                            </div>
-                          </div>
+                                <div className="flex justify-between text-xl font-bold pt-3 border-t border-border">
+                                  <span>{vehiclePriceType === 'cif' ? 'CIF Total' : 'Duty Paid Total'}</span>
+                                  <span className="text-primary">
+                                    {vehiclePriceType === 'cif' ? (
+                                      <>
+                                        {vehicleCalculation.shippingSymbol}{vehicleCalculation.totalCif.toLocaleString()} {vehicleCalculation.shippingCurrency}
+                                      </>
+                                    ) : (
+                                      <>TZS {vehicleCalculation.totalDutyPaidTzs?.toLocaleString()}</>
+                                    )}
+                                  </span>
+                                </div>
+
+                                {vehiclePriceType === 'duty_paid' && (
+                                  <p className="text-xs text-muted-foreground italic">
+                                    Based on Tanzania TRA duty rates. Actual duties may vary.
+                                  </p>
+                                )}
+
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2">
+                                  <Clock className="h-4 w-4" />
+                                  <span>Est. Delivery: {vehicleShippingMethod === 'roro' ? deliveryTimes.vehicle_roro : deliveryTimes.vehicle_container}</span>
+                                </div>
+
+                                <Button className="w-full h-12 text-base btn-gold group" asChild>
+                                  <a href="/customer">
+                                    Request Full Quote
+                                    <MoveRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
+                                  </a>
+                                </Button>
+                              </div>
+                            }
+                            title="Sign in to see vehicle shipping costs"
+                            description="Create a free account to view detailed pricing and duty breakdown."
+                          />
                         )}
                       </div>
                     )}
 
-                    <Button className="w-full h-12 text-base btn-gold group" asChild>
-                      <a href="/auth?mode=signup">
-                        Request Full Quote
-                        <MoveRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
-                      </a>
-                    </Button>
+                    {!vehicleInfo && (
+                      <Button className="w-full h-12 text-base btn-gold group" asChild>
+                        <a href="/auth?mode=signup">
+                          Request Full Quote
+                          <MoveRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
+                        </a>
+                      </Button>
+                    )}
                     
                     <p className="text-xs text-center text-muted-foreground">
                       * Final cost may vary based on vehicle dimensions and port fees.
@@ -837,34 +930,64 @@ export function PricingCalculator() {
                 </div>
 
                 {airWeightNum > 0 && airPricing && (
-                  <div className="pt-4 border-t border-border space-y-3 animate-fade-in">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">
-                        Shipping ({airSymbol}{airPricing.customer_rate_per_kg}/kg × {airWeightNum}kg)
-                      </span>
-                      <span className="font-medium">{airSymbol}{airShippingCost.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Handling Fee</span>
-                      <span className="font-medium">{airSymbol}{airHandlingFee.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-xl font-bold pt-3 border-t border-border">
-                      <span>Estimated Total</span>
-                      <span className="text-primary">{airSymbol}{airTotal.toFixed(2)} {airCurrency}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Clock className="h-4 w-4" />
-                      <span>Est. Delivery: {deliveryTimes.air_cargo}</span>
-                    </div>
-                  </div>
+                  <InlineAuthGate
+                    teaserContent={
+                      <div className="pt-4 border-t border-border space-y-3">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Shipping ({airSymbol}X.XX/kg × {airWeightNum}kg)</span>
+                          <span className="font-medium">{airSymbol}XXX.XX</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Handling Fee</span>
+                          <span className="font-medium">{airSymbol}XX.XX</span>
+                        </div>
+                        <div className="flex justify-between text-xl font-bold pt-3 border-t border-border">
+                          <span>Estimated Total</span>
+                          <span className="text-primary">From {airSymbol}XXX {airCurrency}</span>
+                        </div>
+                      </div>
+                    }
+                    fullContent={
+                      <div className="pt-4 border-t border-border space-y-3 animate-fade-in">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">
+                            Shipping ({airSymbol}{airPricing.customer_rate_per_kg}/kg × {airWeightNum}kg)
+                          </span>
+                          <span className="font-medium">{airSymbol}{airShippingCost.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Handling Fee</span>
+                          <span className="font-medium">{airSymbol}{airHandlingFee.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-xl font-bold pt-3 border-t border-border">
+                          <span>Estimated Total</span>
+                          <span className="text-primary">{airSymbol}{airTotal.toFixed(2)} {airCurrency}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Clock className="h-4 w-4" />
+                          <span>Est. Delivery: {deliveryTimes.air_cargo}</span>
+                        </div>
+                        <Button className="w-full h-12 text-base btn-gold group" asChild>
+                          <a href="/customer">
+                            Request Full Quote
+                            <MoveRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
+                          </a>
+                        </Button>
+                      </div>
+                    }
+                    title="Sign in to see air cargo pricing"
+                    description="Create a free account to view your complete air freight quote."
+                  />
                 )}
 
-                <Button className="w-full h-12 text-base btn-gold group" asChild>
-                  <a href="/auth?mode=signup">
-                    Request Full Quote
-                    <MoveRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
-                  </a>
-                </Button>
+                {!(airWeightNum > 0 && airPricing) && (
+                  <Button className="w-full h-12 text-base btn-gold group" asChild>
+                    <a href="/auth?mode=signup">
+                      Request Full Quote
+                      <MoveRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
+                    </a>
+                  </Button>
+                )}
                 
                 <p className="text-xs text-center text-muted-foreground">
                   * Final cost may vary based on actual weight, volumetric weight, and customs duties.

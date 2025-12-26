@@ -29,6 +29,8 @@ import { useRegionPricing } from '@/hooks/useRegionPricing';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useShopForMeCharges, calculateShopForMeCharges } from '@/hooks/useShopForMeCharges';
 import { useDeliveryTimes } from '@/hooks/useDeliveryTimes';
+import { useAuth } from '@/hooks/useAuth';
+import { InlineAuthGate } from '@/components/auth/InlineAuthGate';
 import { REGIONS, type Region } from '@/lib/constants';
 
 type LoadingStep = 'fetching' | 'extracting' | 'analyzing' | 'complete' | 'error';
@@ -844,7 +846,7 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
         </Card>
       )}
 
-      {/* Order Summary - Price Breakdown */}
+      {/* Order Summary - Price Breakdown - Gated for non-authenticated users */}
       {items.length > 0 && (
         <Card>
           <CardHeader>
@@ -853,87 +855,72 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
               Estimated Cost
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Show breakdown per region */}
-            {totals.regionBreakdowns.map((regionData, regionIndex) => (
-              <div key={regionData.region} className="space-y-2">
-                {/* Region header for multi-region orders */}
-                {!totals.isSingleRegion && (
-                  <div className="flex items-center gap-2 font-medium text-sm bg-muted/50 px-3 py-2 rounded-md -mx-1">
-                    <span>{REGIONS[regionData.region]?.flag}</span>
-                    <span>{REGIONS[regionData.region]?.label}</span>
-                    <span className="text-muted-foreground">({regionData.currency})</span>
+          <CardContent>
+            <InlineAuthGate
+              teaserContent={
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Product Cost</span>
+                    <span className="font-medium">XXX.XX</span>
                   </div>
-                )}
-                
-                {regionData.charges.map((charge, index) => {
-                  const prevCharge = index > 0 ? regionData.charges[index - 1] : null;
-                  const showSeparator = charge.key === 'shipping' || 
-                    (prevCharge?.key === 'shipping' && charge.key !== 'shipping');
-                  
-                  return (
-                    <div key={`${regionData.region}-${charge.key}`}>
-                      {showSeparator && <Separator className="my-2" />}
-                      <div className="flex justify-between items-center">
-                        <span className="text-muted-foreground">{charge.name}</span>
-                        <span className="font-medium">{formatCurrency(charge.amount, regionData.currency)}</span>
-                      </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Shipping</span>
+                    <span className="font-medium">XXX.XX</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Handling Fee</span>
+                    <span className="font-medium">XX.XX</span>
+                  </div>
+                  <Separator className="my-3" />
+                  <div className="flex justify-between items-center bg-primary/10 p-3 rounded-lg -mx-3">
+                    <span className="font-semibold">Total (TZS)</span>
+                    <span className="font-bold text-xl">From TZS X,XXX,XXX</span>
+                  </div>
+                </div>
+              }
+              fullContent={
+                <div className="space-y-4">
+                  {totals.regionBreakdowns.map((regionData, regionIndex) => (
+                    <div key={regionData.region} className="space-y-2">
+                      {!totals.isSingleRegion && (
+                        <div className="flex items-center gap-2 font-medium text-sm bg-muted/50 px-3 py-2 rounded-md -mx-1">
+                          <span>{REGIONS[regionData.region]?.flag}</span>
+                          <span>{REGIONS[regionData.region]?.label}</span>
+                          <span className="text-muted-foreground">({regionData.currency})</span>
+                        </div>
+                      )}
+                      {regionData.charges.map((charge, index) => (
+                        <div key={`${regionData.region}-${charge.key}`} className="flex justify-between items-center">
+                          <span className="text-muted-foreground">{charge.name}</span>
+                          <span className="font-medium">{formatCurrency(charge.amount, regionData.currency)}</span>
+                        </div>
+                      ))}
+                      {!totals.isSingleRegion && regionIndex < totals.regionBreakdowns.length - 1 && <Separator className="my-4" />}
                     </div>
-                  );
-                })}
-
-                {/* Region subtotal for multi-region */}
-                {!totals.isSingleRegion && (
-                  <>
-                    <Separator className="my-2" />
+                  ))}
+                  <Separator className="my-3" />
+                  {totals.isSingleRegion && totals.regionBreakdowns[0] && (
                     <div className="flex justify-between items-center">
-                      <span className="font-medium">Subtotal ({regionData.currency})</span>
-                      <span className="font-semibold">{formatCurrency(regionData.subtotal, regionData.currency)}</span>
+                      <span className="font-semibold text-lg">Total ({totals.regionBreakdowns[0].currency})</span>
+                      <span className="font-bold text-xl text-primary">{formatCurrency(totals.regionBreakdowns[0].subtotal, totals.regionBreakdowns[0].currency)}</span>
                     </div>
-                    <div className="flex justify-between items-center text-sm text-muted-foreground">
-                      <span>= TZS @ {regionData.exchangeRate.toLocaleString()}</span>
-                      <span>{formatTZS(regionData.subtotalInTZS)}</span>
-                    </div>
-                  </>
-                )}
-
-                {/* Separator between regions */}
-                {!totals.isSingleRegion && regionIndex < totals.regionBreakdowns.length - 1 && (
-                  <Separator className="my-4" />
-                )}
-              </div>
-            ))}
-
-            <Separator className="my-3" />
-
-            {/* Single region: show total in that currency */}
-            {totals.isSingleRegion && totals.regionBreakdowns[0] && (
-              <div className="flex justify-between items-center">
-                <span className="font-semibold text-lg">Total ({totals.regionBreakdowns[0].currency})</span>
-                <span className="font-bold text-xl text-primary">
-                  {formatCurrency(totals.regionBreakdowns[0].subtotal, totals.regionBreakdowns[0].currency)}
-                </span>
-              </div>
-            )}
-
-            {/* Total in TZS */}
-            <div className="flex justify-between items-center bg-primary/10 p-3 rounded-lg -mx-3">
-              <span className="font-semibold">Total (TZS)</span>
-              <span className="font-bold text-xl">
-                {formatTZS(totals.grandTotalInTZS)}
-              </span>
-            </div>
-
-            {/* Estimated Delivery */}
-            <div className="flex items-center justify-center gap-2 text-sm text-primary font-medium mt-4">
-              <Package className="h-4 w-4" />
-              <span>Estimated Delivery: {deliveryTimes.shop_for_me}</span>
-            </div>
-
-            {/* Disclaimer */}
-            <p className="text-xs text-muted-foreground text-center mt-2">
-              Final costs may vary based on actual product weight and current exchange rates at the time of purchase.
-            </p>
+                  )}
+                  <div className="flex justify-between items-center bg-primary/10 p-3 rounded-lg -mx-3">
+                    <span className="font-semibold">Total (TZS)</span>
+                    <span className="font-bold text-xl">{formatTZS(totals.grandTotalInTZS)}</span>
+                  </div>
+                  <div className="flex items-center justify-center gap-2 text-sm text-primary font-medium mt-4">
+                    <Package className="h-4 w-4" />
+                    <span>Estimated Delivery: {deliveryTimes.shop_for_me}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground text-center mt-2">
+                    Final costs may vary based on actual product weight and current exchange rates.
+                  </p>
+                </div>
+              }
+              title="Sign in to see your quote"
+              description="Create a free account to view the complete cost breakdown."
+            />
           </CardContent>
         </Card>
       )}
