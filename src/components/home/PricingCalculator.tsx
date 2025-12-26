@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Calculator, PackageSearch, MoveRight } from 'lucide-react';
+import { Calculator, PackageSearch, MoveRight, Container, Car } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { REGIONS, CURRENCY_SYMBOLS, type Region } from '@/lib/constants';
 import { useScrollAnimation } from '@/hooks/useScrollAnimation';
@@ -21,6 +22,7 @@ export function PricingCalculator() {
   const [weight, setWeight] = useState<string>('');
   const [pricing, setPricing] = useState<RegionPricing[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('loose-cargo');
 
   const { ref: leftRef, isVisible: leftVisible } = useScrollAnimation();
   const { ref: rightRef, isVisible: rightVisible } = useScrollAnimation();
@@ -106,73 +108,127 @@ export function PricingCalculator() {
               </div>
             </div>
 
-            <div className="space-y-4 sm:space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="origin" className="text-sm font-medium">Origin Region</Label>
-                <Select value={region} onValueChange={(v) => setRegion(v as Region)}>
-                  <SelectTrigger className="h-12">
-                    <SelectValue placeholder="Select origin" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(REGIONS).map(([key, value]) => (
-                      <SelectItem key={key} value={key}>
-                        <span className="flex items-center gap-2">
-                          <span className="text-lg">{value.flag}</span>
-                          {value.label}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-3 mb-6">
+                <TabsTrigger value="loose-cargo" className="flex items-center gap-1.5 text-xs sm:text-sm">
+                  <PackageSearch className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span className="hidden sm:inline">Loose Cargo</span>
+                  <span className="sm:hidden">Loose</span>
+                </TabsTrigger>
+                <TabsTrigger value="full-containers" className="flex items-center gap-1.5 text-xs sm:text-sm">
+                  <Container className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span className="hidden sm:inline">Full Containers</span>
+                  <span className="sm:hidden">Container</span>
+                </TabsTrigger>
+                <TabsTrigger value="vehicles" className="flex items-center gap-1.5 text-xs sm:text-sm">
+                  <Car className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span>Vehicles</span>
+                </TabsTrigger>
+              </TabsList>
 
-              <div className="space-y-2">
-                <Label htmlFor="weight" className="text-sm font-medium">Weight (kg)</Label>
-                <div className="relative">
-                  <PackageSearch className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <Input
-                    id="weight"
-                    type="number"
-                    placeholder="Enter weight in kg"
-                    className="h-12 pl-12 text-base"
-                    value={weight}
-                    onChange={(e) => setWeight(e.target.value)}
-                    min="0"
-                    step="0.1"
-                  />
+              {/* Loose Cargo Tab */}
+              <TabsContent value="loose-cargo" className="space-y-4 sm:space-y-6 mt-0">
+                <div className="space-y-2">
+                  <Label htmlFor="origin" className="text-sm font-medium">Origin Region</Label>
+                  <Select value={region} onValueChange={(v) => setRegion(v as Region)}>
+                    <SelectTrigger className="h-12">
+                      <SelectValue placeholder="Select origin" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(REGIONS).map(([key, value]) => (
+                        <SelectItem key={key} value={key}>
+                          <span className="flex items-center gap-2">
+                            <span className="text-lg">{value.flag}</span>
+                            {value.label}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              </div>
 
-              {weightNum > 0 && selectedPricing && (
-                <div className="pt-4 border-t border-border space-y-3 animate-fade-in">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      Shipping ({symbol}{selectedPricing.customer_rate_per_kg}/kg × {weightNum}kg)
-                    </span>
-                    <span className="font-medium">{symbol}{shippingCost.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Handling Fee</span>
-                    <span className="font-medium">{symbol}{handlingFee.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-xl font-bold pt-3 border-t border-border">
-                    <span>Estimated Total</span>
-                    <span className="text-primary">{symbol}{total.toFixed(2)} {currency}</span>
+                <div className="space-y-2">
+                  <Label htmlFor="weight" className="text-sm font-medium">Weight (kg)</Label>
+                  <div className="relative">
+                    <PackageSearch className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input
+                      id="weight"
+                      type="number"
+                      placeholder="Enter weight in kg"
+                      className="h-12 pl-12 text-base"
+                      value={weight}
+                      onChange={(e) => setWeight(e.target.value)}
+                      min="0"
+                      step="0.1"
+                    />
                   </div>
                 </div>
-              )}
 
-              <Button className="w-full h-12 text-base btn-gold group" asChild>
-                <a href="/auth?mode=signup">
-                  Request Full Quote
-                  <MoveRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
-                </a>
-              </Button>
-              
-              <p className="text-xs text-center text-muted-foreground">
-                * Final cost may vary based on actual weight and customs duties.
-              </p>
-            </div>
+                {weightNum > 0 && selectedPricing && (
+                  <div className="pt-4 border-t border-border space-y-3 animate-fade-in">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        Shipping ({symbol}{selectedPricing.customer_rate_per_kg}/kg × {weightNum}kg)
+                      </span>
+                      <span className="font-medium">{symbol}{shippingCost.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Handling Fee</span>
+                      <span className="font-medium">{symbol}{handlingFee.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-xl font-bold pt-3 border-t border-border">
+                      <span>Estimated Total</span>
+                      <span className="text-primary">{symbol}{total.toFixed(2)} {currency}</span>
+                    </div>
+                  </div>
+                )}
+
+                <Button className="w-full h-12 text-base btn-gold group" asChild>
+                  <a href="/auth?mode=signup">
+                    Request Full Quote
+                    <MoveRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
+                  </a>
+                </Button>
+                
+                <p className="text-xs text-center text-muted-foreground">
+                  * Final cost may vary based on actual weight and customs duties.
+                </p>
+              </TabsContent>
+
+              {/* Full Containers Tab */}
+              <TabsContent value="full-containers" className="space-y-4 sm:space-y-6 mt-0">
+                <div className="text-center py-8">
+                  <Container className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                  <h4 className="font-semibold text-lg mb-2">Full Container Shipping</h4>
+                  <p className="text-sm text-muted-foreground mb-6 max-w-xs mx-auto">
+                    For 20ft and 40ft container shipments, please contact us for a customized quote based on your specific requirements.
+                  </p>
+                  <Button className="btn-gold group" asChild>
+                    <a href="/contact">
+                      Request Container Quote
+                      <MoveRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
+                    </a>
+                  </Button>
+                </div>
+              </TabsContent>
+
+              {/* Vehicles Tab */}
+              <TabsContent value="vehicles" className="space-y-4 sm:space-y-6 mt-0">
+                <div className="text-center py-8">
+                  <Car className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                  <h4 className="font-semibold text-lg mb-2">Vehicle Shipping</h4>
+                  <p className="text-sm text-muted-foreground mb-6 max-w-xs mx-auto">
+                    We handle cars, motorcycles, and other vehicles. Contact us for pricing based on vehicle type, dimensions, and shipping method.
+                  </p>
+                  <Button className="btn-gold group" asChild>
+                    <a href="/contact">
+                      Request Vehicle Quote
+                      <MoveRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
+                    </a>
+                  </Button>
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
       </div>
