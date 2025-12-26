@@ -39,6 +39,7 @@ import { VehicleDutyRatesManagement } from '@/components/admin/VehicleDutyRatesM
 import { RegionManagement } from '@/components/admin/RegionManagement';
 import { DeliveryTimesManagement } from '@/components/admin/DeliveryTimesManagement';
 import { ShippingCalculatorChargesManagement } from '@/components/admin/ShippingCalculatorChargesManagement';
+import { ConversionAnalytics } from '@/components/admin/ConversionAnalytics';
 import { PricingCalculator } from '@/components/home/PricingCalculator';
 import { ShoppingAggregator } from '@/components/shopping/ShoppingAggregator';
 import {
@@ -917,7 +918,8 @@ export default function AdminSettingsPage() {
         </TabsContent>
 
         {/* System Settings */}
-        <TabsContent value="system">
+        <TabsContent value="system" className="space-y-6">
+          <ConversionAnalytics />
           <Card>
             <CardHeader>
               <CardTitle>System Preferences</CardTitle>

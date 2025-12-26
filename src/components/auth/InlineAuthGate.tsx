@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -6,15 +6,27 @@ import { Loader2, Lock, Mail, User, Eye, EyeOff, CheckCircle } from 'lucide-reac
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { supabase } from '@/integrations/supabase/client';
 
 const emailSchema = z.string().trim().email({ message: 'Invalid email address' });
 const passwordSchema = z.string().min(6, { message: 'Password must be at least 6 characters' });
+
+// Get or create session ID for tracking anonymous users
+const getSessionId = (): string => {
+  let sessionId = sessionStorage.getItem('teaser_session_id');
+  if (!sessionId) {
+    sessionId = crypto.randomUUID();
+    sessionStorage.setItem('teaser_session_id', sessionId);
+  }
+  return sessionId;
+};
 
 interface InlineAuthGateProps {
   teaserContent: React.ReactNode;
   fullContent: React.ReactNode;
   title?: string;
   description?: string;
+  source: 'shipping_calculator' | 'shop_for_me';
 }
 
 export function InlineAuthGate({
@@ -22,6 +34,7 @@ export function InlineAuthGate({
   fullContent,
   title = 'Sign in to see full details',
   description = 'Create a free account or sign in to view your complete quote breakdown.',
+  source,
 }: InlineAuthGateProps) {
   const { user, signIn, signUp, loading: authLoading } = useAuth();
   const [mode, setMode] = useState<'signin' | 'signup'>('signup');
@@ -31,6 +44,21 @@ export function InlineAuthGate({
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const viewTrackedRef = useRef(false);
+
+  // Track teaser view (once per component mount)
+  useEffect(() => {
+    if (!user && !viewTrackedRef.current) {
+      viewTrackedRef.current = true;
+      const sessionId = getSessionId();
+      supabase
+        .from('teaser_conversion_events')
+        .insert({ event_type: 'view', source, session_id: sessionId })
+        .then(({ error }) => {
+          if (error) console.error('Failed to track teaser view:', error);
+        });
+    }
+  }, [user, source]);
 
   // If user is authenticated, show full content
   if (user) {
@@ -83,6 +111,15 @@ export function InlineAuthGate({
             toast.error(error.message);
           }
         } else {
+          // Track signup conversion (user_id will be null since signup just completed)
+          const sessionId = getSessionId();
+          await supabase
+            .from('teaser_conversion_events')
+            .insert({ 
+              event_type: 'signup', 
+              source, 
+              session_id: sessionId
+            });
           toast.success('Account created! You can now see your full quote.');
         }
       }

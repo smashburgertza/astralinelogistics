@@ -437,6 +437,7 @@ export function PricingCalculator() {
                         }
                         title="Sign in to see exact pricing"
                         description="Create a free account to view your full container shipping quote."
+                        source="shipping_calculator"
                       />
                     )}
 
@@ -540,6 +541,7 @@ export function PricingCalculator() {
                         }
                         title="Sign in to see your quote"
                         description="Create a free account to view exact shipping costs."
+                        source="shipping_calculator"
                       />
                     )}
 
@@ -865,6 +867,7 @@ export function PricingCalculator() {
                             }
                             title="Sign in to see vehicle shipping costs"
                             description="Create a free account to view detailed pricing and duty breakdown."
+                            source="shipping_calculator"
                           />
                         )}
                       </div>
@@ -977,6 +980,7 @@ export function PricingCalculator() {
                     }
                     title="Sign in to see air cargo pricing"
                     description="Create a free account to view your complete air freight quote."
+                    source="shipping_calculator"
                   />
                 )}
 

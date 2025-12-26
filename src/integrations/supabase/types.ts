@@ -1508,6 +1508,33 @@ export type Database = {
           },
         ]
       }
+      teaser_conversion_events: {
+        Row: {
+          created_at: string
+          event_type: string
+          id: string
+          session_id: string
+          source: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          id?: string
+          session_id: string
+          source: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          id?: string
+          session_id?: string
+          source?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string | null
