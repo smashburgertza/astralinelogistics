@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Building2, Mail, Shield, Settings, Save, Loader2, Upload, Trash2, ImageIcon, RefreshCw, ShoppingBag } from 'lucide-react';
+import { Building2, Mail, Shield, Settings, Save, Loader2, Upload, Trash2, ImageIcon, RefreshCw, ShoppingBag, Container, Car } from 'lucide-react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -33,6 +33,8 @@ import { toast } from 'sonner';
 import { useAllSettings, useUpdateSettings } from '@/hooks/useSettings';
 import { ExchangeRateManagement } from '@/components/admin/ExchangeRateManagement';
 import { ShopForMeChargesManagement } from '@/components/admin/ShopForMeChargesManagement';
+import { ContainerPricingManagement } from '@/components/admin/ContainerPricingManagement';
+import { VehiclePricingManagement } from '@/components/admin/VehiclePricingManagement';
 
 // Schemas
 const companySchema = z.object({
@@ -341,7 +343,7 @@ export default function AdminSettingsPage() {
   return (
     <AdminLayout title="Settings" subtitle="Configure your system preferences">
       <Tabs defaultValue="company" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-grid">
+        <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 lg:w-auto lg:inline-grid">
           <TabsTrigger value="company" className="gap-2">
             <Building2 className="h-4 w-4 hidden sm:inline" />
             Company
@@ -349,6 +351,14 @@ export default function AdminSettingsPage() {
           <TabsTrigger value="currency" className="gap-2">
             <RefreshCw className="h-4 w-4 hidden sm:inline" />
             Currency
+          </TabsTrigger>
+          <TabsTrigger value="containers" className="gap-2">
+            <Container className="h-4 w-4 hidden sm:inline" />
+            Containers
+          </TabsTrigger>
+          <TabsTrigger value="vehicles" className="gap-2">
+            <Car className="h-4 w-4 hidden sm:inline" />
+            Vehicles
           </TabsTrigger>
           <TabsTrigger value="shopforme" className="gap-2">
             <ShoppingBag className="h-4 w-4 hidden sm:inline" />
@@ -373,12 +383,36 @@ export default function AdminSettingsPage() {
           <ExchangeRateManagement />
         </TabsContent>
 
+        {/* Container Pricing */}
+        <TabsContent value="containers">
+          <Card>
+            <CardHeader>
+              <CardTitle>Container Shipping Pricing</CardTitle>
+              <CardDescription>Configure pricing for full container shipments</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ContainerPricingManagement />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Vehicle Pricing */}
+        <TabsContent value="vehicles">
+          <Card>
+            <CardHeader>
+              <CardTitle>Vehicle Shipping Pricing</CardTitle>
+              <CardDescription>Configure pricing for vehicle shipments</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <VehiclePricingManagement />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* Shop For Me Charges */}
         <TabsContent value="shopforme">
           <ShopForMeChargesManagement />
         </TabsContent>
-
-        {/* Company Settings */}
         <TabsContent value="company">
           <Card>
             <CardHeader>
