@@ -1046,6 +1046,7 @@ export type Database = {
       }
       order_requests: {
         Row: {
+          category: string | null
           created_at: string
           customer_address: string
           customer_email: string
@@ -1061,6 +1062,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          category?: string | null
           created_at?: string
           customer_address: string
           customer_email: string
@@ -1076,6 +1078,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          category?: string | null
           created_at?: string
           customer_address?: string
           customer_email?: string
