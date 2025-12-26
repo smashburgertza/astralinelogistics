@@ -72,7 +72,11 @@ const LOADING_STEPS: { step: LoadingStep; label: string; progress: number }[] = 
   { step: 'complete', label: 'Complete', progress: 100 },
 ];
 
-export function ShoppingAggregator() {
+interface ShoppingAggregatorProps {
+  category?: string;
+}
+
+export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
   const [items, setItems] = useState<ProductItem[]>([]);
   const [newUrl, setNewUrl] = useState('');
   const [isAddingUrl, setIsAddingUrl] = useState(false);
