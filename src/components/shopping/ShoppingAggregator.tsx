@@ -28,6 +28,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useRegionPricing } from '@/hooks/useRegionPricing';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useShopForMeCharges, calculateShopForMeCharges } from '@/hooks/useShopForMeCharges';
+import { useDeliveryTimes } from '@/hooks/useDeliveryTimes';
 import { REGIONS, type Region } from '@/lib/constants';
 
 type LoadingStep = 'fetching' | 'extracting' | 'analyzing' | 'complete' | 'error';
@@ -93,6 +94,7 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
   const { data: regionPricing } = useRegionPricing();
   const { data: exchangeRates } = useExchangeRates();
   const { data: charges } = useShopForMeCharges();
+  const { times: deliveryTimes } = useDeliveryTimes();
 
   // Get shipping rate for selected region
   const getShippingRate = (region: Region) => {
@@ -925,7 +927,7 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
             {/* Estimated Delivery */}
             <div className="flex items-center justify-center gap-2 text-sm text-primary font-medium mt-4">
               <Package className="h-4 w-4" />
-              <span>Estimated Delivery: 7-10 working days</span>
+              <span>Estimated Delivery: {deliveryTimes.shop_for_me}</span>
             </div>
 
             {/* Disclaimer */}
