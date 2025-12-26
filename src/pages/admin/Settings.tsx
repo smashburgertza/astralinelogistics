@@ -38,6 +38,7 @@ import { VehiclePricingManagement } from '@/components/admin/VehiclePricingManag
 import { VehicleDutyRatesManagement } from '@/components/admin/VehicleDutyRatesManagement';
 import { RegionManagement } from '@/components/admin/RegionManagement';
 import { DeliveryTimesManagement } from '@/components/admin/DeliveryTimesManagement';
+import { ShippingCalculatorChargesManagement } from '@/components/admin/ShippingCalculatorChargesManagement';
 import { PricingCalculator } from '@/components/home/PricingCalculator';
 import { ShoppingAggregator } from '@/components/shopping/ShoppingAggregator';
 import {
@@ -445,6 +446,7 @@ export default function AdminSettingsPage() {
               </DialogContent>
             </Dialog>
           </div>
+          <ShippingCalculatorChargesManagement />
           <RegionManagement />
           <Card>
             <CardHeader>

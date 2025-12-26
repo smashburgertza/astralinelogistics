@@ -1377,6 +1377,48 @@ export type Database = {
           },
         ]
       }
+      shipping_calculator_charges: {
+        Row: {
+          applies_to: string
+          charge_key: string
+          charge_name: string
+          charge_type: string
+          charge_value: number
+          created_at: string | null
+          description: string | null
+          display_order: number
+          id: string
+          is_active: boolean
+          updated_at: string | null
+        }
+        Insert: {
+          applies_to?: string
+          charge_key: string
+          charge_name: string
+          charge_type?: string
+          charge_value?: number
+          created_at?: string | null
+          description?: string | null
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          updated_at?: string | null
+        }
+        Update: {
+          applies_to?: string
+          charge_key?: string
+          charge_name?: string
+          charge_type?: string
+          charge_value?: number
+          created_at?: string | null
+          description?: string | null
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       shop_for_me_charges: {
         Row: {
           applies_to: string
