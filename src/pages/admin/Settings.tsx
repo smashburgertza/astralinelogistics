@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Building2, Mail, Shield, Settings, Save, Loader2, Upload, Trash2, ImageIcon, RefreshCw, ShoppingBag, Container, Car } from 'lucide-react';
+import { Building2, Mail, Shield, Settings, Save, Loader2, Upload, Trash2, ImageIcon, RefreshCw, ShoppingBag, Container, Car, Package, MapPin, Receipt } from 'lucide-react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -35,6 +35,8 @@ import { ExchangeRateManagement } from '@/components/admin/ExchangeRateManagemen
 import { ShopForMeChargesManagement } from '@/components/admin/ShopForMeChargesManagement';
 import { ContainerPricingManagement } from '@/components/admin/ContainerPricingManagement';
 import { VehiclePricingManagement } from '@/components/admin/VehiclePricingManagement';
+import { VehicleDutyRatesManagement } from '@/components/admin/VehicleDutyRatesManagement';
+import { RegionManagement } from '@/components/admin/RegionManagement';
 
 // Schemas
 const companySchema = z.object({
@@ -343,44 +345,59 @@ export default function AdminSettingsPage() {
   return (
     <AdminLayout title="Settings" subtitle="Configure your system preferences">
       <Tabs defaultValue="company" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 lg:w-auto lg:inline-grid">
-          <TabsTrigger value="company" className="gap-2">
-            <Building2 className="h-4 w-4 hidden sm:inline" />
-            Company
-          </TabsTrigger>
-          <TabsTrigger value="currency" className="gap-2">
-            <RefreshCw className="h-4 w-4 hidden sm:inline" />
-            Currency
-          </TabsTrigger>
-          <TabsTrigger value="containers" className="gap-2">
-            <Container className="h-4 w-4 hidden sm:inline" />
-            Containers
-          </TabsTrigger>
-          <TabsTrigger value="vehicles" className="gap-2">
-            <Car className="h-4 w-4 hidden sm:inline" />
-            Vehicles
-          </TabsTrigger>
-          <TabsTrigger value="shopforme" className="gap-2">
-            <ShoppingBag className="h-4 w-4 hidden sm:inline" />
-            Shop For Me
-          </TabsTrigger>
-          <TabsTrigger value="notifications" className="gap-2">
-            <Mail className="h-4 w-4 hidden sm:inline" />
-            Notifications
-          </TabsTrigger>
-          <TabsTrigger value="security" className="gap-2">
-            <Shield className="h-4 w-4 hidden sm:inline" />
-            Security
-          </TabsTrigger>
-          <TabsTrigger value="system" className="gap-2">
-            <Settings className="h-4 w-4 hidden sm:inline" />
-            System
-          </TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto pb-2">
+          <TabsList className="inline-flex w-auto min-w-full lg:min-w-0">
+            <TabsTrigger value="company" className="gap-2">
+              <Building2 className="h-4 w-4 hidden sm:inline" />
+              Company
+            </TabsTrigger>
+            <TabsTrigger value="currency" className="gap-2">
+              <RefreshCw className="h-4 w-4 hidden sm:inline" />
+              Currency
+            </TabsTrigger>
+            <TabsTrigger value="regions" className="gap-2">
+              <MapPin className="h-4 w-4 hidden sm:inline" />
+              Regions
+            </TabsTrigger>
+            <TabsTrigger value="containers" className="gap-2">
+              <Container className="h-4 w-4 hidden sm:inline" />
+              Containers
+            </TabsTrigger>
+            <TabsTrigger value="vehicles" className="gap-2">
+              <Car className="h-4 w-4 hidden sm:inline" />
+              Vehicles
+            </TabsTrigger>
+            <TabsTrigger value="duties" className="gap-2">
+              <Receipt className="h-4 w-4 hidden sm:inline" />
+              Duties
+            </TabsTrigger>
+            <TabsTrigger value="shopforme" className="gap-2">
+              <ShoppingBag className="h-4 w-4 hidden sm:inline" />
+              Shop For Me
+            </TabsTrigger>
+            <TabsTrigger value="notifications" className="gap-2">
+              <Mail className="h-4 w-4 hidden sm:inline" />
+              Notifications
+            </TabsTrigger>
+            <TabsTrigger value="security" className="gap-2">
+              <Shield className="h-4 w-4 hidden sm:inline" />
+              Security
+            </TabsTrigger>
+            <TabsTrigger value="system" className="gap-2">
+              <Settings className="h-4 w-4 hidden sm:inline" />
+              System
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* Currency / Exchange Rates */}
         <TabsContent value="currency">
           <ExchangeRateManagement />
+        </TabsContent>
+
+        {/* Region Pricing (Sea/Air Cargo) */}
+        <TabsContent value="regions">
+          <RegionManagement />
         </TabsContent>
 
         {/* Container Pricing */}
@@ -388,7 +405,7 @@ export default function AdminSettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Container Shipping Pricing</CardTitle>
-              <CardDescription>Configure pricing for full container shipments</CardDescription>
+              <CardDescription>Configure pricing for full container shipments by region and size</CardDescription>
             </CardHeader>
             <CardContent>
               <ContainerPricingManagement />
@@ -396,17 +413,22 @@ export default function AdminSettingsPage() {
           </Card>
         </TabsContent>
 
-        {/* Vehicle Pricing */}
+        {/* Vehicle Shipping Pricing */}
         <TabsContent value="vehicles">
           <Card>
             <CardHeader>
               <CardTitle>Vehicle Shipping Pricing</CardTitle>
-              <CardDescription>Configure pricing for vehicle shipments</CardDescription>
+              <CardDescription>Configure shipping costs for vehicles by type, method, and region</CardDescription>
             </CardHeader>
             <CardContent>
               <VehiclePricingManagement />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Vehicle Import Duty Rates */}
+        <TabsContent value="duties">
+          <VehicleDutyRatesManagement />
         </TabsContent>
 
         {/* Shop For Me Charges */}
