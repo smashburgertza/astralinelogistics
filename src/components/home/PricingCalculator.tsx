@@ -524,8 +524,17 @@ export function PricingCalculator() {
                       </p>
                     </div>
 
+                    {/* Loading State */}
+                    {vehicleLoading && (
+                      <div className="flex flex-col items-center justify-center py-8 space-y-3 animate-fade-in">
+                        <Loader2 className="w-10 h-10 text-primary animate-spin" />
+                        <p className="text-sm font-medium text-muted-foreground">Analyzing vehicle listing...</p>
+                        <p className="text-xs text-muted-foreground/70">Extracting make, model, year, and pricing</p>
+                      </div>
+                    )}
+
                     {/* Vehicle Info Display */}
-                    {vehicleInfo && (
+                    {!vehicleLoading && vehicleInfo && (
                       <div className="space-y-4 animate-fade-in">
                         <div className="p-4 bg-muted/50 rounded-lg border border-border space-y-3">
                           {/* Vehicle Image */}
