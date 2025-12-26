@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Building2, Mail, Shield, Settings, Save, Loader2, Upload, Trash2, ImageIcon, RefreshCw, ShoppingBag, Container, Car, Package, MapPin, Receipt } from 'lucide-react';
+import { Building2, Mail, Shield, Settings, Save, Loader2, Upload, Trash2, ImageIcon, RefreshCw, ShoppingBag, Container, Car, Package, MapPin, Receipt, Clock } from 'lucide-react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -37,6 +37,7 @@ import { ContainerPricingManagement } from '@/components/admin/ContainerPricingM
 import { VehiclePricingManagement } from '@/components/admin/VehiclePricingManagement';
 import { VehicleDutyRatesManagement } from '@/components/admin/VehicleDutyRatesManagement';
 import { RegionManagement } from '@/components/admin/RegionManagement';
+import { DeliveryTimesManagement } from '@/components/admin/DeliveryTimesManagement';
 
 // Schemas
 const companySchema = z.object({
@@ -375,6 +376,10 @@ export default function AdminSettingsPage() {
               <ShoppingBag className="h-4 w-4 hidden sm:inline" />
               Shop For Me
             </TabsTrigger>
+            <TabsTrigger value="delivery" className="gap-2">
+              <Clock className="h-4 w-4 hidden sm:inline" />
+              Delivery
+            </TabsTrigger>
             <TabsTrigger value="notifications" className="gap-2">
               <Mail className="h-4 w-4 hidden sm:inline" />
               Notifications
@@ -435,6 +440,12 @@ export default function AdminSettingsPage() {
         <TabsContent value="shopforme">
           <ShopForMeChargesManagement />
         </TabsContent>
+
+        {/* Delivery Times */}
+        <TabsContent value="delivery">
+          <DeliveryTimesManagement />
+        </TabsContent>
+
         <TabsContent value="company">
           <Card>
             <CardHeader>

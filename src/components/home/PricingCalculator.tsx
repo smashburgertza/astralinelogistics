@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Calculator, PackageSearch, MoveRight, Ship, Plane, Container, Package, Car, Link2, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Calculator, PackageSearch, MoveRight, Ship, Plane, Container, Package, Car, Link2, Loader2, ChevronDown, ChevronUp, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { REGIONS, CURRENCY_SYMBOLS, type Region } from '@/lib/constants';
 import { useScrollAnimation } from '@/hooks/useScrollAnimation';
 import { useVehicleDutyRates } from '@/hooks/useVehicleDutyRates';
+import { useDeliveryTimes } from '@/hooks/useDeliveryTimes';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 interface RegionPricing {
@@ -98,8 +99,9 @@ export function PricingCalculator() {
   const [vehiclePricing, setVehiclePricing] = useState<VehiclePricing[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Duty rates hook
+  // Duty rates and delivery times hooks
   const { calculateDuties, dutyRates } = useVehicleDutyRates();
+  const { times: deliveryTimes } = useDeliveryTimes();
 
   const { ref: leftRef, isVisible: leftVisible } = useScrollAnimation();
   const { ref: rightRef, isVisible: rightVisible } = useScrollAnimation();
@@ -405,6 +407,10 @@ export function PricingCalculator() {
                           <span>Estimated Cost</span>
                           <span className="text-primary">{containerSymbol}{containerTotal.toLocaleString()} {containerCurrency}</span>
                         </div>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Clock className="h-4 w-4" />
+                          <span>Est. Delivery: {deliveryTimes.full_container}</span>
+                        </div>
                       </div>
                     )}
 
@@ -473,6 +479,10 @@ export function PricingCalculator() {
                         <div className="flex justify-between text-xl font-bold pt-3 border-t border-border">
                           <span>Estimated Total</span>
                           <span className="text-primary">{looseSymbol}{looseTotal.toFixed(2)} {looseCurrency}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Clock className="h-4 w-4" />
+                          <span>Est. Delivery: {deliveryTimes.sea_cargo}</span>
                         </div>
                       </div>
                     )}
@@ -759,6 +769,11 @@ export function PricingCalculator() {
                                 Based on Tanzania TRA duty rates. Actual duties may vary.
                               </p>
                             )}
+
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2">
+                              <Clock className="h-4 w-4" />
+                              <span>Est. Delivery: {vehicleShippingMethod === 'roro' ? deliveryTimes.vehicle_roro : deliveryTimes.vehicle_container}</span>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -836,6 +851,10 @@ export function PricingCalculator() {
                     <div className="flex justify-between text-xl font-bold pt-3 border-t border-border">
                       <span>Estimated Total</span>
                       <span className="text-primary">{airSymbol}{airTotal.toFixed(2)} {airCurrency}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Clock className="h-4 w-4" />
+                      <span>Est. Delivery: {deliveryTimes.air_cargo}</span>
                     </div>
                   </div>
                 )}
