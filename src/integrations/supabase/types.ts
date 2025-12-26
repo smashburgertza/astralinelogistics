@@ -1385,10 +1385,12 @@ export type Database = {
           charge_type: string
           charge_value: number
           created_at: string | null
+          currency: string
           description: string | null
           display_order: number
           id: string
           is_active: boolean
+          region: Database["public"]["Enums"]["agent_region"]
           updated_at: string | null
         }
         Insert: {
@@ -1398,10 +1400,12 @@ export type Database = {
           charge_type?: string
           charge_value?: number
           created_at?: string | null
+          currency?: string
           description?: string | null
           display_order?: number
           id?: string
           is_active?: boolean
+          region?: Database["public"]["Enums"]["agent_region"]
           updated_at?: string | null
         }
         Update: {
@@ -1411,10 +1415,12 @@ export type Database = {
           charge_type?: string
           charge_value?: number
           created_at?: string | null
+          currency?: string
           description?: string | null
           display_order?: number
           id?: string
           is_active?: boolean
+          region?: Database["public"]["Enums"]["agent_region"]
           updated_at?: string | null
         }
         Relationships: []

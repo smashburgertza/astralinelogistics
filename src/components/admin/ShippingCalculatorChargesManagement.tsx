@@ -5,6 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog,
   DialogContent,
@@ -29,7 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Pencil, Trash2, Loader2, DollarSign, Percent } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, DollarSign, Percent, PoundSterling } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   useShippingCalculatorCharges,
@@ -37,7 +39,14 @@ import {
   useUpdateShippingCalculatorCharge,
   useDeleteShippingCalculatorCharge,
   ShippingCalculatorCharge,
+  REGION_CURRENCIES,
+  REGION_LABELS,
 } from '@/hooks/useShippingCalculatorCharges';
+import { Database } from '@/integrations/supabase/types';
+
+type AgentRegion = Database['public']['Enums']['agent_region'];
+
+const REGIONS: AgentRegion[] = ['usa', 'uk', 'europe', 'dubai', 'china', 'india'];
 
 const APPLIES_TO_OPTIONS = [
   { value: 'shipping_cost', label: 'Shipping Cost' },
@@ -54,18 +63,9 @@ interface ChargeFormData {
   description: string;
   is_active: boolean;
   display_order: number;
+  region: AgentRegion;
+  currency: string;
 }
-
-const defaultFormData: ChargeFormData = {
-  charge_key: '',
-  charge_name: '',
-  charge_type: 'fixed',
-  charge_value: 0,
-  applies_to: 'order_total',
-  description: '',
-  is_active: true,
-  display_order: 0,
-};
 
 export function ShippingCalculatorChargesManagement() {
   const { data: charges, isLoading } = useShippingCalculatorCharges();
@@ -73,9 +73,33 @@ export function ShippingCalculatorChargesManagement() {
   const updateCharge = useUpdateShippingCalculatorCharge();
   const deleteCharge = useDeleteShippingCalculatorCharge();
 
+  const [selectedRegion, setSelectedRegion] = useState<AgentRegion>('usa');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingCharge, setEditingCharge] = useState<ShippingCalculatorCharge | null>(null);
-  const [formData, setFormData] = useState<ChargeFormData>(defaultFormData);
+
+  const getDefaultFormData = (region: AgentRegion): ChargeFormData => ({
+    charge_key: '',
+    charge_name: '',
+    charge_type: 'fixed',
+    charge_value: 0,
+    applies_to: 'order_total',
+    description: '',
+    is_active: true,
+    display_order: 0,
+    region,
+    currency: REGION_CURRENCIES[region],
+  });
+
+  const [formData, setFormData] = useState<ChargeFormData>(getDefaultFormData('usa'));
+
+  const handleRegionChange = (region: AgentRegion) => {
+    setSelectedRegion(region);
+  };
+
+  const handleOpenCreate = () => {
+    setFormData(getDefaultFormData(selectedRegion));
+    setIsCreateOpen(true);
+  };
 
   const handleCreate = async () => {
     if (!formData.charge_key || !formData.charge_name) {
@@ -87,7 +111,7 @@ export function ShippingCalculatorChargesManagement() {
       await createCharge.mutateAsync(formData);
       toast.success('Charge created successfully');
       setIsCreateOpen(false);
-      setFormData(defaultFormData);
+      setFormData(getDefaultFormData(selectedRegion));
     } catch (error) {
       toast.error('Failed to create charge');
     }
@@ -103,7 +127,7 @@ export function ShippingCalculatorChargesManagement() {
       });
       toast.success('Charge updated successfully');
       setEditingCharge(null);
-      setFormData(defaultFormData);
+      setFormData(getDefaultFormData(selectedRegion));
     } catch (error) {
       toast.error('Failed to update charge');
     }
@@ -143,125 +167,146 @@ export function ShippingCalculatorChargesManagement() {
       description: charge.description || '',
       is_active: charge.is_active,
       display_order: charge.display_order,
+      region: charge.region,
+      currency: charge.currency,
     });
   };
 
-  const ChargeForm = ({ onSubmit, isSubmitting }: { onSubmit: () => void; isSubmitting: boolean }) => (
-    <div className="grid gap-4 py-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="charge_key">Charge Key *</Label>
-          <Input
-            id="charge_key"
-            value={formData.charge_key}
-            onChange={(e) => setFormData({ ...formData, charge_key: e.target.value.toLowerCase().replace(/\s+/g, '_') })}
-            placeholder="e.g. inspection_fee"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="charge_name">Display Name *</Label>
-          <Input
-            id="charge_name"
-            value={formData.charge_name}
-            onChange={(e) => setFormData({ ...formData, charge_name: e.target.value })}
-            placeholder="e.g. Inspection Fee"
-          />
-        </div>
-      </div>
+  const getCurrencySymbol = (currency: string) => {
+    return currency === 'GBP' ? '£' : '$';
+  };
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="charge_type">Charge Type</Label>
-          <Select
-            value={formData.charge_type}
-            onValueChange={(value: 'fixed' | 'percentage') => setFormData({ ...formData, charge_type: value })}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="fixed">Fixed Amount ($)</SelectItem>
-              <SelectItem value="percentage">Percentage (%)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="charge_value">Value</Label>
-          <div className="relative">
+  const CurrencyIcon = ({ currency }: { currency: string }) => {
+    return currency === 'GBP' ? (
+      <PoundSterling className="h-4 w-4 text-muted-foreground" />
+    ) : (
+      <DollarSign className="h-4 w-4 text-muted-foreground" />
+    );
+  };
+
+  const ChargeForm = ({ onSubmit, isSubmitting }: { onSubmit: () => void; isSubmitting: boolean }) => {
+    const currency = REGION_CURRENCIES[formData.region];
+    const currencySymbol = getCurrencySymbol(currency);
+
+    return (
+      <div className="grid gap-4 py-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="charge_key">Charge Key *</Label>
             <Input
-              id="charge_value"
-              type="number"
-              step="0.01"
-              min="0"
-              value={formData.charge_value}
-              onChange={(e) => setFormData({ ...formData, charge_value: parseFloat(e.target.value) || 0 })}
-              className="pl-8"
+              id="charge_key"
+              value={formData.charge_key}
+              onChange={(e) => setFormData({ ...formData, charge_key: e.target.value.toLowerCase().replace(/\s+/g, '_') })}
+              placeholder="e.g. inspection_fee"
             />
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-              {formData.charge_type === 'fixed' ? '$' : '%'}
-            </span>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="charge_name">Display Name *</Label>
+            <Input
+              id="charge_name"
+              value={formData.charge_name}
+              onChange={(e) => setFormData({ ...formData, charge_name: e.target.value })}
+              placeholder="e.g. Inspection Fee"
+            />
           </div>
         </div>
-      </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="applies_to">Applies To</Label>
-          <Select
-            value={formData.applies_to}
-            onValueChange={(value) => setFormData({ ...formData, applies_to: value })}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {APPLIES_TO_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="charge_type">Charge Type</Label>
+            <Select
+              value={formData.charge_type}
+              onValueChange={(value: 'fixed' | 'percentage') => setFormData({ ...formData, charge_type: value })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="fixed">Fixed Amount ({currencySymbol})</SelectItem>
+                <SelectItem value="percentage">Percentage (%)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="charge_value">Value</Label>
+            <div className="relative">
+              <Input
+                id="charge_value"
+                type="number"
+                step="0.01"
+                min="0"
+                value={formData.charge_value}
+                onChange={(e) => setFormData({ ...formData, charge_value: parseFloat(e.target.value) || 0 })}
+                className="pl-8"
+              />
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                {formData.charge_type === 'fixed' ? currencySymbol : '%'}
+              </span>
+            </div>
+          </div>
         </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="applies_to">Applies To</Label>
+            <Select
+              value={formData.applies_to}
+              onValueChange={(value) => setFormData({ ...formData, applies_to: value })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {APPLIES_TO_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="display_order">Display Order</Label>
+            <Input
+              id="display_order"
+              type="number"
+              min="0"
+              value={formData.display_order}
+              onChange={(e) => setFormData({ ...formData, display_order: parseInt(e.target.value) || 0 })}
+            />
+          </div>
+        </div>
+
         <div className="space-y-2">
-          <Label htmlFor="display_order">Display Order</Label>
+          <Label htmlFor="description">Description</Label>
           <Input
-            id="display_order"
-            type="number"
-            min="0"
-            value={formData.display_order}
-            onChange={(e) => setFormData({ ...formData, display_order: parseInt(e.target.value) || 0 })}
+            id="description"
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            placeholder="Brief description of this charge"
           />
         </div>
-      </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="description">Description</Label>
-        <Input
-          id="description"
-          value={formData.description}
-          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-          placeholder="Brief description of this charge"
-        />
-      </div>
+        <div className="flex items-center gap-2">
+          <Switch
+            id="is_active"
+            checked={formData.is_active}
+            onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
+          />
+          <Label htmlFor="is_active">Active</Label>
+        </div>
 
-      <div className="flex items-center gap-2">
-        <Switch
-          id="is_active"
-          checked={formData.is_active}
-          onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
-        />
-        <Label htmlFor="is_active">Active</Label>
+        <DialogFooter>
+          <Button onClick={onSubmit} disabled={isSubmitting}>
+            {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            {editingCharge ? 'Update Charge' : 'Create Charge'}
+          </Button>
+        </DialogFooter>
       </div>
+    );
+  };
 
-      <DialogFooter>
-        <Button onClick={onSubmit} disabled={isSubmitting}>
-          {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          {editingCharge ? 'Update Charge' : 'Create Charge'}
-        </Button>
-      </DialogFooter>
-    </div>
-  );
+  const regionCharges = charges?.filter(c => c.region === selectedRegion) || [];
 
   if (isLoading) {
     return (
@@ -284,21 +329,23 @@ export function ShippingCalculatorChargesManagement() {
           <div>
             <CardTitle>Additional Shipping Charges</CardTitle>
             <CardDescription>
-              Configure inspection fees, agency fees, and other miscellaneous charges
+              Configure region-specific fees like inspection, agency fees, etc.
             </CardDescription>
           </div>
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>
-              <Button onClick={() => setFormData(defaultFormData)}>
+              <Button onClick={handleOpenCreate}>
                 <Plus className="h-4 w-4 mr-2" />
                 Create Charge
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Create New Charge</DialogTitle>
+                <DialogTitle>
+                  Create New Charge for {REGION_LABELS[selectedRegion]}
+                </DialogTitle>
                 <DialogDescription>
-                  Add a new charge that will be applied to shipping calculations
+                  Add a new charge in {REGION_CURRENCIES[selectedRegion]} for shipments from {REGION_LABELS[selectedRegion]}
                 </DialogDescription>
               </DialogHeader>
               <ChargeForm onSubmit={handleCreate} isSubmitting={createCharge.isPending} />
@@ -307,87 +354,114 @@ export function ShippingCalculatorChargesManagement() {
         </div>
       </CardHeader>
       <CardContent>
-        {charges && charges.length > 0 ? (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Value</TableHead>
-                <TableHead>Applies To</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {charges.map((charge) => (
-                <TableRow key={charge.id}>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium">{charge.charge_name}</p>
-                      <p className="text-xs text-muted-foreground">{charge.charge_key}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      {charge.charge_type === 'fixed' ? (
-                        <DollarSign className="h-4 w-4 text-muted-foreground" />
-                      ) : (
-                        <Percent className="h-4 w-4 text-muted-foreground" />
-                      )}
-                      <span className="capitalize">{charge.charge_type}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {charge.charge_type === 'fixed' ? `$${charge.charge_value}` : `${charge.charge_value}%`}
-                  </TableCell>
-                  <TableCell className="capitalize">
-                    {charge.applies_to.replace(/_/g, ' ')}
-                  </TableCell>
-                  <TableCell>
-                    <Switch
-                      checked={charge.is_active}
-                      onCheckedChange={() => handleToggleActive(charge)}
-                    />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Dialog open={editingCharge?.id === charge.id} onOpenChange={(open) => !open && setEditingCharge(null)}>
-                        <DialogTrigger asChild>
-                          <Button variant="ghost" size="icon" onClick={() => openEditDialog(charge)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Edit Charge</DialogTitle>
-                            <DialogDescription>
-                              Update the charge details
-                            </DialogDescription>
-                          </DialogHeader>
-                          <ChargeForm onSubmit={handleUpdate} isSubmitting={updateCharge.isPending} />
-                        </DialogContent>
-                      </Dialog>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => handleDelete(charge.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        ) : (
-          <div className="text-center py-8 text-muted-foreground">
-            <p>No charges configured yet.</p>
-            <p className="text-sm">Click "Create Charge" to add inspection fees, agency fees, etc.</p>
-          </div>
-        )}
+        <Tabs value={selectedRegion} onValueChange={(v) => handleRegionChange(v as AgentRegion)}>
+          <TabsList className="mb-4 flex-wrap h-auto gap-1">
+            {REGIONS.map((region) => {
+              const count = charges?.filter(c => c.region === region).length || 0;
+              return (
+                <TabsTrigger key={region} value={region} className="gap-2">
+                  {REGION_LABELS[region]}
+                  <Badge variant="secondary" className="text-xs">
+                    {REGION_CURRENCIES[region]}
+                  </Badge>
+                  {count > 0 && (
+                    <Badge variant="outline" className="text-xs ml-1">
+                      {count}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+
+          {REGIONS.map((region) => (
+            <TabsContent key={region} value={region}>
+              {regionCharges.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Value</TableHead>
+                      <TableHead>Applies To</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {regionCharges.map((charge) => (
+                      <TableRow key={charge.id}>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{charge.charge_name}</p>
+                            <p className="text-xs text-muted-foreground">{charge.charge_key}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            {charge.charge_type === 'fixed' ? (
+                              <CurrencyIcon currency={charge.currency} />
+                            ) : (
+                              <Percent className="h-4 w-4 text-muted-foreground" />
+                            )}
+                            <span className="capitalize">{charge.charge_type}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {charge.charge_type === 'fixed' 
+                            ? `${getCurrencySymbol(charge.currency)}${charge.charge_value}` 
+                            : `${charge.charge_value}%`}
+                        </TableCell>
+                        <TableCell className="capitalize">
+                          {charge.applies_to.replace(/_/g, ' ')}
+                        </TableCell>
+                        <TableCell>
+                          <Switch
+                            checked={charge.is_active}
+                            onCheckedChange={() => handleToggleActive(charge)}
+                          />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Dialog open={editingCharge?.id === charge.id} onOpenChange={(open) => !open && setEditingCharge(null)}>
+                              <DialogTrigger asChild>
+                                <Button variant="ghost" size="icon" onClick={() => openEditDialog(charge)}>
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent>
+                                <DialogHeader>
+                                  <DialogTitle>Edit Charge</DialogTitle>
+                                  <DialogDescription>
+                                    Update the charge details for {REGION_LABELS[charge.region]}
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <ChargeForm onSubmit={handleUpdate} isSubmitting={updateCharge.isPending} />
+                              </DialogContent>
+                            </Dialog>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => handleDelete(charge.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground border rounded-lg">
+                  <p>No charges configured for {REGION_LABELS[region]}.</p>
+                  <p className="text-sm mt-1">Click "Create Charge" to add fees in {REGION_CURRENCIES[region]}.</p>
+                </div>
+              )}
+            </TabsContent>
+          ))}
+        </Tabs>
       </CardContent>
     </Card>
   );
