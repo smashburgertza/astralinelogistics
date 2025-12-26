@@ -12,6 +12,7 @@ export interface OrderRequest {
   handling_fee: number;
   grand_total: number;
   status: string;
+  category: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;

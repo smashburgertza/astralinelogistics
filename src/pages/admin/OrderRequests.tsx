@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { OrderRequestTable } from '@/components/admin/OrderRequestTable';
 import { useOrderRequests } from '@/hooks/useOrderRequests';
-import { ShoppingCart, Clock, CheckCircle, XCircle, Filter, Search, X } from 'lucide-react';
+import { ShoppingCart, Clock, CheckCircle, XCircle, Filter, Search, X, Package, Car, Sparkles, Cpu, Cog } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -24,8 +24,18 @@ const STATUS_OPTIONS = [
   { value: 'cancelled', label: 'Cancelled' },
 ];
 
+const CATEGORY_OPTIONS = [
+  { value: 'all', label: 'All Categories', icon: Package },
+  { value: 'products', label: 'Products', icon: Package },
+  { value: 'vehicles', label: 'Vehicles', icon: Car },
+  { value: 'cosmetics', label: 'Cosmetics', icon: Sparkles },
+  { value: 'electronics', label: 'Electronics', icon: Cpu },
+  { value: 'spare-parts', label: 'Spare Parts', icon: Cog },
+];
+
 export default function AdminOrderRequestsPage() {
   const [statusFilter, setStatusFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 300);
   const { data: orders, isLoading } = useOrderRequests();
@@ -40,6 +50,11 @@ export default function AdminOrderRequestsPage() {
       filtered = filtered.filter(o => o.status === statusFilter);
     }
     
+    // Filter by category
+    if (categoryFilter !== 'all') {
+      filtered = filtered.filter(o => (o.category || 'products') === categoryFilter);
+    }
+    
     // Filter by search query (name or email)
     if (debouncedSearch.trim()) {
       const query = debouncedSearch.toLowerCase();
@@ -50,7 +65,7 @@ export default function AdminOrderRequestsPage() {
     }
     
     return filtered;
-  }, [orders, statusFilter, debouncedSearch]);
+  }, [orders, statusFilter, categoryFilter, debouncedSearch]);
 
   const stats = {
     total: orders?.length || 0,
@@ -59,10 +74,11 @@ export default function AdminOrderRequestsPage() {
     cancelled: orders?.filter(o => o.status === 'cancelled').length || 0,
   };
 
-  const hasFilters = statusFilter !== 'all' || searchQuery.trim() !== '';
+  const hasFilters = statusFilter !== 'all' || categoryFilter !== 'all' || searchQuery.trim() !== '';
 
   const clearFilters = () => {
     setStatusFilter('all');
+    setCategoryFilter('all');
     setSearchQuery('');
   };
 
@@ -125,18 +141,33 @@ export default function AdminOrderRequestsPage() {
             )}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px] bg-background">
+              <SelectTrigger className="w-[160px] bg-background">
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
               <SelectContent className="bg-background z-50">
                 {STATUS_OPTIONS.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-[160px] bg-background">
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
+              <SelectContent className="bg-background z-50">
+                {CATEGORY_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    <div className="flex items-center gap-2">
+                      <option.icon className="h-4 w-4" />
+                      <span>{option.label}</span>
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
