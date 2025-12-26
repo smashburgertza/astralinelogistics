@@ -1490,6 +1490,60 @@ export type Database = {
         }
         Relationships: []
       }
+      vehicle_duty_rates: {
+        Row: {
+          applies_to: string
+          created_at: string | null
+          description: string | null
+          display_order: number
+          engine_cc_max: number | null
+          engine_cc_min: number | null
+          id: string
+          is_active: boolean
+          rate_key: string
+          rate_name: string
+          rate_type: string
+          rate_value: number
+          updated_at: string | null
+          vehicle_age_min: number | null
+          vehicle_category: string | null
+        }
+        Insert: {
+          applies_to?: string
+          created_at?: string | null
+          description?: string | null
+          display_order?: number
+          engine_cc_max?: number | null
+          engine_cc_min?: number | null
+          id?: string
+          is_active?: boolean
+          rate_key: string
+          rate_name: string
+          rate_type?: string
+          rate_value?: number
+          updated_at?: string | null
+          vehicle_age_min?: number | null
+          vehicle_category?: string | null
+        }
+        Update: {
+          applies_to?: string
+          created_at?: string | null
+          description?: string | null
+          display_order?: number
+          engine_cc_max?: number | null
+          engine_cc_min?: number | null
+          id?: string
+          is_active?: boolean
+          rate_key?: string
+          rate_name?: string
+          rate_type?: string
+          rate_value?: number
+          updated_at?: string | null
+          vehicle_age_min?: number | null
+          vehicle_category?: string | null
+        }
+        Relationships: []
+      }
       vehicle_pricing: {
         Row: {
           created_at: string | null

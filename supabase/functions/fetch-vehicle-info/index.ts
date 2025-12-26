@@ -178,7 +178,8 @@ Return ONLY valid JSON:
   "year": number or null,
   "vehicle_type": "motorcycle" | "sedan" | "suv" | "truck",
   "mileage": "string or null",
-  "engine": "string or null",
+  "engine": "string or null (e.g., '2.0L Turbo')",
+  "engine_cc": number or null (engine displacement in cc, e.g., 2000 for a 2.0L engine),
   "transmission": "string or null",
   "fuel_type": "string or null",
   "color": "string or null",
@@ -193,6 +194,7 @@ Return ONLY valid JSON:
 IMPORTANT:
 - price MUST be a number without currency symbols
 - year MUST be a 4-digit number (e.g., 2020)
+- engine_cc should be the engine size in cubic centimeters (cc), e.g., 2000 for 2.0L, 1600 for 1.6L
 - vehicle_type MUST be one of the four options listed`
           },
           {
