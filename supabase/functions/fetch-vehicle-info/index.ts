@@ -113,16 +113,69 @@ serve(async (req) => {
       }
     }
     
+    // eBay-specific price extraction - try multiple patterns
+    if (isEbayMotors && !extractedPrice) {
+      console.log('Attempting eBay-specific price extraction...');
+      
+      // Try various eBay price patterns
+      const ebayPricePatterns = [
+        /"price":\s*"?([\d.]+)"?/,
+        /"priceCurrency":\s*"[A-Z]+",\s*"price":\s*"?([\d.]+)"?/,
+        /itemprop="price"\s+content="([\d.]+)"/,
+        /data-testid="x-price-primary"[^>]*>.*?([£$€]\s*[\d,.]+)/s,
+        /class="x-price-primary"[^>]*>.*?([£$€]\s*[\d,.]+)/s,
+        /ux-textspans[^>]*>([£$€]\s*[\d,.]+)</,
+        /"binPrice":"([^"]+)"/,
+        /"displayPrice":"([^"]+)"/,
+        /Price:?\s*([£$€]\s*[\d,.]+)/i,
+      ];
+      
+      for (const pattern of ebayPricePatterns) {
+        const match = html.match(pattern);
+        if (match) {
+          const priceStr = match[1].replace(/[^0-9.]/g, '');
+          const price = parseFloat(priceStr);
+          if (price > 0) {
+            extractedPrice = price;
+            console.log('Found eBay price:', price, 'from pattern:', pattern.source);
+            break;
+          }
+        }
+      }
+    }
+    
     // Look for Open Graph meta tags
     const ogImageMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
                          html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
     const ogTitleMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i) ||
                          html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:title["']/i);
     
+    // Also try getting title from <title> tag
+    const titleTagMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    
     if (!extractedImage && ogImageMatch) extractedImage = ogImageMatch[1];
     if (!extractedTitle && ogTitleMatch) extractedTitle = ogTitleMatch[1];
+    if (!extractedTitle && titleTagMatch) extractedTitle = titleTagMatch[1].trim();
     
-    console.log('Pre-extracted data:', { extractedPrice, extractedImage, extractedTitle });
+    // eBay-specific image extraction
+    if (isEbayMotors && !extractedImage) {
+      const ebayImagePatterns = [
+        /"image":\s*\["([^"]+)"\]/,
+        /"imageUrl":\s*"([^"]+)"/,
+        /data-zoom-src="([^"]+)"/,
+        /icImg[^>]+src="([^"]+)"/,
+      ];
+      for (const pattern of ebayImagePatterns) {
+        const match = html.match(pattern);
+        if (match) {
+          extractedImage = match[1];
+          console.log('Found eBay image:', extractedImage);
+          break;
+        }
+      }
+    }
+    
+    console.log('Pre-extracted data:', { extractedPrice, extractedCurrency: detectedCurrency, extractedImage, extractedName: extractedTitle });
     
     // Truncate HTML to avoid token limits
     const truncatedHtml = html.substring(0, 35000);
