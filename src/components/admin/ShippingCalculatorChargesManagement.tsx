@@ -31,7 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Pencil, Trash2, Loader2, DollarSign, Percent, PoundSterling } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, DollarSign, Percent, PoundSterling, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   useShippingCalculatorCharges,
@@ -42,6 +42,8 @@ import {
   REGION_CURRENCIES,
   REGION_LABELS,
 } from '@/hooks/useShippingCalculatorCharges';
+import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 
 type AgentRegion = Database['public']['Enums']['agent_region'];
@@ -68,6 +70,7 @@ interface ChargeFormData {
 }
 
 export function ShippingCalculatorChargesManagement() {
+  const queryClient = useQueryClient();
   const { data: charges, isLoading } = useShippingCalculatorCharges();
   const createCharge = useCreateShippingCalculatorCharge();
   const updateCharge = useUpdateShippingCalculatorCharge();
@@ -75,6 +78,9 @@ export function ShippingCalculatorChargesManagement() {
 
   const [selectedRegion, setSelectedRegion] = useState<AgentRegion>('usa');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isCopyOpen, setIsCopyOpen] = useState(false);
+  const [copyTargetRegion, setCopyTargetRegion] = useState<AgentRegion | ''>('');
+  const [isCopying, setIsCopying] = useState(false);
   const [editingCharge, setEditingCharge] = useState<ShippingCalculatorCharge | null>(null);
 
   const getDefaultFormData = (region: AgentRegion): ChargeFormData => ({
@@ -99,6 +105,51 @@ export function ShippingCalculatorChargesManagement() {
   const handleOpenCreate = () => {
     setFormData(getDefaultFormData(selectedRegion));
     setIsCreateOpen(true);
+  };
+
+  const handleCopyToRegion = async () => {
+    if (!copyTargetRegion) {
+      toast.error('Please select a target region');
+      return;
+    }
+
+    const sourceCharges = charges?.filter(c => c.region === selectedRegion) || [];
+    if (sourceCharges.length === 0) {
+      toast.error('No charges to copy from this region');
+      return;
+    }
+
+    setIsCopying(true);
+    try {
+      const targetCurrency = REGION_CURRENCIES[copyTargetRegion];
+      const newCharges = sourceCharges.map(charge => ({
+        charge_key: charge.charge_key,
+        charge_name: charge.charge_name,
+        charge_type: charge.charge_type,
+        charge_value: charge.charge_value,
+        applies_to: charge.applies_to,
+        description: charge.description,
+        is_active: charge.is_active,
+        display_order: charge.display_order,
+        region: copyTargetRegion,
+        currency: targetCurrency,
+      }));
+
+      const { error } = await supabase
+        .from('shipping_calculator_charges')
+        .insert(newCharges);
+
+      if (error) throw error;
+
+      queryClient.invalidateQueries({ queryKey: ['shipping-calculator-charges'] });
+      toast.success(`Copied ${sourceCharges.length} charges to ${REGION_LABELS[copyTargetRegion]}`);
+      setIsCopyOpen(false);
+      setCopyTargetRegion('');
+    } catch (error) {
+      toast.error('Failed to copy charges');
+    } finally {
+      setIsCopying(false);
+    }
   };
 
   const handleCreate = async () => {
@@ -332,25 +383,78 @@ export function ShippingCalculatorChargesManagement() {
               Configure region-specific fees like inspection, agency fees, etc.
             </CardDescription>
           </div>
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={handleOpenCreate}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Charge
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>
-                  Create New Charge for {REGION_LABELS[selectedRegion]}
-                </DialogTitle>
-                <DialogDescription>
-                  Add a new charge in {REGION_CURRENCIES[selectedRegion]} for shipments from {REGION_LABELS[selectedRegion]}
-                </DialogDescription>
-              </DialogHeader>
-              <ChargeForm onSubmit={handleCreate} isSubmitting={createCharge.isPending} />
-            </DialogContent>
-          </Dialog>
+          <div className="flex gap-2">
+            <Dialog open={isCopyOpen} onOpenChange={setIsCopyOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" disabled={regionCharges.length === 0}>
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copy to Region
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Copy Charges to Another Region</DialogTitle>
+                  <DialogDescription>
+                    Copy all {regionCharges.length} charges from {REGION_LABELS[selectedRegion]} to another region. 
+                    Values will be copied as-is but currency will be updated to match the target region.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="py-4 space-y-4">
+                  <div className="space-y-2">
+                    <Label>Target Region</Label>
+                    <Select
+                      value={copyTargetRegion}
+                      onValueChange={(v) => setCopyTargetRegion(v as AgentRegion)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select target region" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {REGIONS.filter(r => r !== selectedRegion).map((region) => (
+                          <SelectItem key={region} value={region}>
+                            {REGION_LABELS[region]} ({REGION_CURRENCIES[region]})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {copyTargetRegion && (
+                    <p className="text-sm text-muted-foreground">
+                      This will create {regionCharges.length} new charges in {REGION_LABELS[copyTargetRegion]} with {REGION_CURRENCIES[copyTargetRegion]} currency.
+                    </p>
+                  )}
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsCopyOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleCopyToRegion} disabled={!copyTargetRegion || isCopying}>
+                    {isCopying && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Copy Charges
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={handleOpenCreate}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Charge
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>
+                    Create New Charge for {REGION_LABELS[selectedRegion]}
+                  </DialogTitle>
+                  <DialogDescription>
+                    Add a new charge in {REGION_CURRENCIES[selectedRegion]} for shipments from {REGION_LABELS[selectedRegion]}
+                  </DialogDescription>
+                </DialogHeader>
+                <ChargeForm onSubmit={handleCreate} isSubmitting={createCharge.isPending} />
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
