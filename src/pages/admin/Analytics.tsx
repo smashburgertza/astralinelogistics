@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { format, subDays, subMonths, startOfDay, endOfDay, parseISO, isWithinInterval, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
+import { format, subDays, subMonths, startOfDay, endOfDay, parseISO, isWithinInterval, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, startOfWeek, endOfWeek, startOfMonth, endOfMonth, getMonth, getQuarter, differenceInDays } from 'date-fns';
 import { 
   Download, Calendar, TrendingUp, Package, DollarSign, Users, 
   FileSpreadsheet, ArrowUpRight, ArrowDownRight, Filter, RefreshCw,
-  BarChart3, PieChart as PieChartIcon, LineChart as LineChartIcon, MapPin
+  BarChart3, PieChart as PieChartIcon, LineChart as LineChartIcon, MapPin,
+  Crown, Target, Snowflake, Sun, Leaf, Cloud, Zap, Award
 } from 'lucide-react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,18 +16,27 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { REGIONS, type Region } from '@/lib/constants';
 import { EXPENSE_CATEGORIES } from '@/hooks/useExpenses';
 import { toast } from 'sonner';
 import {
   AreaChart, Area, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ComposedChart
+  Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ComposedChart, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis
 } from 'recharts';
 import { cn } from '@/lib/utils';
 import type { DateRange } from 'react-day-picker';
 
 const CHART_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4'];
+const REGION_COLORS: Record<string, string> = {
+  europe: '#3B82F6',
+  uk: '#8B5CF6',
+  usa: '#EC4899',
+  dubai: '#F59E0B',
+  china: '#EF4444',
+  india: '#10B981',
+};
 
 const DATE_PRESETS = [
   { label: 'Last 7 days', value: '7d', days: 7 },
@@ -35,6 +45,13 @@ const DATE_PRESETS = [
   { label: 'Last 6 months', value: '6m', days: 180 },
   { label: 'Last 12 months', value: '12m', days: 365 },
   { label: 'Custom', value: 'custom', days: 0 },
+];
+
+const SEASONS = [
+  { name: 'Winter', months: [11, 0, 1], icon: Snowflake, color: '#60A5FA' },
+  { name: 'Spring', months: [2, 3, 4], icon: Leaf, color: '#34D399' },
+  { name: 'Summer', months: [5, 6, 7], icon: Sun, color: '#FBBF24' },
+  { name: 'Fall', months: [8, 9, 10], icon: Cloud, color: '#F97316' },
 ];
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -47,7 +64,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
             <span className="text-muted-foreground">{item.name}:</span>
             <span className="font-semibold">
-              {item.dataKey === 'revenue' || item.dataKey === 'expenses' || item.dataKey === 'profit'
+              {item.dataKey === 'revenue' || item.dataKey === 'expenses' || item.dataKey === 'profit' || item.dataKey === 'clv' || item.dataKey === 'avgOrderValue'
                 ? `$${item.value?.toLocaleString() ?? 0}` 
                 : item.value?.toLocaleString() ?? 0}
             </span>
@@ -60,12 +77,12 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export default function AnalyticsPage() {
-  const [datePreset, setDatePreset] = useState('30d');
+  const [datePreset, setDatePreset] = useState('12m'); // Default to 12 months for better trend visibility
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: subDays(new Date(), 30),
+    from: subDays(new Date(), 365),
     to: new Date(),
   });
-  const [granularity, setGranularity] = useState<'day' | 'week' | 'month'>('day');
+  const [granularity, setGranularity] = useState<'day' | 'week' | 'month'>('month');
 
   // Calculate date range based on preset
   const effectiveDateRange = useMemo(() => {
@@ -237,6 +254,160 @@ export default function AnalyticsPage() {
     });
   }, [filteredData, effectiveDateRange, granularity]);
 
+  // Revenue by Region over time
+  const regionTrendData = useMemo(() => {
+    const { from, to } = effectiveDateRange;
+    const intervals = eachMonthOfInterval({ start: from, end: to });
+    
+    return intervals.map(interval => {
+      const periodStart = startOfMonth(interval);
+      const periodEnd = endOfMonth(interval);
+      
+      const periodShipments = (shipments || []).filter(s => {
+        if (!s.created_at) return false;
+        const date = parseISO(s.created_at);
+        return isWithinInterval(date, { start: periodStart, end: periodEnd });
+      });
+      
+      // Calculate revenue by region
+      const regionRevenue: Record<string, number> = {};
+      Object.keys(REGIONS).forEach(r => { regionRevenue[r] = 0; });
+      
+      periodShipments.forEach(shipment => {
+        const region = shipment.origin_region || 'unknown';
+        // Match invoices to shipments by customer
+        const shipmentInvoices = (invoices || []).filter(
+          i => i.customer_id === shipment.customer_id && 
+               i.status === 'paid' &&
+               i.paid_at &&
+               isWithinInterval(parseISO(i.paid_at), { start: periodStart, end: periodEnd })
+        );
+        const shipmentRevenue = shipmentInvoices.reduce((sum, i) => sum + (i.amount || 0), 0);
+        if (regionRevenue[region] !== undefined) {
+          regionRevenue[region] += shipmentRevenue;
+        }
+      });
+      
+      return {
+        period: format(interval, 'MMM yyyy'),
+        ...regionRevenue,
+      };
+    });
+  }, [shipments, invoices, effectiveDateRange]);
+
+  // Customer Lifetime Value (CLV) analysis
+  const clvData = useMemo(() => {
+    if (!customers || !invoices || !shipments) return [];
+    
+    const customerStats = customers.map(customer => {
+      const customerInvoices = invoices.filter(
+        i => i.customer_id === customer.id && i.status === 'paid'
+      );
+      const customerShipments = shipments.filter(s => s.customer_id === customer.id);
+      
+      const totalRevenue = customerInvoices.reduce((sum, i) => sum + (i.amount || 0), 0);
+      const orderCount = customerShipments.length;
+      const avgOrderValue = orderCount > 0 ? totalRevenue / orderCount : 0;
+      
+      // Calculate customer tenure in days
+      const firstOrderDate = customerShipments.length > 0 
+        ? customerShipments.reduce((earliest, s) => {
+            const date = s.created_at ? parseISO(s.created_at) : new Date();
+            return date < earliest ? date : earliest;
+          }, new Date())
+        : new Date();
+      const tenure = differenceInDays(new Date(), firstOrderDate);
+      
+      // CLV = Average Order Value × Purchase Frequency × Customer Tenure (simplified)
+      const purchaseFrequency = tenure > 0 ? (orderCount / (tenure / 30)) : 0; // per month
+      const projectedCLV = avgOrderValue * purchaseFrequency * 12; // 12-month projection
+      
+      return {
+        id: customer.id,
+        name: customer.name,
+        totalRevenue,
+        orderCount,
+        avgOrderValue,
+        tenure,
+        purchaseFrequency,
+        clv: projectedCLV,
+      };
+    })
+    .filter(c => c.orderCount > 0)
+    .sort((a, b) => b.clv - a.clv);
+    
+    return customerStats;
+  }, [customers, invoices, shipments]);
+
+  // Top customers by CLV
+  const topCustomers = useMemo(() => {
+    return clvData.slice(0, 10);
+  }, [clvData]);
+
+  // CLV distribution buckets
+  const clvDistribution = useMemo(() => {
+    const buckets = [
+      { range: '$0 - $100', min: 0, max: 100, count: 0 },
+      { range: '$100 - $500', min: 100, max: 500, count: 0 },
+      { range: '$500 - $1K', min: 500, max: 1000, count: 0 },
+      { range: '$1K - $5K', min: 1000, max: 5000, count: 0 },
+      { range: '$5K+', min: 5000, max: Infinity, count: 0 },
+    ];
+    
+    clvData.forEach(customer => {
+      const bucket = buckets.find(b => customer.clv >= b.min && customer.clv < b.max);
+      if (bucket) bucket.count++;
+    });
+    
+    return buckets;
+  }, [clvData]);
+
+  // Seasonal patterns analysis
+  const seasonalData = useMemo(() => {
+    if (!invoices) return [];
+    
+    const paidInvoices = invoices.filter(i => i.status === 'paid' && i.paid_at);
+    
+    return SEASONS.map(season => {
+      const seasonInvoices = paidInvoices.filter(invoice => {
+        const month = getMonth(parseISO(invoice.paid_at!));
+        return season.months.includes(month);
+      });
+      
+      const revenue = seasonInvoices.reduce((sum, i) => sum + (i.amount || 0), 0);
+      const orderCount = seasonInvoices.length;
+      const avgOrderValue = orderCount > 0 ? revenue / orderCount : 0;
+      
+      return {
+        season: season.name,
+        revenue,
+        orders: orderCount,
+        avgOrderValue,
+        color: season.color,
+      };
+    });
+  }, [invoices]);
+
+  // Monthly seasonal comparison (same month across years)
+  const monthlyPatterns = useMemo(() => {
+    if (!invoices) return [];
+    
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const paidInvoices = invoices.filter(i => i.status === 'paid' && i.paid_at);
+    
+    return months.map((month, index) => {
+      const monthInvoices = paidInvoices.filter(invoice => {
+        const invoiceMonth = getMonth(parseISO(invoice.paid_at!));
+        return invoiceMonth === index;
+      });
+      
+      const revenue = monthInvoices.reduce((sum, i) => sum + (i.amount || 0), 0);
+      const orders = monthInvoices.length;
+      
+      return { month, revenue, orders };
+    });
+  }, [invoices]);
+
   // Calculate summary stats
   const stats = useMemo(() => {
     const totalShipments = filteredData.shipments.length;
@@ -251,6 +422,10 @@ export default function AnalyticsPage() {
     const avgRevenuePerShipment = totalShipments > 0 ? totalRevenue / totalShipments : 0;
     const deliveredShipments = filteredData.shipments.filter(s => s.status === 'delivered').length;
     const deliveryRate = totalShipments > 0 ? (deliveredShipments / totalShipments) * 100 : 0;
+    
+    // CLV stats
+    const avgCLV = clvData.length > 0 ? clvData.reduce((sum, c) => sum + c.clv, 0) / clvData.length : 0;
+    const topCLV = clvData.length > 0 ? clvData[0]?.clv || 0 : 0;
 
     return {
       totalShipments,
@@ -263,8 +438,10 @@ export default function AnalyticsPage() {
       avgRevenuePerShipment,
       deliveredShipments,
       deliveryRate,
+      avgCLV,
+      topCLV,
     };
-  }, [filteredData]);
+  }, [filteredData, clvData]);
 
   // Region breakdown
   const regionData = useMemo(() => {
@@ -328,7 +505,7 @@ export default function AnalyticsPage() {
   }, [filteredData]);
 
   // Export to CSV
-  const exportToCSV = (type: 'shipments' | 'revenue' | 'expenses' | 'summary') => {
+  const exportToCSV = (type: 'shipments' | 'revenue' | 'expenses' | 'summary' | 'clv' | 'regions') => {
     let csvContent = '';
     let filename = '';
 
@@ -350,6 +527,18 @@ export default function AnalyticsPage() {
         csvContent += `"${row.name}",${row.value.toFixed(2)}\n`;
       });
       filename = `expenses-breakdown-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    } else if (type === 'clv') {
+      csvContent = 'Customer,Total Revenue ($),Orders,Avg Order Value ($),CLV ($)\n';
+      clvData.forEach(row => {
+        csvContent += `"${row.name}",${row.totalRevenue.toFixed(2)},${row.orderCount},${row.avgOrderValue.toFixed(2)},${row.clv.toFixed(2)}\n`;
+      });
+      filename = `customer-lifetime-value-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    } else if (type === 'regions') {
+      csvContent = 'Region,Shipments,Weight (kg),Revenue ($)\n';
+      regionData.forEach(row => {
+        csvContent += `"${row.name}",${row.shipments},${row.weight.toFixed(2)},${row.revenue.toFixed(2)}\n`;
+      });
+      filename = `region-analytics-${format(new Date(), 'yyyy-MM-dd')}.csv`;
     } else {
       csvContent = 'Metric,Value\n';
       csvContent += `Total Shipments,${stats.totalShipments}\n`;
@@ -360,6 +549,7 @@ export default function AnalyticsPage() {
       csvContent += `Profit Margin (%),${stats.profitMargin.toFixed(2)}\n`;
       csvContent += `Total Customers,${stats.totalCustomers}\n`;
       csvContent += `Delivery Rate (%),${stats.deliveryRate.toFixed(2)}\n`;
+      csvContent += `Average CLV ($),${stats.avgCLV.toFixed(2)}\n`;
       filename = `analytics-summary-${format(new Date(), 'yyyy-MM-dd')}.csv`;
     }
 
@@ -387,7 +577,7 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <AdminLayout title="Analytics" subtitle="Detailed reports with date range filters and export">
+    <AdminLayout title="Analytics" subtitle="Advanced reports with CLV, regional trends, and seasonal analysis">
       <div className="space-y-6">
         {/* Filters Bar */}
         <Card>
@@ -517,13 +707,13 @@ export default function AnalyticsPage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Customers</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-muted-foreground">Avg Customer CLV</CardTitle>
+              <Crown className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalCustomers.toLocaleString()}</div>
+              <div className="text-2xl font-bold">${stats.avgCLV.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
               <p className="text-xs text-muted-foreground">
-                {stats.deliveryRate.toFixed(1)}% delivery rate
+                Top: ${stats.topCLV.toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </p>
             </CardContent>
           </Card>
@@ -531,23 +721,27 @@ export default function AnalyticsPage() {
 
         {/* Charts */}
         <Tabs defaultValue="overview" className="space-y-4">
-          <div className="flex items-center justify-between">
-            <TabsList>
+          <div className="flex items-center justify-between overflow-x-auto">
+            <TabsList className="flex-wrap">
               <TabsTrigger value="overview" className="gap-2">
                 <LineChartIcon className="w-4 h-4" />
                 Overview
               </TabsTrigger>
+              <TabsTrigger value="region-trends" className="gap-2">
+                <MapPin className="w-4 h-4" />
+                Region Trends
+              </TabsTrigger>
+              <TabsTrigger value="clv" className="gap-2">
+                <Crown className="w-4 h-4" />
+                Customer LTV
+              </TabsTrigger>
+              <TabsTrigger value="seasonal" className="gap-2">
+                <Sun className="w-4 h-4" />
+                Seasonal
+              </TabsTrigger>
               <TabsTrigger value="shipments" className="gap-2">
                 <BarChart3 className="w-4 h-4" />
                 Shipments
-              </TabsTrigger>
-              <TabsTrigger value="revenue" className="gap-2">
-                <DollarSign className="w-4 h-4" />
-                Revenue
-              </TabsTrigger>
-              <TabsTrigger value="regions" className="gap-2">
-                <MapPin className="w-4 h-4" />
-                Regions
               </TabsTrigger>
               <TabsTrigger value="breakdown" className="gap-2">
                 <PieChartIcon className="w-4 h-4" />
@@ -616,6 +810,323 @@ export default function AnalyticsPage() {
             </Card>
           </TabsContent>
 
+          {/* Region Trends Tab */}
+          <TabsContent value="region-trends" className="space-y-4">
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Card className="lg:col-span-2">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle>Revenue by Region Over Time</CardTitle>
+                    <CardDescription>Monthly revenue trends across all origin regions</CardDescription>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => exportToCSV('regions')}>
+                    <FileSpreadsheet className="w-4 h-4 mr-2" />
+                    Export
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={400}>
+                    <AreaChart data={regionTrendData}>
+                      <defs>
+                        {Object.entries(REGION_COLORS).map(([region, color]) => (
+                          <linearGradient key={region} id={`grad-${region}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor={color} stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor={color} stopOpacity={0}/>
+                          </linearGradient>
+                        ))}
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
+                      <XAxis 
+                        dataKey="period" 
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                      />
+                      <YAxis 
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                        tickFormatter={(value) => `$${value.toLocaleString()}`}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend />
+                      {Object.entries(REGIONS).map(([region, info]) => (
+                        <Area
+                          key={region}
+                          type="monotone"
+                          dataKey={region}
+                          stackId="1"
+                          stroke={REGION_COLORS[region] || '#888'}
+                          fill={`url(#grad-${region})`}
+                          name={`${info.flag} ${info.label}`}
+                        />
+                      ))}
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Revenue Share by Region</CardTitle>
+                  <CardDescription>Current period distribution</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={regionData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        paddingAngle={2}
+                        dataKey="revenue"
+                        nameKey="name"
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        labelLine={false}
+                      >
+                        {regionData.map((entry, index) => (
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={REGION_COLORS[entry.region] || CHART_COLORS[index % CHART_COLORS.length]} 
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value: number) => `$${value.toLocaleString()}`} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Region Performance</CardTitle>
+                  <CardDescription>Shipments, weight, and revenue comparison</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {regionData.sort((a, b) => b.revenue - a.revenue).map((region, index) => (
+                      <div key={region.region} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">{REGIONS[region.region as Region]?.flag}</span>
+                            <span className="font-medium">{region.name}</span>
+                            {index === 0 && <Badge className="bg-yellow-500">Top</Badge>}
+                          </div>
+                          <span className="font-bold">${region.revenue.toLocaleString()}</span>
+                        </div>
+                        <Progress 
+                          value={(region.revenue / Math.max(...regionData.map(r => r.revenue))) * 100} 
+                          className="h-2"
+                        />
+                        <div className="flex gap-4 text-xs text-muted-foreground">
+                          <span>{region.shipments} shipments</span>
+                          <span>{region.weight.toFixed(0)} kg</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* CLV Tab */}
+          <TabsContent value="clv" className="space-y-4">
+            <div className="grid gap-4 lg:grid-cols-3">
+              <Card className="lg:col-span-2">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Crown className="h-5 w-5 text-yellow-500" />
+                      Top Customers by Lifetime Value
+                    </CardTitle>
+                    <CardDescription>Projected 12-month customer lifetime value</CardDescription>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => exportToCSV('clv')}>
+                    <FileSpreadsheet className="w-4 h-4 mr-2" />
+                    Export CLV
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {topCustomers.length > 0 ? (
+                    <div className="space-y-4">
+                      {topCustomers.map((customer, index) => (
+                        <div key={customer.id} className="flex items-center gap-4 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+                          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                            {index < 3 ? (
+                              <Award className={cn(
+                                "h-4 w-4",
+                                index === 0 && "text-yellow-500",
+                                index === 1 && "text-gray-400",
+                                index === 2 && "text-amber-600"
+                              )} />
+                            ) : (
+                              <span className="text-xs font-bold text-muted-foreground">{index + 1}</span>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">{customer.name}</p>
+                            <div className="flex gap-3 text-xs text-muted-foreground">
+                              <span>{customer.orderCount} orders</span>
+                              <span>Avg ${customer.avgOrderValue.toFixed(0)}</span>
+                              <span>{customer.tenure} days</span>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-bold text-lg">${customer.clv.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                            <p className="text-xs text-muted-foreground">Projected CLV</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No customer data available
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>CLV Distribution</CardTitle>
+                  <CardDescription>Customer value segments</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={clvDistribution} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
+                      <XAxis type="number" />
+                      <YAxis 
+                        dataKey="range" 
+                        type="category" 
+                        width={80}
+                        tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+                      />
+                      <Tooltip />
+                      <Bar dataKey="count" fill="#8B5CF6" name="Customers" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                  <div className="mt-4 space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Total Customers</span>
+                      <span className="font-bold">{clvData.length}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Avg CLV</span>
+                      <span className="font-bold">${stats.avgCLV.toFixed(0)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Top CLV</span>
+                      <span className="font-bold text-green-600">${stats.topCLV.toFixed(0)}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Seasonal Tab */}
+          <TabsContent value="seasonal" className="space-y-4">
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Revenue by Season</CardTitle>
+                  <CardDescription>Performance across different seasons</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-4 mb-6">
+                    {seasonalData.map(season => {
+                      const SeasonIcon = SEASONS.find(s => s.name === season.season)?.icon || Sun;
+                      return (
+                        <Card key={season.season} className="p-4">
+                          <div className="flex items-center gap-3">
+                            <div 
+                              className="p-2 rounded-lg" 
+                              style={{ backgroundColor: `${season.color}20` }}
+                            >
+                              <SeasonIcon className="h-5 w-5" style={{ color: season.color }} />
+                            </div>
+                            <div>
+                              <p className="text-sm text-muted-foreground">{season.season}</p>
+                              <p className="font-bold text-lg">${season.revenue.toLocaleString()}</p>
+                              <p className="text-xs text-muted-foreground">{season.orders} orders</p>
+                            </div>
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={seasonalData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
+                      <XAxis dataKey="season" />
+                      <YAxis tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Bar dataKey="revenue" name="Revenue">
+                        {seasonalData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Monthly Patterns</CardTitle>
+                  <CardDescription>Revenue and order patterns by month</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={350}>
+                    <ComposedChart data={monthlyPatterns}>
+                      <defs>
+                        <linearGradient id="monthGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
+                      <XAxis dataKey="month" />
+                      <YAxis 
+                        yAxisId="left" 
+                        tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`}
+                        tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+                      />
+                      <YAxis 
+                        yAxisId="right" 
+                        orientation="right"
+                        tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend />
+                      <Area 
+                        yAxisId="left"
+                        type="monotone" 
+                        dataKey="revenue" 
+                        stroke="#3B82F6"
+                        fill="url(#monthGrad)"
+                        name="Revenue"
+                      />
+                      <Line 
+                        yAxisId="right"
+                        type="monotone" 
+                        dataKey="orders" 
+                        stroke="#10B981"
+                        strokeWidth={2}
+                        dot={{ r: 4 }}
+                        name="Orders"
+                      />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
           {/* Shipments Tab */}
           <TabsContent value="shipments" className="space-y-4">
             <Card>
@@ -661,108 +1172,6 @@ export default function AnalyticsPage() {
                 </ResponsiveContainer>
               </CardContent>
             </Card>
-          </TabsContent>
-
-          {/* Revenue Tab */}
-          <TabsContent value="revenue" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Revenue Trend</CardTitle>
-                <CardDescription>Revenue generated over the selected period</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={400}>
-                  <AreaChart data={timeSeriesData}>
-                    <defs>
-                      <linearGradient id="revGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10B981" stopOpacity={0.4}/>
-                        <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
-                    <XAxis 
-                      dataKey="period" 
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                    />
-                    <YAxis 
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                      tickFormatter={(value) => `$${value.toLocaleString()}`}
-                    />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Area 
-                      type="monotone" 
-                      dataKey="revenue" 
-                      stroke="#10B981" 
-                      strokeWidth={2.5}
-                      fill="url(#revGradient)"
-                      name="Revenue"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Regions Tab */}
-          <TabsContent value="regions" className="space-y-4">
-            <div className="grid gap-4 lg:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Shipments by Region</CardTitle>
-                  <CardDescription>Distribution across origin regions</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={regionData} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
-                      <XAxis type="number" />
-                      <YAxis 
-                        dataKey="name" 
-                        type="category" 
-                        width={80}
-                        tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                      />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Bar dataKey="shipments" fill="#3B82F6" name="Shipments" radius={[0, 4, 4, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Weight by Region</CardTitle>
-                  <CardDescription>Total weight shipped from each region</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={regionData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={100}
-                        paddingAngle={2}
-                        dataKey="weight"
-                        nameKey="name"
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                        labelLine={false}
-                      >
-                        {regionData.map((_, index) => (
-                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value: number) => `${value.toFixed(2)} kg`} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            </div>
           </TabsContent>
 
           {/* Breakdown Tab */}
