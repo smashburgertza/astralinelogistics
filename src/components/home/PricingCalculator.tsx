@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Calculator, PackageSearch, MoveRight, Container, Car } from 'lucide-react';
+import { Calculator, PackageSearch, MoveRight, Container, Car, Bike, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -37,7 +37,32 @@ const CONTAINER_PRICING = {
   },
 } as const;
 
+// Vehicle shipping pricing estimates
+const VEHICLE_TYPES = {
+  motorcycle: { label: 'Motorcycle', icon: 'bike', baseWeight: 200 },
+  sedan: { label: 'Sedan / Hatchback', icon: 'car', baseWeight: 1400 },
+  suv: { label: 'SUV / Crossover', icon: 'car', baseWeight: 2000 },
+  truck: { label: 'Truck / Pickup', icon: 'truck', baseWeight: 2500 },
+} as const;
+
+const VEHICLE_PRICING = {
+  roro: {
+    motorcycle: { europe: 800, dubai: 600, china: 700, india: 650, usa: 1200, uk: 750, currency: 'USD' },
+    sedan: { europe: 1500, dubai: 1100, china: 1300, india: 1200, usa: 2200, uk: 1400, currency: 'USD' },
+    suv: { europe: 1800, dubai: 1400, china: 1600, india: 1500, usa: 2600, uk: 1700, currency: 'USD' },
+    truck: { europe: 2200, dubai: 1800, china: 2000, india: 1900, usa: 3200, uk: 2100, currency: 'USD' },
+  },
+  container: {
+    motorcycle: { europe: 1200, dubai: 900, china: 1000, india: 950, usa: 1600, uk: 1100, currency: 'USD' },
+    sedan: { europe: 2500, dubai: 1900, china: 2200, india: 2000, usa: 3500, uk: 2400, currency: 'USD' },
+    suv: { europe: 3000, dubai: 2400, china: 2700, india: 2500, usa: 4200, uk: 2900, currency: 'USD' },
+    truck: { europe: 3800, dubai: 3000, china: 3400, india: 3200, usa: 5000, uk: 3600, currency: 'USD' },
+  },
+} as const;
+
 type ContainerSize = '20ft' | '40ft';
+type VehicleType = keyof typeof VEHICLE_TYPES;
+type ShippingMethod = 'roro' | 'container';
 
 export function PricingCalculator() {
   const [region, setRegion] = useState<Region>('europe');
@@ -47,6 +72,9 @@ export function PricingCalculator() {
   const [activeTab, setActiveTab] = useState('loose-cargo');
   const [containerSize, setContainerSize] = useState<ContainerSize>('20ft');
   const [containerRegion, setContainerRegion] = useState<Region>('china');
+  const [vehicleType, setVehicleType] = useState<VehicleType>('sedan');
+  const [shippingMethod, setShippingMethod] = useState<ShippingMethod>('roro');
+  const [vehicleRegion, setVehicleRegion] = useState<Region>('dubai');
 
   const { ref: leftRef, isVisible: leftVisible } = useScrollAnimation();
   const { ref: rightRef, isVisible: rightVisible } = useScrollAnimation();
@@ -79,6 +107,11 @@ export function PricingCalculator() {
   // Container calculations
   const containerPricing = CONTAINER_PRICING[containerSize][containerRegion];
   const containerSymbol = CURRENCY_SYMBOLS[containerPricing.currency] || '$';
+
+  // Vehicle calculations
+  const vehiclePricing = VEHICLE_PRICING[shippingMethod][vehicleType];
+  const vehiclePrice = vehiclePricing[vehicleRegion];
+  const vehicleSymbol = CURRENCY_SYMBOLS[vehiclePricing.currency] || '$';
 
   return (
     <section className="section-padding bg-muted/50 overflow-hidden">
@@ -314,19 +347,118 @@ export function PricingCalculator() {
 
               {/* Vehicles Tab */}
               <TabsContent value="vehicles" className="space-y-4 sm:space-y-6 mt-0">
-                <div className="text-center py-8">
-                  <Car className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                  <h4 className="font-semibold text-lg mb-2">Vehicle Shipping</h4>
-                  <p className="text-sm text-muted-foreground mb-6 max-w-xs mx-auto">
-                    We handle cars, motorcycles, and other vehicles. Contact us for pricing based on vehicle type, dimensions, and shipping method.
-                  </p>
-                  <Button className="btn-gold group" asChild>
-                    <a href="/contact">
-                      Request Vehicle Quote
-                      <MoveRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
-                    </a>
-                  </Button>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Vehicle Type</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(Object.entries(VEHICLE_TYPES) as [VehicleType, typeof VEHICLE_TYPES[VehicleType]][]).map(([key, value]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setVehicleType(key)}
+                        className={cn(
+                          "p-3 rounded-lg border-2 transition-all text-left",
+                          vehicleType === key
+                            ? "border-primary bg-primary/5"
+                            : "border-border hover:border-primary/50"
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          {key === 'motorcycle' ? (
+                            <Bike className="w-4 h-4 text-primary" />
+                          ) : key === 'truck' ? (
+                            <Truck className="w-4 h-4 text-primary" />
+                          ) : (
+                            <Car className="w-4 h-4 text-primary" />
+                          )}
+                          <span className="font-medium text-sm">{value.label}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Shipping Method</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShippingMethod('roro')}
+                      className={cn(
+                        "p-4 rounded-lg border-2 transition-all text-left",
+                        shippingMethod === 'roro'
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-primary/50"
+                      )}
+                    >
+                      <span className="font-semibold text-sm">RoRo (Roll-on/Roll-off)</span>
+                      <p className="text-xs text-muted-foreground mt-1">Drive on/off ship. More economical.</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShippingMethod('container')}
+                      className={cn(
+                        "p-4 rounded-lg border-2 transition-all text-left",
+                        shippingMethod === 'container'
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-primary/50"
+                      )}
+                    >
+                      <span className="font-semibold text-sm">Container Shipping</span>
+                      <p className="text-xs text-muted-foreground mt-1">Enclosed container. More protected.</p>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Origin Region</Label>
+                  <Select value={vehicleRegion} onValueChange={(v) => setVehicleRegion(v as Region)}>
+                    <SelectTrigger className="h-12">
+                      <SelectValue placeholder="Select origin" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(REGIONS).map(([key, value]) => (
+                        <SelectItem key={key} value={key}>
+                          <span className="flex items-center gap-2">
+                            <span className="text-lg">{value.flag}</span>
+                            {value.label}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="pt-4 border-t border-border space-y-3 animate-fade-in">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Vehicle</span>
+                    <span className="font-medium">{VEHICLE_TYPES[vehicleType].label}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Method</span>
+                    <span className="font-medium">{shippingMethod === 'roro' ? 'RoRo' : 'Container'}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Origin</span>
+                    <span className="font-medium">{REGIONS[vehicleRegion].label}</span>
+                  </div>
+                  <div className="flex justify-between text-xl font-bold pt-3 border-t border-border">
+                    <span>Estimated Cost</span>
+                    <span className="text-primary">
+                      {vehicleSymbol}{vehiclePrice.toLocaleString()} {vehiclePricing.currency}
+                    </span>
+                  </div>
+                </div>
+
+                <Button className="w-full h-12 text-base btn-gold group" asChild>
+                  <a href="/contact">
+                    Request Vehicle Quote
+                    <MoveRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
+                  </a>
+                </Button>
+                
+                <p className="text-xs text-center text-muted-foreground">
+                  * Prices are estimates. Final cost depends on vehicle condition, exact dimensions, and current rates.
+                </p>
               </TabsContent>
             </Tabs>
           </div>
