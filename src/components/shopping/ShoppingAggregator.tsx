@@ -922,8 +922,14 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
               </span>
             </div>
 
+            {/* Estimated Delivery */}
+            <div className="flex items-center justify-center gap-2 text-sm text-primary font-medium mt-4">
+              <Package className="h-4 w-4" />
+              <span>Estimated Delivery: 7-10 working days</span>
+            </div>
+
             {/* Disclaimer */}
-            <p className="text-xs text-muted-foreground text-center mt-4">
+            <p className="text-xs text-muted-foreground text-center mt-2">
               Final costs may vary based on actual product weight and current exchange rates at the time of purchase.
             </p>
           </CardContent>
