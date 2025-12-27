@@ -49,7 +49,9 @@ import {
   Trash2,
   User,
   Tag,
-  Save
+  Save,
+  Pencil,
+  X
 } from 'lucide-react';
 import { Agent } from '@/hooks/useAgents';
 import { useTransitRoutes, TRANSIT_POINT_LABELS, TRANSIT_POINT_OPTIONS, TransitPointType, useCreateTransitRoute, useUpdateTransitRoute, useDeleteTransitRoute } from '@/hooks/useTransitRoutes';
@@ -84,7 +86,14 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
     estimated_days: 0,
   });
 
-  const [editingPricing, setEditingPricing] = useState<Record<string, { agent_rate_per_kg: number }>>({});
+  const [editingPricing, setEditingPricing] = useState<Record<string, {
+    cargo_type: 'sea' | 'air';
+    service_type: 'door_to_door' | 'airport_to_airport' | null;
+    transit_point: 'direct' | 'nairobi' | 'zanzibar';
+    agent_rate_per_kg: number;
+    customer_rate_per_kg: number;
+    handling_fee: number;
+  }>>({});
 
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'pricing' | 'route'; id: string } | null>(null);
   const [newPricing, setNewPricing] = useState({
@@ -119,11 +128,37 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
     agentRegionCodes.includes(p.region)
   );
 
-  const handlePricingChange = (pricingId: string, value: number) => {
+  const handleStartEditPricing = (pricing: typeof agentPricing[0]) => {
     setEditingPricing(prev => ({
       ...prev,
-      [pricingId]: { agent_rate_per_kg: value }
+      [pricing.id]: {
+        cargo_type: pricing.cargo_type as 'sea' | 'air',
+        service_type: pricing.service_type as 'door_to_door' | 'airport_to_airport' | null,
+        transit_point: (pricing.transit_point || 'direct') as 'direct' | 'nairobi' | 'zanzibar',
+        agent_rate_per_kg: pricing.agent_rate_per_kg,
+        customer_rate_per_kg: pricing.customer_rate_per_kg,
+        handling_fee: pricing.handling_fee || 0,
+      }
     }));
+  };
+
+  const handleEditPricingField = <K extends keyof typeof editingPricing[string]>(
+    pricingId: string, 
+    field: K, 
+    value: typeof editingPricing[string][K]
+  ) => {
+    setEditingPricing(prev => ({
+      ...prev,
+      [pricingId]: { ...prev[pricingId], [field]: value }
+    }));
+  };
+
+  const handleCancelEditPricing = (pricingId: string) => {
+    setEditingPricing(prev => {
+      const newState = { ...prev };
+      delete newState[pricingId];
+      return newState;
+    });
   };
 
   const handleSavePricing = async (pricingId: string) => {
@@ -132,7 +167,12 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
     
     await updatePricing.mutateAsync({
       id: pricingId,
+      cargo_type: editedValue.cargo_type,
+      service_type: editedValue.service_type,
+      transit_point: editedValue.transit_point,
       agent_rate_per_kg: editedValue.agent_rate_per_kg,
+      customer_rate_per_kg: editedValue.customer_rate_per_kg,
+      handling_fee: editedValue.handling_fee,
     });
     
     setEditingPricing(prev => {
@@ -274,9 +314,7 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
                         <TableBody>
                           {agentPricing.map((pricing) => {
                             const isEditing = editingPricing[pricing.id] !== undefined;
-                            const currentRate = isEditing 
-                              ? editingPricing[pricing.id].agent_rate_per_kg 
-                              : pricing.agent_rate_per_kg;
+                            const editData = editingPricing[pricing.id];
                             const regionInfo = regions.find(r => r.code === pricing.region);
                             
                             return (
@@ -288,49 +326,119 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
                                   </span>
                                 </TableCell>
                                 <TableCell>
-                                  <Badge variant="outline" className="text-xs capitalize">
-                                    {pricing.cargo_type}
-                                  </Badge>
+                                  {isEditing ? (
+                                    <Select
+                                      value={editData.cargo_type}
+                                      onValueChange={(value) => handleEditPricingField(pricing.id, 'cargo_type', value as 'sea' | 'air')}
+                                    >
+                                      <SelectTrigger className="h-8 w-20">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="air">Air</SelectItem>
+                                        <SelectItem value="sea">Sea</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  ) : (
+                                    <Badge variant="outline" className="text-xs capitalize">
+                                      {pricing.cargo_type}
+                                    </Badge>
+                                  )}
                                 </TableCell>
                                 <TableCell>
-                                  <Badge variant="secondary" className="text-xs">
-                                    {TRANSIT_POINT_LABELS[pricing.transit_point || 'direct']}
-                                  </Badge>
+                                  {isEditing ? (
+                                    <Select
+                                      value={editData.transit_point}
+                                      onValueChange={(value) => handleEditPricingField(pricing.id, 'transit_point', value as 'direct' | 'nairobi' | 'zanzibar')}
+                                    >
+                                      <SelectTrigger className="h-8 w-28">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="direct">Direct</SelectItem>
+                                        <SelectItem value="nairobi">Via Nairobi</SelectItem>
+                                        <SelectItem value="zanzibar">Via Zanzibar</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  ) : (
+                                    <Badge variant="secondary" className="text-xs">
+                                      {TRANSIT_POINT_LABELS[pricing.transit_point || 'direct']}
+                                    </Badge>
+                                  )}
                                 </TableCell>
                                 <TableCell>
-                                  <span className="text-xs text-muted-foreground">
-                                    {pricing.service_type?.replace(/_/g, ' ') || '—'}
-                                  </span>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-muted-foreground text-sm">
-                                      {CURRENCY_SYMBOLS[pricing.currency] || pricing.currency}
+                                  {isEditing ? (
+                                    <Select
+                                      value={editData.service_type || ''}
+                                      onValueChange={(value) => handleEditPricingField(pricing.id, 'service_type', value as 'door_to_door' | 'airport_to_airport' | null)}
+                                    >
+                                      <SelectTrigger className="h-8 w-28">
+                                        <SelectValue placeholder="Select" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="door_to_door">Door to Door</SelectItem>
+                                        <SelectItem value="airport_to_airport">Airport to Airport</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground">
+                                      {pricing.service_type?.replace(/_/g, ' ') || '—'}
                                     </span>
-                                    <Input
-                                      type="number"
-                                      step="0.01"
-                                      min="0"
-                                      value={currentRate}
-                                      onChange={(e) => handlePricingChange(pricing.id, parseFloat(e.target.value) || 0)}
-                                      className="w-24 h-8"
-                                    />
-                                    <span className="text-xs text-muted-foreground">/kg</span>
-                                  </div>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {isEditing ? (
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-muted-foreground text-xs">
+                                        {CURRENCY_SYMBOLS[pricing.currency] || pricing.currency}
+                                      </span>
+                                      <Input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        value={editData.agent_rate_per_kg}
+                                        onChange={(e) => handleEditPricingField(pricing.id, 'agent_rate_per_kg', parseFloat(e.target.value) || 0)}
+                                        className="w-20 h-8"
+                                      />
+                                    </div>
+                                  ) : (
+                                    <span className="text-sm font-medium">
+                                      {CURRENCY_SYMBOLS[pricing.currency] || pricing.currency}{pricing.agent_rate_per_kg}/kg
+                                    </span>
+                                  )}
                                 </TableCell>
                                 <TableCell>
                                   <div className="flex items-center gap-1">
-                                    {isEditing && (
+                                    {isEditing ? (
+                                      <>
+                                        <Button
+                                          size="sm"
+                                          onClick={() => handleSavePricing(pricing.id)}
+                                          disabled={updatePricing.isPending}
+                                        >
+                                          {updatePricing.isPending ? (
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                          ) : (
+                                            <Save className="w-4 h-4" />
+                                          )}
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-8 w-8"
+                                          onClick={() => handleCancelEditPricing(pricing.id)}
+                                        >
+                                          <X className="w-4 h-4" />
+                                        </Button>
+                                      </>
+                                    ) : (
                                       <Button
-                                        size="sm"
-                                        onClick={() => handleSavePricing(pricing.id)}
-                                        disabled={updatePricing.isPending}
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => handleStartEditPricing(pricing)}
                                       >
-                                        {updatePricing.isPending ? (
-                                          <Loader2 className="w-4 h-4 animate-spin" />
-                                        ) : (
-                                          <Save className="w-4 h-4" />
-                                        )}
+                                        <Pencil className="w-4 h-4" />
                                       </Button>
                                     )}
                                     <Button
