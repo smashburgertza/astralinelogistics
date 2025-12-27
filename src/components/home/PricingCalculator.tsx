@@ -145,15 +145,48 @@ export function PricingCalculator() {
               <TabsContent value="sea-cargo" className="mt-0">
                 <Tabs value={seaSubTab} onValueChange={setSeaSubTab} className="w-full">
                   <TabsList className="grid w-full grid-cols-3 mb-4 h-auto">
-                    <TabsTrigger value="full-container" className="flex items-center gap-1.5 text-xs sm:text-sm py-2">
-                      <Container className="w-3.5 h-3.5" /><span className="hidden sm:inline">Full</span> Container
-                    </TabsTrigger>
-                    <TabsTrigger value="loose-cargo" className="flex items-center gap-1.5 text-xs sm:text-sm py-2">
-                      <Package className="w-3.5 h-3.5" /><span className="hidden sm:inline">Loose</span> Cargo
-                    </TabsTrigger>
-                    <TabsTrigger value="vehicles" className="flex items-center gap-1.5 text-xs sm:text-sm py-2">
-                      <Car className="w-3.5 h-3.5" />Vehicles
-                    </TabsTrigger>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <TabsTrigger value="full-container" className="flex items-center gap-1.5 text-xs sm:text-sm py-2">
+                            <Container className="w-3.5 h-3.5" /><span className="hidden sm:inline">Full</span> Container
+                            <Info className="w-3 h-3 text-muted-foreground hidden sm:block" />
+                          </TabsTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="max-w-[250px] text-center">
+                          <p className="font-medium mb-1">Full Container Load (FCL)</p>
+                          <p className="text-xs">Exclusive use of a 20ft or 40ft container. Best for large shipments. Fixed price regardless of weight.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <TabsTrigger value="loose-cargo" className="flex items-center gap-1.5 text-xs sm:text-sm py-2">
+                            <Package className="w-3.5 h-3.5" /><span className="hidden sm:inline">Loose</span> Cargo
+                            <Info className="w-3 h-3 text-muted-foreground hidden sm:block" />
+                          </TabsTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="max-w-[250px] text-center">
+                          <p className="font-medium mb-1">Less than Container Load (LCL)</p>
+                          <p className="text-xs">Share container space with others. Pay per kg. Ideal for smaller shipments that don't fill a container.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <TabsTrigger value="vehicles" className="flex items-center gap-1.5 text-xs sm:text-sm py-2">
+                            <Car className="w-3.5 h-3.5" />Vehicles
+                            <Info className="w-3 h-3 text-muted-foreground hidden sm:block" />
+                          </TabsTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="max-w-[250px] text-center">
+                          <p className="font-medium mb-1">Vehicle Shipping</p>
+                          <p className="text-xs">Ship cars, motorcycles, SUVs via RoRo (drive-on/off) or containerized. Includes duty calculation for Tanzania.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </TabsList>
 
                   <TabsContent value="full-container" className="mt-0">
