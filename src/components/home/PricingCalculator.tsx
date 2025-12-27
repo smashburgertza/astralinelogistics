@@ -528,7 +528,7 @@ export function PricingCalculator() {
                     {looseWeightNum > 0 && loosePricing && (
                       <InlineAuthGate
                         teaserContent={
-                          <div className="pt-4 border-t border-border space-y-3">
+                        <div className="pt-4 border-t border-border space-y-3">
                             <div className="flex justify-between text-sm">
                               <span className="text-muted-foreground">Shipping ({looseSymbol}X.XX/kg × {looseWeightNum}kg)</span>
                               <span className="font-medium">{looseSymbol}XXX.XX</span>
@@ -540,6 +540,10 @@ export function PricingCalculator() {
                             <div className="flex justify-between text-xl font-bold pt-3 border-t border-border">
                               <span>Estimated Total</span>
                               <span className="text-primary">From {looseSymbol}XXX {looseCurrency}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Clock className="h-4 w-4" />
+                              <span>Est. Delivery: {deliveryTimes.sea_cargo}</span>
                             </div>
                           </div>
                         }
@@ -815,6 +819,10 @@ export function PricingCalculator() {
                                   <span>{vehiclePriceType === 'cif' ? 'CIF Total' : 'Duty Paid Total'}</span>
                                   <span className="text-primary">From $X,XXX</span>
                                 </div>
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                  <Clock className="h-4 w-4" />
+                                  <span>Est. Delivery: {vehicleShippingMethod === 'roro' ? deliveryTimes.vehicle_roro : deliveryTimes.vehicle_container}</span>
+                                </div>
                               </div>
                             }
                             fullContent={
@@ -979,6 +987,10 @@ export function PricingCalculator() {
                         <div className="flex justify-between text-xl font-bold pt-3 border-t border-border">
                           <span>Estimated Total</span>
                           <span className="text-primary">From {airSymbol}XXX {airCurrency}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Clock className="h-4 w-4" />
+                          <span>Est. Delivery: {deliveryTimes.air_cargo}</span>
                         </div>
                       </div>
                     }
