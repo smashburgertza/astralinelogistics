@@ -3,6 +3,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Command,
   CommandEmpty,
@@ -34,13 +36,15 @@ import {
   Check,
   Plus,
   Trash2,
-  Globe
+  Globe,
+  Route
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useCustomers } from '@/hooks/useShipments';
 import { useRegionPricingByRegion } from '@/hooks/useRegionPricing';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 import { useAgentAssignedRegions } from '@/hooks/useAgentRegions';
+import { useTransitRoutesByRegion, TRANSIT_POINT_LABELS, TransitPointType } from '@/hooks/useTransitRoutes';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -49,6 +53,7 @@ import { useGetOrCreateBatch } from '@/hooks/useCargoBatches';
 import { Database } from '@/integrations/supabase/types';
 
 type AgentRegion = Database['public']['Enums']['agent_region'];
+type ShipmentOwnerType = 'astraline' | 'agent';
 
 // Generate a unique barcode for each parcel
 const generateBarcode = () => {
@@ -193,6 +198,10 @@ export function ShipmentUploadForm() {
   // State for selected region (for multi-region agents)
   const [selectedRegion, setSelectedRegion] = useState<AgentRegion | undefined>(defaultRegion);
   
+  // Shipment ownership and routing state
+  const [shipmentOwner, setShipmentOwner] = useState<ShipmentOwnerType>('astraline');
+  const [transitPoint, setTransitPoint] = useState<TransitPointType>('direct');
+  
   // Set default region when assigned regions load
   useEffect(() => {
     if (assignedRegions.length > 0 && !selectedRegion) {
@@ -207,7 +216,27 @@ export function ShipmentUploadForm() {
   
   const { data: customers, isLoading: customersLoading } = useCustomers();
   const { data: pricing, isLoading: pricingLoading } = useRegionPricingByRegion(selectedRegion);
+  const { data: transitRoutes = [] } = useTransitRoutesByRegion(selectedRegion);
   const getOrCreateBatch = useGetOrCreateBatch();
+  
+  // Filter available transit options based on configured routes
+  const availableTransitPoints = useMemo(() => {
+    const points: { value: TransitPointType; label: string; additionalCost?: number }[] = [
+      { value: 'direct', label: 'Direct' }
+    ];
+    
+    transitRoutes.forEach(route => {
+      if (route.is_active && route.transit_point !== 'direct') {
+        points.push({
+          value: route.transit_point,
+          label: TRANSIT_POINT_LABELS[route.transit_point],
+          additionalCost: route.additional_cost,
+        });
+      }
+    });
+    
+    return points;
+  }, [transitRoutes]);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [completedShipments, setCompletedShipments] = useState<CompletedShipment[] | null>(null);
@@ -219,11 +248,18 @@ export function ShipmentUploadForm() {
   const currencySymbol = CURRENCY_SYMBOLS[pricing?.currency || 'USD'] || '$';
   const ratePerKg = pricing?.agent_rate_per_kg || 0; // Use agent rate for agent invoices
   const handlingFee = pricing?.handling_fee || 0;
+  
+  // Get additional transit cost if not direct
+  const transitAdditionalCost = useMemo(() => {
+    if (transitPoint === 'direct') return 0;
+    const route = transitRoutes.find(r => r.transit_point === transitPoint);
+    return route?.additional_cost || 0;
+  }, [transitPoint, transitRoutes]);
 
-  // Calculate amount for a line (using agent rate)
+  // Calculate amount for a line (using agent rate + transit cost)
   const calculateLineAmount = (weight: number) => {
     if (!weight || weight <= 0) return 0;
-    return (weight * ratePerKg) + handlingFee;
+    return (weight * ratePerKg) + handlingFee + transitAdditionalCost;
   };
 
   // Calculate totals
@@ -232,7 +268,7 @@ export function ShipmentUploadForm() {
     const totalAmount = lines.reduce((sum, line) => sum + calculateLineAmount(line.weight_kg), 0);
     const validLines = lines.filter(l => l.customer_id && l.weight_kg > 0);
     return { totalWeight, totalAmount, validLines: validLines.length };
-  }, [lines, ratePerKg, handlingFee]);
+  }, [lines, ratePerKg, handlingFee, transitAdditionalCost]);
 
   // Add new line
   const addLine = () => {
@@ -266,6 +302,8 @@ export function ShipmentUploadForm() {
   const resetForm = () => {
     setCompletedShipments(null);
     setLines([{ id: crypto.randomUUID(), customer_id: '', customer_name: '', description: '', weight_kg: 0 }]);
+    setShipmentOwner('astraline');
+    setTransitPoint('direct');
   };
 
   const onSubmit = async () => {
@@ -314,6 +352,8 @@ export function ShipmentUploadForm() {
             agent_id: user?.id,
             tracking_number: '',
             batch_id: batchId,
+            shipment_owner: shipmentOwner,
+            transit_point: transitPoint,
           })
           .select()
           .single();
@@ -331,8 +371,16 @@ export function ShipmentUploadForm() {
 
         if (parcelError) throw parcelError;
 
-        // Create invoice from agent to Astraline (agent invoice)
+        // Determine invoice direction based on shipment owner
+        // If agent's shipment: Astraline invoices the agent (from_agent direction)
+        // If Astraline's shipment: Agent invoices Astraline (to_agent direction)
+        const invoiceDirection = shipmentOwner === 'agent' ? 'from_agent' : 'to_agent';
+        
+        // Create invoice
         const invoiceNumber = generateInvoiceNumber();
+        const transitLabel = transitPoint !== 'direct' ? ` (${TRANSIT_POINT_LABELS[transitPoint]})` : '';
+        const ownerLabel = shipmentOwner === 'agent' ? 'Agent customer' : 'Astraline';
+        
         const { error: invoiceError } = await supabase
           .from('invoices')
           .insert({
@@ -344,7 +392,9 @@ export function ShipmentUploadForm() {
             invoice_type: 'shipping',
             status: 'pending',
             created_by: user?.id,
-            notes: `Agent shipment from ${currentRegionInfo?.region_name || selectedRegion}. Weight: ${line.weight_kg}kg`,
+            agent_id: user?.id,
+            invoice_direction: invoiceDirection,
+            notes: `${ownerLabel} shipment from ${currentRegionInfo?.region_name || selectedRegion}${transitLabel}. Weight: ${line.weight_kg}kg`,
           });
 
         if (invoiceError) {
@@ -451,6 +501,62 @@ export function ShipmentUploadForm() {
             </div>
           </div>
         </CardHeader>
+      </Card>
+
+      {/* Shipment Ownership & Routing Card */}
+      <Card className="shadow-lg border-0">
+        <CardContent className="p-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Shipment Owner Selection */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Shipment For</Label>
+              <RadioGroup
+                value={shipmentOwner}
+                onValueChange={(value) => setShipmentOwner(value as ShipmentOwnerType)}
+                className="flex gap-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="astraline" id="owner-astraline" />
+                  <Label htmlFor="owner-astraline" className="cursor-pointer">
+                    <span className="font-medium">Astraline</span>
+                    <span className="text-xs text-muted-foreground ml-1">(We pay you)</span>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="agent" id="owner-agent" />
+                  <Label htmlFor="owner-agent" className="cursor-pointer">
+                    <span className="font-medium">My Customer</span>
+                    <span className="text-xs text-muted-foreground ml-1">(You pay us)</span>
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            {/* Transit Point Selection */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Route className="w-4 h-4 text-muted-foreground" />
+                <Label className="text-sm font-medium">Transit Route</Label>
+              </div>
+              <Select
+                value={transitPoint}
+                onValueChange={(value) => setTransitPoint(value as TransitPointType)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableTransitPoints.map((point) => (
+                    <SelectItem key={point.value} value={point.value}>
+                      {point.label}
+                      {point.additionalCost ? ` (+${currencySymbol}${point.additionalCost})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
       </Card>
 
       {/* Shipment Lines Table */}
