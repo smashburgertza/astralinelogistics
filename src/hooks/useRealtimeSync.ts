@@ -90,6 +90,13 @@ export function useRealtimeSync() {
           queryClient.invalidateQueries({ queryKey: ['region_delivery_times'] });
         }
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'currency_exchange_rates' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['exchange-rates'] });
+        }
+      )
       .subscribe();
 
     // Cleanup on unmount

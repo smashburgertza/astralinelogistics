@@ -3,7 +3,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
 type AppRole = 'super_admin' | 'employee' | 'agent' | 'customer';
-type AgentRegion = 'europe' | 'dubai' | 'china' | 'india';
+type AgentRegion = 'europe' | 'dubai' | 'china' | 'india' | 'usa' | 'uk';
 
 interface UserRole {
   role: AppRole;

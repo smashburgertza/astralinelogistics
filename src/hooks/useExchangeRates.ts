@@ -111,6 +111,41 @@ export function useDeleteExchangeRate() {
   });
 }
 
+// Default fallback rates if database is empty
+const DEFAULT_EXCHANGE_RATES: Record<string, number> = {
+  USD: 2500,
+  GBP: 3150,
+  EUR: 2700,
+  AED: 680,
+  JPY: 17,
+  CNY: 345,
+  INR: 30,
+  TZS: 1,
+};
+
+// Hook that returns exchange rates as a map for easy lookup
+export function useExchangeRatesMap() {
+  const { data: rates, isLoading, error } = useExchangeRates();
+
+  // Convert array to map for easy lookup
+  const ratesMap: Record<string, number> = rates?.reduce((acc, rate) => {
+    acc[rate.currency_code] = rate.rate_to_tzs;
+    return acc;
+  }, {} as Record<string, number>) || {};
+
+  // Merge with defaults (database values take priority)
+  const mergedRates = { ...DEFAULT_EXCHANGE_RATES, ...ratesMap };
+
+  return {
+    rates: mergedRates,
+    isLoading,
+    error,
+    getRate: (currencyCode: string): number => {
+      return mergedRates[currencyCode] || 1;
+    },
+  };
+}
+
 // Helper to convert amount to TZS
 export function convertToTZS(amount: number, currencyCode: string, rates: ExchangeRate[]): number {
   if (currencyCode === 'TZS') return amount;
