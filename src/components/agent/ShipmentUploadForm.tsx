@@ -241,8 +241,7 @@ export function ShipmentUploadForm() {
   // Routing state (billing party is now automatic based on cargo type)
   const [transitPoint, setTransitPoint] = useState<TransitPointType>('direct');
   
-  // Consignee state
-  const [consignee, setConsignee] = useState<string>(DEFAULT_CONSIGNEE);
+  
   
   // Agent's consolidated cargo (not tracked individually)
   const [agentCargoWeight, setAgentCargoWeight] = useState<number>(0);
@@ -350,7 +349,6 @@ export function ShipmentUploadForm() {
     setLines([{ id: crypto.randomUUID(), customer_id: '', customer_name: '', description: '', weight_kg: 0 }]);
     setTransitPoint('direct');
     setRatePerKg(0);
-    setConsignee(DEFAULT_CONSIGNEE);
     setAgentCargoWeight(0);
   };
 
@@ -604,17 +602,6 @@ export function ShipmentUploadForm() {
               </div>
             </div>
             <div className="flex items-center gap-4 flex-wrap">
-              <div className="flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Consignee:</span>
-                <Input
-                  value={consignee}
-                  onChange={(e) => setConsignee(e.target.value)}
-                  placeholder="Enter consignee name"
-                  className="w-[220px] h-8"
-                />
-              </div>
-              
               {/* Region Selector for multi-region agents */}
               {hasMultipleRegions ? (
                 <div className="flex items-center gap-2">
