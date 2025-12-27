@@ -7,16 +7,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { supabase } from '@/integrations/supabase/client';
-import { REGIONS, CURRENCY_SYMBOLS, type Region } from '@/lib/constants';
+import { CURRENCY_SYMBOLS } from '@/lib/constants';
 import { useScrollAnimation } from '@/hooks/useScrollAnimation';
 import { useVehicleDutyRates } from '@/hooks/useVehicleDutyRates';
 import { useDeliveryTimes } from '@/hooks/useDeliveryTimes';
-import { useAuth } from '@/hooks/useAuth';
+import { useActiveRegions } from '@/hooks/useRegions';
 import { InlineAuthGate } from '@/components/auth/InlineAuthGate';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 interface RegionPricing {
-  region: Region;
+  region: string;
+  region_id: string | null;
   customer_rate_per_kg: number;
   handling_fee: number;
   currency: string;
@@ -25,7 +26,8 @@ interface RegionPricing {
 interface ContainerPricing {
   id: string;
   container_size: '20ft' | '40ft';
-  region: Region;
+  region: string;
+  region_id: string | null;
   price: number;
   currency: string;
 }
@@ -34,7 +36,8 @@ interface VehiclePricing {
   id: string;
   vehicle_type: 'motorcycle' | 'sedan' | 'suv' | 'truck';
   shipping_method: 'roro' | 'container';
-  region: Region;
+  region: string;
+  region_id: string | null;
   price: number;
   currency: string;
 }
@@ -76,11 +79,11 @@ export function PricingCalculator() {
   const [seaSubTab, setSeaSubTab] = useState('loose-cargo');
   
   // Loose cargo state
-  const [looseRegion, setLooseRegion] = useState<Region>('china');
+  const [looseRegionId, setLooseRegionId] = useState<string>('');
   const [looseWeight, setLooseWeight] = useState<string>('');
   
   // Full container state
-  const [containerRegion, setContainerRegion] = useState<Region>('china');
+  const [containerRegionId, setContainerRegionId] = useState<string>('');
   const [containerSize, setContainerSize] = useState<'20ft' | '40ft'>('20ft');
   
   // Vehicle state
@@ -92,7 +95,7 @@ export function PricingCalculator() {
   const [showDutyBreakdown, setShowDutyBreakdown] = useState(false);
   
   // Air cargo state
-  const [airRegion, setAirRegion] = useState<Region>('dubai');
+  const [airRegionId, setAirRegionId] = useState<string>('');
   const [airWeight, setAirWeight] = useState<string>('');
   
   // Pricing data
@@ -101,6 +104,9 @@ export function PricingCalculator() {
   const [vehiclePricing, setVehiclePricing] = useState<VehiclePricing[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Dynamic regions from database
+  const { data: regions, isLoading: regionsLoading } = useActiveRegions();
+
   // Duty rates and delivery times hooks
   const { calculateDuties, dutyRates } = useVehicleDutyRates();
   const { times: deliveryTimes } = useDeliveryTimes();
@@ -108,13 +114,23 @@ export function PricingCalculator() {
   const { ref: leftRef, isVisible: leftVisible } = useScrollAnimation();
   const { ref: rightRef, isVisible: rightVisible } = useScrollAnimation();
 
+  // Set default region when regions load
+  useEffect(() => {
+    if (regions && regions.length > 0 && !looseRegionId) {
+      const defaultRegion = regions[0];
+      setLooseRegionId(defaultRegion.id);
+      setContainerRegionId(defaultRegion.id);
+      setAirRegionId(defaultRegion.id);
+    }
+  }, [regions, looseRegionId]);
+
   useEffect(() => {
     fetchAllPricing();
   }, []);
 
   const fetchAllPricing = async () => {
     const [regionData, containerData, vehicleData] = await Promise.all([
-      supabase.from('region_pricing').select('region, customer_rate_per_kg, handling_fee, currency'),
+      supabase.from('region_pricing').select('region, region_id, customer_rate_per_kg, handling_fee, currency'),
       supabase.from('container_pricing').select('*'),
       supabase.from('vehicle_pricing').select('*'),
     ]);
@@ -126,7 +142,7 @@ export function PricingCalculator() {
   };
 
   // Loose cargo calculations
-  const loosePricing = pricing.find(p => p.region === looseRegion);
+  const loosePricing = pricing.find(p => p.region_id === looseRegionId);
   const looseWeightNum = parseFloat(looseWeight) || 0;
   const looseShippingCost = loosePricing ? looseWeightNum * loosePricing.customer_rate_per_kg : 0;
   const looseHandlingFee = loosePricing?.handling_fee || 0;
@@ -136,7 +152,7 @@ export function PricingCalculator() {
 
   // Full container calculations
   const containerPricingItem = containerPricing.find(
-    p => p.region === containerRegion && p.container_size === containerSize
+    p => p.region_id === containerRegionId && p.container_size === containerSize
   );
   const containerTotal = containerPricingItem?.price || 0;
   const containerCurrency = containerPricingItem?.currency || 'USD';
@@ -161,14 +177,15 @@ export function PricingCalculator() {
 
   // Vehicle calculations with proper duty calculation
   const vehicleCalculation = useMemo(() => {
-    if (!vehicleInfo) return null;
+    if (!vehicleInfo || !regions) return null;
     
-    const region = vehicleInfo.origin_region as Region || 'usa';
+    // Find region by code from vehicleInfo
+    const vehicleOriginRegion = regions.find(r => r.code === vehicleInfo.origin_region);
     const vehicleType = vehicleInfo.vehicle_type || 'sedan';
     
-    // Get shipping pricing
+    // Get shipping pricing by region_id
     const shippingPricing = vehiclePricing.find(
-      p => p.region === region && 
+      p => p.region_id === vehicleOriginRegion?.id && 
            p.vehicle_type === vehicleType && 
            p.shipping_method === vehicleShippingMethod
     );
@@ -227,10 +244,10 @@ export function PricingCalculator() {
       dutyCalculation: dutyCalc,
       totalDutyPaidTzs: cifValueTzs + dutyCalc.totalDuties,
     };
-  }, [vehicleInfo, vehiclePricing, vehicleShippingMethod, vehiclePriceType, calculateDuties]);
+  }, [vehicleInfo, vehiclePricing, vehicleShippingMethod, vehiclePriceType, calculateDuties, regions]);
 
   // Air cargo calculations
-  const airPricing = pricing.find(p => p.region === airRegion);
+  const airPricing = pricing.find(p => p.region_id === airRegionId);
   const airWeightNum = parseFloat(airWeight) || 0;
   const airShippingCost = airPricing ? airWeightNum * airPricing.customer_rate_per_kg : 0;
   const airHandlingFee = airPricing?.handling_fee || 0;
@@ -385,16 +402,16 @@ export function PricingCalculator() {
                       
                       <div className="space-y-2">
                         <Label className="text-sm font-medium">Origin Region</Label>
-                        <Select value={containerRegion} onValueChange={(v) => setContainerRegion(v as Region)}>
+                        <Select value={containerRegionId} onValueChange={setContainerRegionId}>
                           <SelectTrigger className="h-12">
-                            <SelectValue />
+                            <SelectValue placeholder="Select region" />
                           </SelectTrigger>
                           <SelectContent>
-                            {Object.entries(REGIONS).map(([key, value]) => (
-                              <SelectItem key={key} value={key}>
+                            {regions?.map((region) => (
+                              <SelectItem key={region.id} value={region.id}>
                                 <span className="flex items-center gap-2">
-                                  <span className="text-lg">{value.flag}</span>
-                                  {value.label}
+                                  <span className="text-lg">{region.flag_emoji}</span>
+                                  {region.name}
                                 </span>
                               </SelectItem>
                             ))}
@@ -460,16 +477,16 @@ export function PricingCalculator() {
 
                     <div className="space-y-2">
                       <Label className="text-sm font-medium">Origin Region</Label>
-                      <Select value={looseRegion} onValueChange={(v) => setLooseRegion(v as Region)}>
+                      <Select value={looseRegionId} onValueChange={setLooseRegionId}>
                         <SelectTrigger className="h-12">
                           <SelectValue placeholder="Select origin" />
                         </SelectTrigger>
                         <SelectContent>
-                          {Object.entries(REGIONS).map(([key, value]) => (
-                            <SelectItem key={key} value={key}>
+                          {regions?.map((region) => (
+                            <SelectItem key={region.id} value={region.id}>
                               <span className="flex items-center gap-2">
-                                <span className="text-lg">{value.flag}</span>
-                                {value.label}
+                                <span className="text-lg">{region.flag_emoji}</span>
+                                {region.name}
                               </span>
                             </SelectItem>
                           ))}
@@ -898,16 +915,16 @@ export function PricingCalculator() {
 
                 <div className="space-y-2">
                   <Label htmlFor="air-origin" className="text-sm font-medium">Origin Region</Label>
-                  <Select value={airRegion} onValueChange={(v) => setAirRegion(v as Region)}>
+                  <Select value={airRegionId} onValueChange={setAirRegionId}>
                     <SelectTrigger className="h-12">
                       <SelectValue placeholder="Select origin" />
                     </SelectTrigger>
                     <SelectContent>
-                      {Object.entries(REGIONS).map(([key, value]) => (
-                        <SelectItem key={key} value={key}>
+                      {regions?.map((region) => (
+                        <SelectItem key={region.id} value={region.id}>
                           <span className="flex items-center gap-2">
-                            <span className="text-lg">{value.flag}</span>
-                            {value.label}
+                            <span className="text-lg">{region.flag_emoji}</span>
+                            {region.name}
                           </span>
                         </SelectItem>
                       ))}
