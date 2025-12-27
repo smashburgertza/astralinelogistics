@@ -109,11 +109,13 @@ const AVAILABLE_CURRENCIES = [
 
 function CustomerSelector({ 
   value, 
+  customerName,
   onChange, 
   customers, 
   isLoading 
 }: { 
-  value: string; 
+  value: string;
+  customerName: string;
   onChange: (id: string, name: string) => void; 
   customers: any[] | undefined;
   isLoading: boolean;
@@ -123,15 +125,25 @@ function CustomerSelector({
 
   const filteredCustomers = useMemo(() => {
     if (!customers) return [];
-    if (!search) return customers;
+    if (!search) return customers.slice(0, 20); // Limit initial display
     const searchLower = search.toLowerCase();
     return customers.filter(c => 
       c.name.toLowerCase().includes(searchLower) ||
       c.phone?.toLowerCase().includes(searchLower)
-    );
+    ).slice(0, 20);
   }, [customers, search]);
 
   const selectedCustomer = customers?.find(c => c.id === value);
+  const displayValue = selectedCustomer?.name || customerName || '';
+
+  // Handle typing in search - allow using the typed value as a new customer
+  const handleSelectNewName = () => {
+    if (search.trim()) {
+      onChange('', search.trim()); // Empty ID means new customer
+      setOpen(false);
+      setSearch('');
+    }
+  };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -142,11 +154,11 @@ function CustomerSelector({
           aria-expanded={open}
           className={cn(
             "w-full h-10 justify-between font-normal text-left",
-            !value && "text-muted-foreground"
+            !displayValue && "text-muted-foreground"
           )}
         >
           <span className="truncate">
-            {selectedCustomer?.name || "Select customer..."}
+            {displayValue || "Search or type name..."}
           </span>
           <ChevronsUpDown className="ml-1 h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -154,7 +166,7 @@ function CustomerSelector({
       <PopoverContent className="w-[280px] p-0" align="start">
         <Command shouldFilter={false}>
           <CommandInput 
-            placeholder="Type to search..." 
+            placeholder="Search or type new name..." 
             value={search}
             onValueChange={setSearch}
           />
@@ -163,35 +175,52 @@ function CustomerSelector({
               <div className="p-4 text-center">
                 <Loader2 className="w-4 h-4 animate-spin mx-auto" />
               </div>
-            ) : filteredCustomers.length === 0 ? (
-              <CommandEmpty>No customer found.</CommandEmpty>
             ) : (
-              <CommandGroup>
-                {filteredCustomers.map((customer) => (
-                  <CommandItem
-                    key={customer.id}
-                    value={customer.id}
-                    onSelect={() => {
-                      onChange(customer.id, customer.name);
-                      setOpen(false);
-                      setSearch('');
-                    }}
-                  >
-                    <Check
-                      className={cn(
-                        "mr-2 h-4 w-4",
-                        value === customer.id ? "opacity-100" : "opacity-0"
-                      )}
-                    />
-                    <div className="flex flex-col">
-                      <span className="font-medium">{customer.name}</span>
-                      {customer.phone && (
-                        <span className="text-xs text-muted-foreground">{customer.phone}</span>
-                      )}
-                    </div>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
+              <>
+                {/* Option to use typed name as new customer */}
+                {search.trim() && !filteredCustomers.some(c => c.name.toLowerCase() === search.toLowerCase()) && (
+                  <CommandGroup heading="New Customer">
+                    <CommandItem
+                      value={`new-${search}`}
+                      onSelect={handleSelectNewName}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      <span>Use "{search}"</span>
+                    </CommandItem>
+                  </CommandGroup>
+                )}
+                
+                {filteredCustomers.length === 0 && !search.trim() ? (
+                  <CommandEmpty>No customers found.</CommandEmpty>
+                ) : filteredCustomers.length > 0 && (
+                  <CommandGroup heading="Existing Customers">
+                    {filteredCustomers.map((customer) => (
+                      <CommandItem
+                        key={customer.id}
+                        value={customer.id}
+                        onSelect={() => {
+                          onChange(customer.id, customer.name);
+                          setOpen(false);
+                          setSearch('');
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            value === customer.id ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        <div className="flex flex-col">
+                          <span className="font-medium">{customer.name}</span>
+                          {customer.phone && (
+                            <span className="text-xs text-muted-foreground">{customer.phone}</span>
+                          )}
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                )}
+              </>
             )}
           </CommandList>
         </Command>
@@ -628,6 +657,7 @@ export function ShipmentUploadForm() {
                   <div className="col-span-4">
                     <CustomerSelector
                       value={line.customer_id}
+                      customerName={line.customer_name}
                       onChange={(id, name) => updateLineCustomer(line.id, id, name)}
                       customers={customers}
                       isLoading={customersLoading}
