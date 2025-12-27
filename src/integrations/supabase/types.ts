@@ -1281,6 +1281,41 @@ export type Database = {
         }
         Relationships: []
       }
+      region_delivery_times: {
+        Row: {
+          created_at: string | null
+          delivery_time: string
+          id: string
+          region_id: string
+          service_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          delivery_time: string
+          id?: string
+          region_id: string
+          service_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          delivery_time?: string
+          id?: string
+          region_id?: string
+          service_type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "region_delivery_times_region_id_fkey"
+            columns: ["region_id"]
+            isOneToOne: false
+            referencedRelation: "regions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       region_pricing: {
         Row: {
           agent_rate_per_kg: number

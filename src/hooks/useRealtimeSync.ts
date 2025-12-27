@@ -83,6 +83,13 @@ export function useRealtimeSync() {
           queryClient.invalidateQueries({ queryKey: ['shipping-calculator-charges'] });
         }
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'region_delivery_times' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['region_delivery_times'] });
+        }
+      )
       .subscribe();
 
     // Cleanup on unmount

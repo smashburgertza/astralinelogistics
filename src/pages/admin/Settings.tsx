@@ -37,7 +37,7 @@ import { ContainerPricingManagement } from '@/components/admin/ContainerPricingM
 import { VehiclePricingManagement } from '@/components/admin/VehiclePricingManagement';
 import { VehicleDutyRatesManagement } from '@/components/admin/VehicleDutyRatesManagement';
 import { RegionManagement } from '@/components/admin/RegionManagement';
-import { DeliveryTimesManagement } from '@/components/admin/DeliveryTimesManagement';
+import { RegionDeliveryTimesManagement } from '@/components/admin/RegionDeliveryTimesManagement';
 import { ShippingCalculatorChargesManagement } from '@/components/admin/ShippingCalculatorChargesManagement';
 import { ConversionAnalytics } from '@/components/admin/ConversionAnalytics';
 import { PricingCalculator } from '@/components/home/PricingCalculator';
@@ -416,15 +416,6 @@ export default function AdminSettingsPage() {
             </Dialog>
           </div>
           <ShopForMeChargesManagement />
-          <Card>
-            <CardHeader>
-              <CardTitle>Shop For Me Delivery Times</CardTitle>
-              <CardDescription>Configure estimated delivery time for Shop For Me orders</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <DeliveryTimesManagement filterKeys={['shop_for_me']} />
-            </CardContent>
-          </Card>
         </TabsContent>
 
         {/* Shipping Calculator - All related settings */}
@@ -468,15 +459,7 @@ export default function AdminSettingsPage() {
             </CardContent>
           </Card>
           <VehicleDutyRatesManagement />
-          <Card>
-            <CardHeader>
-              <CardTitle>Shipping Delivery Times</CardTitle>
-              <CardDescription>Configure estimated delivery times for shipping methods</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <DeliveryTimesManagement filterKeys={['sea_cargo', 'air_cargo', 'full_container', 'vehicle_roro', 'vehicle_container']} />
-            </CardContent>
-          </Card>
+          <RegionDeliveryTimesManagement />
         </TabsContent>
 
         <TabsContent value="company">

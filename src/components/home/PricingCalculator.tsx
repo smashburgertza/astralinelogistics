@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 import { useScrollAnimation } from '@/hooks/useScrollAnimation';
 import { useVehicleDutyRates } from '@/hooks/useVehicleDutyRates';
-import { useDeliveryTimes } from '@/hooks/useDeliveryTimes';
+import { useRegionDeliveryTimesByRegion, DEFAULT_DELIVERY_TIMES } from '@/hooks/useRegionDeliveryTimes';
 import { useActiveRegions } from '@/hooks/useRegions';
 import { useRegionPricing } from '@/hooks/useRegionPricing';
 import { useContainerPricing } from '@/hooks/useContainerPricing';
@@ -139,9 +139,17 @@ export function PricingCalculator() {
   // Dynamic regions from database
   const { data: regions, isLoading: regionsLoading } = useActiveRegions();
 
-  // Duty rates and delivery times hooks
+  // Duty rates hook
   const { calculateDuties, dutyRates } = useVehicleDutyRates();
-  const { times: deliveryTimes } = useDeliveryTimes();
+  
+  // Per-region delivery times
+  const { data: looseDeliveryTimes } = useRegionDeliveryTimesByRegion(looseRegionId);
+  const { data: containerDeliveryTimes } = useRegionDeliveryTimesByRegion(containerRegionId);
+  const { data: airDeliveryTimes } = useRegionDeliveryTimesByRegion(airRegionId);
+  
+  // Get vehicle region ID from vehicleInfo
+  const vehicleOriginRegion = regions?.find(r => r.code === vehicleInfo?.origin_region);
+  const { data: vehicleDeliveryTimes } = useRegionDeliveryTimesByRegion(vehicleOriginRegion?.id);
 
   const { ref: leftRef, isVisible: leftVisible } = useScrollAnimation();
   const { ref: rightRef, isVisible: rightVisible } = useScrollAnimation();
@@ -445,7 +453,7 @@ export function PricingCalculator() {
                             </div>
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <Clock className="h-4 w-4" />
-                              <span>Est. Delivery: {deliveryTimes.full_container}</span>
+                              <span>Est. Delivery: {containerDeliveryTimes?.full_container || DEFAULT_DELIVERY_TIMES.full_container}</span>
                             </div>
                           </div>
                         }
@@ -457,7 +465,7 @@ export function PricingCalculator() {
                             </div>
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <Clock className="h-4 w-4" />
-                              <span>Est. Delivery: {deliveryTimes.full_container}</span>
+                              <span>Est. Delivery: {containerDeliveryTimes?.full_container || DEFAULT_DELIVERY_TIMES.full_container}</span>
                             </div>
                             <Button className="w-full h-12 text-base btn-gold group" asChild>
                               <a href="/customer">
@@ -543,7 +551,7 @@ export function PricingCalculator() {
                             </div>
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <Clock className="h-4 w-4" />
-                              <span>Est. Delivery: {deliveryTimes.sea_cargo}</span>
+                              <span>Est. Delivery: {looseDeliveryTimes?.sea_cargo || DEFAULT_DELIVERY_TIMES.sea_cargo}</span>
                             </div>
                           </div>
                         }
@@ -565,7 +573,7 @@ export function PricingCalculator() {
                             </div>
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <Clock className="h-4 w-4" />
-                              <span>Est. Delivery: {deliveryTimes.sea_cargo}</span>
+                              <span>Est. Delivery: {looseDeliveryTimes?.sea_cargo || DEFAULT_DELIVERY_TIMES.sea_cargo}</span>
                             </div>
                             <Button className="w-full h-12 text-base btn-gold group" asChild>
                               <a href="/customer">
@@ -821,7 +829,7 @@ export function PricingCalculator() {
                                 </div>
                                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                   <Clock className="h-4 w-4" />
-                                  <span>Est. Delivery: {vehicleShippingMethod === 'roro' ? deliveryTimes.vehicle_roro : deliveryTimes.vehicle_container}</span>
+                                  <span>Est. Delivery: {vehicleShippingMethod === 'roro' ? (vehicleDeliveryTimes?.vehicle_roro || DEFAULT_DELIVERY_TIMES.vehicle_roro) : (vehicleDeliveryTimes?.vehicle_container || DEFAULT_DELIVERY_TIMES.vehicle_container)}</span>
                                 </div>
                               </div>
                             }
@@ -894,7 +902,7 @@ export function PricingCalculator() {
 
                                 <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2">
                                   <Clock className="h-4 w-4" />
-                                  <span>Est. Delivery: {vehicleShippingMethod === 'roro' ? deliveryTimes.vehicle_roro : deliveryTimes.vehicle_container}</span>
+                                  <span>Est. Delivery: {vehicleShippingMethod === 'roro' ? (vehicleDeliveryTimes?.vehicle_roro || DEFAULT_DELIVERY_TIMES.vehicle_roro) : (vehicleDeliveryTimes?.vehicle_container || DEFAULT_DELIVERY_TIMES.vehicle_container)}</span>
                                 </div>
 
                                 <Button className="w-full h-12 text-base btn-gold group" asChild>
@@ -990,7 +998,7 @@ export function PricingCalculator() {
                         </div>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Clock className="h-4 w-4" />
-                          <span>Est. Delivery: {deliveryTimes.air_cargo}</span>
+                          <span>Est. Delivery: {airDeliveryTimes?.air_cargo || DEFAULT_DELIVERY_TIMES.air_cargo}</span>
                         </div>
                       </div>
                     }
@@ -1012,7 +1020,7 @@ export function PricingCalculator() {
                         </div>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Clock className="h-4 w-4" />
-                          <span>Est. Delivery: {deliveryTimes.air_cargo}</span>
+                          <span>Est. Delivery: {airDeliveryTimes?.air_cargo || DEFAULT_DELIVERY_TIMES.air_cargo}</span>
                         </div>
                         <Button className="w-full h-12 text-base btn-gold group" asChild>
                           <a href="/customer">
