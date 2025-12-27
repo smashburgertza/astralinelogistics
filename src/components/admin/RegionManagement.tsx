@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
   DialogContent,
@@ -16,12 +16,23 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Form,
   FormControl,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from '@/components/ui/form';
 import {
   Accordion,
@@ -37,7 +48,9 @@ import {
   Phone, 
   Mail, 
   Building,
-  Plus
+  Plus,
+  Trash2,
+  Globe
 } from 'lucide-react';
 import { 
   useRegionPricing, 
@@ -46,10 +59,15 @@ import {
   useUpdateAgentAddress,
   useCreateRegionPricing,
   useCreateAgentAddress,
-  RegionPricing,
-  AgentAddress 
 } from '@/hooks/useRegionPricing';
-import { REGIONS, CURRENCY_SYMBOLS } from '@/lib/constants';
+import { 
+  useRegions, 
+  useCreateRegion, 
+  useUpdateRegion, 
+  useDeleteRegion,
+  Region 
+} from '@/hooks/useRegions';
+import { CURRENCY_SYMBOLS } from '@/lib/constants';
 
 const pricingSchema = z.object({
   customer_rate_per_kg: z.coerce.number().min(0, 'Rate must be positive'),
@@ -69,19 +87,59 @@ const addressSchema = z.object({
   contact_email: z.string().email().optional().or(z.literal('')),
 });
 
+const regionSchema = z.object({
+  code: z.string().min(1, 'Code is required').regex(/^[a-z_]+$/, 'Code must be lowercase letters and underscores only'),
+  name: z.string().min(1, 'Name is required'),
+  flag_emoji: z.string().optional(),
+  is_active: z.boolean().default(true),
+  display_order: z.coerce.number().min(0).default(0),
+});
+
 type PricingFormValues = z.infer<typeof pricingSchema>;
 type AddressFormValues = z.infer<typeof addressSchema>;
+type RegionFormValues = z.infer<typeof regionSchema>;
+
+interface RegionPricingData {
+  id: string;
+  region: string;
+  region_id: string | null;
+  customer_rate_per_kg: number;
+  agent_rate_per_kg: number;
+  handling_fee: number | null;
+  currency: string;
+}
+
+interface AgentAddressData {
+  id: string;
+  region: string;
+  region_id: string | null;
+  address_line1: string;
+  address_line2: string | null;
+  city: string;
+  postal_code: string | null;
+  country: string;
+  contact_name: string | null;
+  contact_phone: string | null;
+  contact_email: string | null;
+}
 
 export function RegionManagement() {
+  const { data: regions, isLoading: regionsLoading } = useRegions();
   const { data: pricing, isLoading: pricingLoading } = useRegionPricing();
   const { data: addresses, isLoading: addressesLoading } = useAgentAddresses();
   const updatePricing = useUpdateRegionPricing();
   const updateAddress = useUpdateAgentAddress();
   const createPricing = useCreateRegionPricing();
   const createAddress = useCreateAgentAddress();
+  const createRegion = useCreateRegion();
+  const updateRegion = useUpdateRegion();
+  const deleteRegion = useDeleteRegion();
 
-  const [editingPricing, setEditingPricing] = useState<RegionPricing | null>(null);
-  const [editingAddress, setEditingAddress] = useState<{ region: string; address: AgentAddress | null } | null>(null);
+  const [editingPricing, setEditingPricing] = useState<RegionPricingData | null>(null);
+  const [editingAddress, setEditingAddress] = useState<{ regionCode: string; regionId: string; address: AgentAddressData | null } | null>(null);
+  const [editingRegion, setEditingRegion] = useState<Region | null>(null);
+  const [isCreatingRegion, setIsCreatingRegion] = useState(false);
+  const [deletingRegion, setDeletingRegion] = useState<Region | null>(null);
 
   const pricingForm = useForm<PricingFormValues>({
     resolver: zodResolver(pricingSchema),
@@ -91,7 +149,15 @@ export function RegionManagement() {
     resolver: zodResolver(addressSchema),
   });
 
-  const openPricingDialog = (regionPricing: RegionPricing) => {
+  const regionForm = useForm<RegionFormValues>({
+    resolver: zodResolver(regionSchema),
+    defaultValues: {
+      is_active: true,
+      display_order: 0,
+    },
+  });
+
+  const openPricingDialog = (regionPricing: RegionPricingData) => {
     setEditingPricing(regionPricing);
     pricingForm.reset({
       customer_rate_per_kg: regionPricing.customer_rate_per_kg,
@@ -101,8 +167,8 @@ export function RegionManagement() {
     });
   };
 
-  const openAddressDialog = (region: string, address: AgentAddress | null) => {
-    setEditingAddress({ region, address });
+  const openAddressDialog = (regionCode: string, regionId: string, address: AgentAddressData | null) => {
+    setEditingAddress({ regionCode, regionId, address });
     if (address) {
       addressForm.reset({
         address_line1: address.address_line1,
@@ -128,12 +194,47 @@ export function RegionManagement() {
     }
   };
 
+  const openRegionDialog = (region?: Region) => {
+    if (region) {
+      setEditingRegion(region);
+      setIsCreatingRegion(false);
+      regionForm.reset({
+        code: region.code,
+        name: region.name,
+        flag_emoji: region.flag_emoji || '',
+        is_active: region.is_active,
+        display_order: region.display_order,
+      });
+    } else {
+      setEditingRegion(null);
+      setIsCreatingRegion(true);
+      regionForm.reset({
+        code: '',
+        name: '',
+        flag_emoji: '',
+        is_active: true,
+        display_order: (regions?.length || 0) + 1,
+      });
+    }
+  };
+
   const handlePricingSubmit = async (values: PricingFormValues) => {
     if (editingPricing) {
-      await updatePricing.mutateAsync({
-        id: editingPricing.id,
-        ...values,
-      });
+      if (editingPricing.id) {
+        await updatePricing.mutateAsync({
+          id: editingPricing.id,
+          ...values,
+        });
+      } else {
+        // Create new pricing
+        await createPricing.mutateAsync({
+          region: editingPricing.region as 'europe' | 'dubai' | 'china' | 'india',
+          customer_rate_per_kg: values.customer_rate_per_kg,
+          agent_rate_per_kg: values.agent_rate_per_kg,
+          handling_fee: values.handling_fee,
+          currency: values.currency,
+        });
+      }
       setEditingPricing(null);
     }
   };
@@ -148,7 +249,7 @@ export function RegionManagement() {
         });
       } else {
         await createAddress.mutateAsync({
-          region: editingAddress.region as 'europe' | 'dubai' | 'china' | 'india',
+          region: editingAddress.regionCode as any,
           address_line1: values.address_line1,
           address_line2: values.address_line2 || undefined,
           city: values.city,
@@ -163,7 +264,36 @@ export function RegionManagement() {
     }
   };
 
-  const isLoading = pricingLoading || addressesLoading;
+  const handleRegionSubmit = async (values: RegionFormValues) => {
+    if (isCreatingRegion) {
+      await createRegion.mutateAsync({
+        code: values.code,
+        name: values.name,
+        flag_emoji: values.flag_emoji || undefined,
+        is_active: values.is_active,
+        display_order: values.display_order,
+      });
+    } else if (editingRegion) {
+      await updateRegion.mutateAsync({
+        id: editingRegion.id,
+        name: values.name,
+        flag_emoji: values.flag_emoji || undefined,
+        is_active: values.is_active,
+        display_order: values.display_order,
+      });
+    }
+    setEditingRegion(null);
+    setIsCreatingRegion(false);
+  };
+
+  const handleDeleteRegion = async () => {
+    if (deletingRegion) {
+      await deleteRegion.mutateAsync(deletingRegion.id);
+      setDeletingRegion(null);
+    }
+  };
+
+  const isLoading = regionsLoading || pricingLoading || addressesLoading;
 
   if (isLoading) {
     return (
@@ -175,12 +305,11 @@ export function RegionManagement() {
     );
   }
 
-  // Get pricing and address for each region
-  const regionData = Object.entries(REGIONS).map(([key, region]) => ({
-    key,
+  // Build region data with pricing and addresses
+  const regionData = (regions || []).map((region) => ({
     ...region,
-    pricing: pricing?.find(p => p.region === key),
-    address: addresses?.find(a => a.region === key),
+    pricing: pricing?.find(p => p.region === region.code || p.region_id === region.id),
+    address: addresses?.find(a => a.region === region.code || a.region_id === region.id),
   }));
 
   return (
@@ -189,9 +318,13 @@ export function RegionManagement() {
         <div>
           <h2 className="text-lg font-semibold">Region Configuration</h2>
           <p className="text-sm text-muted-foreground">
-            Manage pricing and warehouse addresses for each region
+            Manage regions, pricing, and warehouse addresses
           </p>
         </div>
+        <Button onClick={() => openRegionDialog()}>
+          <Plus className="w-4 h-4 mr-2" />
+          Add Region
+        </Button>
       </div>
 
       <Accordion type="single" collapsible className="space-y-3">
@@ -202,15 +335,18 @@ export function RegionManagement() {
 
           return (
             <AccordionItem 
-              key={region.key} 
-              value={region.key}
+              key={region.id} 
+              value={region.id}
               className="border rounded-lg bg-card shadow-sm overflow-hidden"
             >
               <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
                 <div className="flex items-center gap-3 flex-1">
-                  <span className="text-2xl">{region.flag}</span>
+                  <span className="text-2xl">{region.flag_emoji || '🌍'}</span>
                   <div className="text-left">
-                    <div className="font-semibold">{region.label}</div>
+                    <div className="font-semibold flex items-center gap-2">
+                      {region.name}
+                      <span className="text-xs text-muted-foreground font-mono">({region.code})</span>
+                    </div>
                     <div className="text-sm text-muted-foreground">
                       {region.pricing 
                         ? `${currencySymbol}${region.pricing.customer_rate_per_kg}/kg`
@@ -218,6 +354,11 @@ export function RegionManagement() {
                       }
                     </div>
                   </div>
+                  {!region.is_active && (
+                    <Badge variant="secondary" className="ml-2">
+                      Inactive
+                    </Badge>
+                  )}
                   {!region.pricing && (
                     <Badge variant="outline" className="ml-auto mr-4 text-amber-600 border-amber-300">
                       Setup Required
@@ -226,7 +367,27 @@ export function RegionManagement() {
                 </div>
               </AccordionTrigger>
               <AccordionContent className="px-4 pb-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                <div className="flex justify-end gap-2 mb-4">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => openRegionDialog(region)}
+                  >
+                    <Edit2 className="w-3 h-3 mr-1" />
+                    Edit Region
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => setDeletingRegion(region)}
+                  >
+                    <Trash2 className="w-3 h-3 mr-1" />
+                    Delete
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Pricing Card */}
                   <Card className="border-0 shadow-none bg-muted/30">
                     <CardHeader className="pb-2">
@@ -239,7 +400,7 @@ export function RegionManagement() {
                           <Button 
                             variant="ghost" 
                             size="sm"
-                            onClick={() => openPricingDialog(region.pricing!)}
+                            onClick={() => openPricingDialog(region.pricing as RegionPricingData)}
                           >
                             <Edit2 className="w-3 h-3 mr-1" />
                             Edit
@@ -284,13 +445,12 @@ export function RegionManagement() {
                             onClick={() => {
                               setEditingPricing({
                                 id: '',
-                                region: region.key as any,
+                                region: region.code,
+                                region_id: region.id,
                                 customer_rate_per_kg: 0,
                                 agent_rate_per_kg: 0,
                                 handling_fee: 0,
                                 currency: 'USD',
-                                created_at: null,
-                                updated_at: null,
                               });
                               pricingForm.reset({
                                 customer_rate_per_kg: 0,
@@ -319,7 +479,7 @@ export function RegionManagement() {
                         <Button 
                           variant="ghost" 
                           size="sm"
-                          onClick={() => openAddressDialog(region.key, region.address || null)}
+                          onClick={() => openAddressDialog(region.code, region.id, region.address as AgentAddressData | null)}
                         >
                           {region.address ? (
                             <>
@@ -387,12 +547,178 @@ export function RegionManagement() {
         })}
       </Accordion>
 
+      {regionData.length === 0 && (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Globe className="w-12 h-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No Regions Configured</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Add your first region to get started with shipping configuration.
+            </p>
+            <Button onClick={() => openRegionDialog()}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Region
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Region Edit/Create Dialog */}
+      <Dialog open={!!editingRegion || isCreatingRegion} onOpenChange={(open) => {
+        if (!open) {
+          setEditingRegion(null);
+          setIsCreatingRegion(false);
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {isCreatingRegion ? 'Add New Region' : 'Edit Region'}
+            </DialogTitle>
+            <DialogDescription>
+              {isCreatingRegion 
+                ? 'Create a new shipping region for your network.'
+                : 'Update the region details.'}
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...regionForm}>
+            <form onSubmit={regionForm.handleSubmit(handleRegionSubmit)} className="space-y-4">
+              <FormField
+                control={regionForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Region Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Western Europe" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={regionForm.control}
+                name="code"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Code</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="e.g., western_europe" 
+                        {...field} 
+                        disabled={!!editingRegion}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Unique identifier (lowercase, underscores only)
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={regionForm.control}
+                name="flag_emoji"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Flag Emoji</FormLabel>
+                    <FormControl>
+                      <Input placeholder="🇪🇺" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      Optional flag emoji for display
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={regionForm.control}
+                name="display_order"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Display Order</FormLabel>
+                    <FormControl>
+                      <Input type="number" min="0" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={regionForm.control}
+                name="is_active"
+                render={({ field }) => (
+                  <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">Active</FormLabel>
+                      <FormDescription>
+                        Inactive regions won't appear in shipping calculators
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              <div className="flex justify-end gap-2 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setEditingRegion(null);
+                    setIsCreatingRegion(false);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={createRegion.isPending || updateRegion.isPending}
+                >
+                  {(createRegion.isPending || updateRegion.isPending) && (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  )}
+                  {isCreatingRegion ? 'Create Region' : 'Save Changes'}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deletingRegion} onOpenChange={(open) => !open && setDeletingRegion(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Region?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{deletingRegion?.name}"? This will also remove associated pricing and address configurations. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteRegion}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteRegion.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Pricing Edit Dialog */}
       <Dialog open={!!editingPricing} onOpenChange={(open) => !open && setEditingPricing(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {editingPricing?.id ? 'Edit' : 'Set'} Pricing - {editingPricing && REGIONS[editingPricing.region]?.label}
+              {editingPricing?.id ? 'Edit' : 'Set'} Pricing
             </DialogTitle>
             <DialogDescription>
               Configure the shipping rates for this region.
@@ -452,15 +778,22 @@ export function RegionManagement() {
                   </FormItem>
                 )}
               />
-              <div className="flex justify-end gap-3 pt-4">
-                <Button type="button" variant="outline" onClick={() => setEditingPricing(null)}>
+              <div className="flex justify-end gap-2 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditingPricing(null)}
+                >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={updatePricing.isPending || createPricing.isPending}>
+                <Button 
+                  type="submit" 
+                  disabled={updatePricing.isPending || createPricing.isPending}
+                >
                   {(updatePricing.isPending || createPricing.isPending) && (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   )}
-                  Save Pricing
+                  Save
                 </Button>
               </div>
             </form>
@@ -470,13 +803,13 @@ export function RegionManagement() {
 
       {/* Address Edit Dialog */}
       <Dialog open={!!editingAddress} onOpenChange={(open) => !open && setEditingAddress(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {editingAddress?.address ? 'Edit' : 'Add'} Warehouse Address - {editingAddress && REGIONS[editingAddress.region as keyof typeof REGIONS]?.label}
+              {editingAddress?.address ? 'Edit' : 'Add'} Warehouse Address
             </DialogTitle>
             <DialogDescription>
-              Set the warehouse address that customers will ship to for this region.
+              Configure the warehouse address for this region.
             </DialogDescription>
           </DialogHeader>
           <Form {...addressForm}>
@@ -499,7 +832,7 @@ export function RegionManagement() {
                 name="address_line2"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Address Line 2 (Optional)</FormLabel>
+                    <FormLabel>Address Line 2 (optional)</FormLabel>
                     <FormControl>
                       <Input placeholder="Apt, suite, unit, etc." {...field} />
                     </FormControl>
@@ -549,7 +882,7 @@ export function RegionManagement() {
                 )}
               />
               <div className="border-t pt-4 mt-4">
-                <h4 className="text-sm font-medium mb-3">Contact Information (Optional)</h4>
+                <h4 className="text-sm font-medium mb-3">Contact Information (optional)</h4>
                 <div className="space-y-4">
                   <FormField
                     control={addressForm.control}
@@ -558,51 +891,56 @@ export function RegionManagement() {
                       <FormItem>
                         <FormLabel>Contact Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="Contact person" {...field} />
+                          <Input placeholder="Contact name" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={addressForm.control}
-                      name="contact_phone"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Phone</FormLabel>
-                          <FormControl>
-                            <Input placeholder="+1 234 567 8900" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={addressForm.control}
-                      name="contact_email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email</FormLabel>
-                          <FormControl>
-                            <Input type="email" placeholder="email@example.com" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+                  <FormField
+                    control={addressForm.control}
+                    name="contact_phone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Phone</FormLabel>
+                        <FormControl>
+                          <Input placeholder="+1 234 567 8900" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={addressForm.control}
+                    name="contact_email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="email@example.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
               </div>
-              <div className="flex justify-end gap-3 pt-4">
-                <Button type="button" variant="outline" onClick={() => setEditingAddress(null)}>
+              <div className="flex justify-end gap-2 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditingAddress(null)}
+                >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={updateAddress.isPending || createAddress.isPending}>
+                <Button 
+                  type="submit" 
+                  disabled={updateAddress.isPending || createAddress.isPending}
+                >
                   {(updateAddress.isPending || createAddress.isPending) && (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   )}
-                  Save Address
+                  Save
                 </Button>
               </div>
             </form>
