@@ -1,5 +1,6 @@
 // Shipment Upload Form - Agent portal for creating shipments (billing type auto-derived)
 import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -244,6 +245,9 @@ function CustomerSelector({
 
 export function ShipmentUploadForm() {
   const { user, getRegion } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const draftId = searchParams.get('draft');
+  
   const defaultRegion = getRegion();
   const { data: assignedRegions = [], isLoading: regionsLoading } = useAgentAssignedRegions();
   
@@ -253,7 +257,9 @@ export function ShipmentUploadForm() {
   // Routing state (billing party is now automatic based on cargo type)
   const [transitPoint, setTransitPoint] = useState<TransitPointType>('direct');
   
-  
+  // Track if editing an existing draft
+  const [editingDraftId, setEditingDraftId] = useState<string | null>(null);
+  const [isLoadingDraft, setIsLoadingDraft] = useState(false);
   
   // Agent's consolidated cargo (not tracked individually)
   const [agentCargoWeight, setAgentCargoWeight] = useState<number>(0);
@@ -308,6 +314,64 @@ export function ShipmentUploadForm() {
   const [lines, setLines] = useState<ShipmentLine[]>([
     { id: crypto.randomUUID(), customer_id: '', customer_name: '', description: '', weight_kg: 0 }
   ]);
+  
+  // Load draft data when draftId is present in URL
+  useEffect(() => {
+    const loadDraft = async () => {
+      if (!draftId || !user?.id) return;
+      
+      setIsLoadingDraft(true);
+      try {
+        // Fetch the draft shipment with its parcels
+        const { data: draft, error } = await supabase
+          .from('shipments')
+          .select('*, parcels(*), customers(name, email)')
+          .eq('id', draftId)
+          .eq('is_draft', true)
+          .eq('agent_id', user.id)
+          .single();
+        
+        if (error) throw error;
+        if (!draft) {
+          toast.error('Draft not found');
+          return;
+        }
+        
+        // Set the editing state
+        setEditingDraftId(draftId);
+        
+        // Populate form with draft data
+        setSelectedRegion(draft.origin_region);
+        setTransitPoint(draft.transit_point || 'direct');
+        setRatePerKg(draft.rate_per_kg || 0);
+        
+        // Check if this is agent cargo
+        if (draft.agent_cargo_weight_kg && draft.agent_cargo_weight_kg > 0) {
+          setAgentCargoWeight(draft.agent_cargo_weight_kg);
+        }
+        
+        // Create a line from the draft data
+        const newLines: ShipmentLine[] = [{
+          id: crypto.randomUUID(),
+          customer_id: draft.customer_id || '',
+          customer_name: draft.customer_name || draft.customers?.name || '',
+          description: draft.description || '',
+          weight_kg: draft.total_weight_kg || 0,
+        }];
+        
+        setLines(newLines);
+        toast.info('Draft loaded - you can continue editing');
+        
+      } catch (error: any) {
+        console.error('Failed to load draft:', error);
+        toast.error('Failed to load draft');
+      } finally {
+        setIsLoadingDraft(false);
+      }
+    };
+    
+    loadDraft();
+  }, [draftId, user?.id]);
 
   const currencySymbol = CURRENCY_SYMBOLS[currency] || currency;
   
@@ -367,6 +431,11 @@ export function ShipmentUploadForm() {
     setTransitPoint('direct');
     setRatePerKg(0);
     setAgentCargoWeight(0);
+    setEditingDraftId(null);
+    // Clear draft from URL
+    if (draftId) {
+      setSearchParams({});
+    }
   };
 
   // Save as draft function
@@ -386,6 +455,46 @@ export function ShipmentUploadForm() {
     setIsSavingDraft(true);
 
     try {
+      // If editing an existing draft, update it
+      if (editingDraftId) {
+        const line = validLines[0]; // For now, we work with the first line
+        const customer = customers?.find(c => c.id === line?.customer_id);
+        const lineAmount = calculateLineAmount(line?.weight_kg || 0);
+
+        const { error: updateError } = await supabase
+          .from('shipments')
+          .update({
+            customer_id: line?.customer_id || null,
+            customer_name: line?.customer_name || customer?.name || null,
+            origin_region: selectedRegion,
+            total_weight_kg: line?.weight_kg || 0,
+            description: line?.description || null,
+            transit_point: transitPoint,
+            rate_per_kg: ratePerKg || 0,
+            total_revenue: lineAmount,
+            agent_cargo_weight_kg: agentCargoWeight > 0 ? agentCargoWeight : null,
+          })
+          .eq('id', editingDraftId)
+          .eq('is_draft', true);
+
+        if (updateError) throw updateError;
+
+        // Update parcel weight if exists
+        if (line) {
+          await supabase
+            .from('parcels')
+            .update({
+              weight_kg: line.weight_kg,
+              description: line.description || null,
+            })
+            .eq('shipment_id', editingDraftId);
+        }
+
+        toast.success('Draft updated successfully!');
+        return; // Don't reset form when just saving draft
+      }
+
+      // Creating new draft
       // Get or create batch
       let batchId: string | null = null;
       try {
@@ -512,6 +621,14 @@ export function ShipmentUploadForm() {
     const createdShipments: CompletedShipment[] = [];
 
     try {
+      // If editing a draft, delete the old draft first (we'll create a finalized version)
+      if (editingDraftId) {
+        // Delete parcels first
+        await supabase.from('parcels').delete().eq('shipment_id', editingDraftId);
+        // Delete the draft shipment
+        await supabase.from('shipments').delete().eq('id', editingDraftId).eq('is_draft', true);
+      }
+
       // Get or create batch
       let batchId: string | null = null;
       try {
@@ -724,6 +841,20 @@ export function ShipmentUploadForm() {
     );
   }
 
+  if (isLoadingDraft) {
+    return (
+      <Card className="max-w-xl mx-auto">
+        <CardContent className="py-12 text-center">
+          <Loader2 className="w-12 h-12 text-primary mx-auto mb-4 animate-spin" />
+          <h3 className="text-lg font-semibold mb-2">Loading Draft</h3>
+          <p className="text-muted-foreground">
+            Please wait while we load your draft...
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header Card */}
@@ -735,8 +866,12 @@ export function ShipmentUploadForm() {
                 <Package className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <CardTitle className="font-heading text-lg">New Shipments</CardTitle>
-                <CardDescription>Add multiple shipment entries</CardDescription>
+                <CardTitle className="font-heading text-lg">
+                  {editingDraftId ? 'Continue Draft Shipment' : 'New Shipments'}
+                </CardTitle>
+                <CardDescription>
+                  {editingDraftId ? 'Edit and finalize your draft shipment' : 'Add multiple shipment entries'}
+                </CardDescription>
               </div>
             </div>
             <div className="flex items-center gap-4 flex-wrap">
