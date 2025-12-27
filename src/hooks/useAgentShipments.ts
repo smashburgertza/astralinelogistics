@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables } from '@/integrations/supabase/types';
 import { useAuth } from '@/hooks/useAuth';
+import { useAgentAssignedRegions } from '@/hooks/useAgentRegions';
 import { toast } from 'sonner';
 
 export type Shipment = Tables<'shipments'> & {
@@ -13,18 +14,19 @@ export function useAgentShipments(filters?: {
   search?: string;
   includeDrafts?: boolean;
 }) {
-  const { getRegion } = useAuth();
-  const region = getRegion();
+  const { user } = useAuth();
+  const { data: assignedRegions } = useAgentAssignedRegions();
+  const regionCodes = assignedRegions?.map(r => r.region_code) || [];
 
   return useQuery({
-    queryKey: ['agent-shipments', region, filters],
+    queryKey: ['agent-shipments', user?.id, regionCodes, filters],
     queryFn: async () => {
-      if (!region) return [];
+      if (!user?.id || regionCodes.length === 0) return [];
 
       let query = supabase
         .from('shipments')
         .select('*, customers(name, email, company_name)')
-        .eq('origin_region', region)
+        .in('origin_region', regionCodes)
         .order('created_at', { ascending: false });
 
       // By default, exclude drafts unless explicitly requested
@@ -43,7 +45,7 @@ export function useAgentShipments(filters?: {
       if (error) throw error;
       return data as Shipment[];
     },
-    enabled: !!region,
+    enabled: !!user?.id && regionCodes.length > 0,
   });
 }
 
@@ -71,18 +73,19 @@ export function useAgentDraftShipments() {
 }
 
 export function useAgentShipmentStats() {
-  const { getRegion } = useAuth();
-  const region = getRegion();
+  const { user } = useAuth();
+  const { data: assignedRegions } = useAgentAssignedRegions();
+  const regionCodes = assignedRegions?.map(r => r.region_code) || [];
 
   return useQuery({
-    queryKey: ['agent-shipment-stats', region],
+    queryKey: ['agent-shipment-stats', user?.id, regionCodes],
     queryFn: async () => {
-      if (!region) return null;
+      if (!user?.id || regionCodes.length === 0) return null;
 
       const { data, error } = await supabase
         .from('shipments')
         .select('status, total_weight_kg, created_at')
-        .eq('origin_region', region);
+        .in('origin_region', regionCodes);
 
       if (error) throw error;
 
@@ -105,7 +108,7 @@ export function useAgentShipmentStats() {
 
       return stats;
     },
-    enabled: !!region,
+    enabled: !!user?.id && regionCodes.length > 0,
   });
 }
 
@@ -203,8 +206,8 @@ export function useUpdateDraftShipment() {
 
 export function useUpdateAgentShipment() {
   const queryClient = useQueryClient();
-  const { getRegion } = useAuth();
-  const region = getRegion();
+  const { data: assignedRegions } = useAgentAssignedRegions();
+  const regionCodes = assignedRegions?.map(r => r.region_code) || [];
 
   return useMutation({
     mutationFn: async (data: {
@@ -214,6 +217,18 @@ export function useUpdateAgentShipment() {
       description: string | null;
       warehouse_location: string | null;
     }) => {
+      // Verify the shipment belongs to one of the agent's assigned regions
+      const { data: shipment, error: fetchError } = await supabase
+        .from('shipments')
+        .select('origin_region')
+        .eq('id', data.id)
+        .single();
+
+      if (fetchError) throw fetchError;
+      if (!regionCodes.includes(shipment.origin_region)) {
+        throw new Error('You do not have permission to edit this shipment');
+      }
+
       const { error } = await supabase
         .from('shipments')
         .update({
@@ -223,7 +238,6 @@ export function useUpdateAgentShipment() {
           warehouse_location: data.warehouse_location,
         })
         .eq('id', data.id)
-        .eq('origin_region', region!)
         .eq('status', 'collected'); // Only allow editing collected shipments
 
       if (error) throw error;
