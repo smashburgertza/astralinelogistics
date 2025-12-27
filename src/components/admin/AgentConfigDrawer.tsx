@@ -48,11 +48,12 @@ import {
   Trash2,
   User
 } from 'lucide-react';
-import { Agent } from '@/hooks/useAgents';
+import { Agent, useUpdateAgentSettings } from '@/hooks/useAgents';
 import { useTransitRoutes, TRANSIT_POINT_LABELS, TRANSIT_POINT_OPTIONS, TransitPointType, useCreateTransitRoute, useUpdateTransitRoute, useDeleteTransitRoute } from '@/hooks/useTransitRoutes';
 import { useAllAgentBalances } from '@/hooks/useAgentBalance';
 import { useRegions } from '@/hooks/useRegions';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
+import { Package } from 'lucide-react';
 
 interface AgentConfigDrawerProps {
   agent: Agent | null;
@@ -67,6 +68,7 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
   const createRoute = useCreateTransitRoute();
   const updateRoute = useUpdateTransitRoute();
   const deleteRoute = useDeleteTransitRoute();
+  const updateAgentSettings = useUpdateAgentSettings();
 
   const [newRoute, setNewRoute] = useState({
     region_id: '',
@@ -463,6 +465,39 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
                       </Badge>
                       <Badge variant="secondary">Active</Badge>
                     </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Agent Cargo Settings Card */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Package className="w-4 h-4" />
+                    Cargo Settings
+                  </CardTitle>
+                  <CardDescription>
+                    Configure cargo handling options for this agent
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="text-sm font-medium">Consolidated Cargo</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Allow agent to add their own consolidated cargo to shipments
+                      </p>
+                    </div>
+                    <Switch
+                      checked={agent.settings?.can_have_consolidated_cargo ?? false}
+                      onCheckedChange={(checked) => {
+                        updateAgentSettings.mutate({
+                          userId: agent.user_id,
+                          canHaveConsolidatedCargo: checked,
+                        });
+                      }}
+                      disabled={updateAgentSettings.isPending}
+                    />
                   </div>
                 </CardContent>
               </Card>
