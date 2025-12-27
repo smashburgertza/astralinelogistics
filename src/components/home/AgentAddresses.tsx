@@ -25,11 +25,17 @@ export function AgentAddresses() {
     setTimeout(() => setCopied(null), 2000);
   };
 
-  // Filter addresses to only show those with active regions
-  const visibleAddresses = (addresses || []).filter(addr => {
-    const regionInfo = regionsMap[addr.region];
-    return regionInfo?.is_active !== false;
-  });
+  // Filter addresses to only show those with active regions and sort by region display_order
+  const visibleAddresses = (addresses || [])
+    .filter(addr => {
+      const regionInfo = regionsMap[addr.region];
+      return regionInfo?.is_active !== false;
+    })
+    .sort((a, b) => {
+      const regionA = regionsMap[a.region];
+      const regionB = regionsMap[b.region];
+      return (regionA?.display_order ?? 999) - (regionB?.display_order ?? 999);
+    });
 
   return (
     <section className="section-padding bg-brand-navy-dark overflow-hidden">
