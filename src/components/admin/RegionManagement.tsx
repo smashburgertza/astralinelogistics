@@ -214,9 +214,9 @@ function SortableRegionItem({
               <div className="font-semibold flex items-center gap-2">
                 {region.name}
                 <span className="text-xs text-muted-foreground font-mono">({region.code})</span>
-                {region.default_currency && (
+                {(region.pricing?.currency || region.default_currency) && (
                   <Badge variant="outline" className="text-xs font-normal">
-                    {region.default_currency}
+                    {region.pricing?.currency || region.default_currency}
                   </Badge>
                 )}
               </div>
