@@ -2,6 +2,23 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,7 +67,8 @@ import {
   Building,
   Plus,
   Trash2,
-  Globe
+  Globe,
+  GripVertical
 } from 'lucide-react';
 import { 
   useRegionPricing, 
@@ -65,6 +83,7 @@ import {
   useCreateRegion, 
   useUpdateRegion, 
   useDeleteRegion,
+  useReorderRegions,
   Region 
 } from '@/hooks/useRegions';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
@@ -123,6 +142,271 @@ interface AgentAddressData {
   contact_email: string | null;
 }
 
+interface RegionWithData extends Region {
+  pricing?: RegionPricingData;
+  address?: AgentAddressData;
+}
+
+interface SortableRegionItemProps {
+  region: RegionWithData;
+  openRegionDialog: (region: Region) => void;
+  openPricingDialog: (pricing: RegionPricingData) => void;
+  openAddressDialog: (regionCode: string, regionId: string, address: AgentAddressData | null) => void;
+  setDeletingRegion: (region: Region) => void;
+  setEditingPricing: (pricing: RegionPricingData) => void;
+  pricingForm: any;
+}
+
+function SortableRegionItem({
+  region,
+  openRegionDialog,
+  openPricingDialog,
+  openAddressDialog,
+  setDeletingRegion,
+  setEditingPricing,
+  pricingForm,
+}: SortableRegionItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: region.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const currencySymbol = region.pricing 
+    ? CURRENCY_SYMBOLS[region.pricing.currency] || region.pricing.currency
+    : '$';
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <AccordionItem 
+        value={region.id}
+        className="border rounded-lg bg-card shadow-sm overflow-hidden"
+      >
+        <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
+          <div className="flex items-center gap-3 flex-1">
+            <button
+              {...attributes}
+              {...listeners}
+              className="cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded touch-none"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <GripVertical className="w-4 h-4 text-muted-foreground" />
+            </button>
+            <span className="text-2xl">{region.flag_emoji || '🌍'}</span>
+            <div className="text-left">
+              <div className="font-semibold flex items-center gap-2">
+                {region.name}
+                <span className="text-xs text-muted-foreground font-mono">({region.code})</span>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {region.pricing 
+                  ? `${currencySymbol}${region.pricing.customer_rate_per_kg}/kg`
+                  : 'No pricing set'
+                }
+              </div>
+            </div>
+            {!region.is_active && (
+              <Badge variant="secondary" className="ml-2">
+                Inactive
+              </Badge>
+            )}
+            {!region.pricing && (
+              <Badge variant="outline" className="ml-auto mr-4 text-amber-600 border-amber-300">
+                Setup Required
+              </Badge>
+            )}
+          </div>
+        </AccordionTrigger>
+        <AccordionContent className="px-4 pb-4">
+          <div className="flex justify-end gap-2 mb-4">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => openRegionDialog(region)}
+            >
+              <Edit2 className="w-3 h-3 mr-1" />
+              Edit Region
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="text-destructive hover:text-destructive"
+              onClick={() => setDeletingRegion(region)}
+            >
+              <Trash2 className="w-3 h-3 mr-1" />
+              Delete
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Pricing Card */}
+            <Card className="border-0 shadow-none bg-muted/30">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <DollarSign className="w-4 h-4 text-primary" />
+                    Pricing
+                  </CardTitle>
+                  {region.pricing && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => openPricingDialog(region.pricing as RegionPricingData)}
+                    >
+                      <Edit2 className="w-3 h-3 mr-1" />
+                      Edit
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {region.pricing ? (
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Customer Rate</span>
+                      <span className="font-medium">
+                        {currencySymbol}{region.pricing.customer_rate_per_kg}/kg
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Agent Rate</span>
+                      <span className="font-medium">
+                        {currencySymbol}{region.pricing.agent_rate_per_kg}/kg
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Handling Fee</span>
+                      <span className="font-medium">
+                        {currencySymbol}{region.pricing.handling_fee || 0}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Currency</span>
+                      <span className="font-medium">{region.pricing.currency}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-sm text-muted-foreground mb-2">
+                      No pricing configured
+                    </p>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => {
+                        setEditingPricing({
+                          id: '',
+                          region: region.code,
+                          region_id: region.id,
+                          customer_rate_per_kg: 0,
+                          agent_rate_per_kg: 0,
+                          handling_fee: 0,
+                          currency: 'USD',
+                        });
+                        pricingForm.reset({
+                          customer_rate_per_kg: 0,
+                          agent_rate_per_kg: 0,
+                          handling_fee: 0,
+                          currency: 'USD',
+                        });
+                      }}
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      Set Pricing
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Address Card */}
+            <Card className="border-0 shadow-none bg-muted/30">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-primary" />
+                    Warehouse Address
+                  </CardTitle>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => openAddressDialog(region.code, region.id, region.address as AgentAddressData | null)}
+                  >
+                    {region.address ? (
+                      <>
+                        <Edit2 className="w-3 h-3 mr-1" />
+                        Edit
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-3 h-3 mr-1" />
+                        Add
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {region.address ? (
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-start gap-2">
+                      <Building className="w-4 h-4 text-muted-foreground mt-0.5" />
+                      <div>
+                        <div>{region.address.address_line1}</div>
+                        {region.address.address_line2 && (
+                          <div>{region.address.address_line2}</div>
+                        )}
+                        <div>
+                          {region.address.city}
+                          {region.address.postal_code && `, ${region.address.postal_code}`}
+                        </div>
+                        <div>{region.address.country}</div>
+                      </div>
+                    </div>
+                    {region.address.contact_name && (
+                      <div className="flex items-center gap-2 pt-2 border-t">
+                        <span className="text-muted-foreground">Contact:</span>
+                        <span>{region.address.contact_name}</span>
+                      </div>
+                    )}
+                    {region.address.contact_phone && (
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-3 h-3 text-muted-foreground" />
+                        <span>{region.address.contact_phone}</span>
+                      </div>
+                    )}
+                    {region.address.contact_email && (
+                      <div className="flex items-center gap-2">
+                        <Mail className="w-3 h-3 text-muted-foreground" />
+                        <span>{region.address.contact_email}</span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-sm text-muted-foreground">
+                      No address configured
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </AccordionContent>
+      </AccordionItem>
+    </div>
+  );
+}
+
 export function RegionManagement() {
   const { data: regions, isLoading: regionsLoading } = useRegions();
   const { data: pricing, isLoading: pricingLoading } = useRegionPricing();
@@ -134,6 +418,18 @@ export function RegionManagement() {
   const createRegion = useCreateRegion();
   const updateRegion = useUpdateRegion();
   const deleteRegion = useDeleteRegion();
+  const reorderRegions = useReorderRegions();
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const [editingPricing, setEditingPricing] = useState<RegionPricingData | null>(null);
   const [editingAddress, setEditingAddress] = useState<{ regionCode: string; regionId: string; address: AgentAddressData | null } | null>(null);
@@ -306,11 +602,30 @@ export function RegionManagement() {
   }
 
   // Build region data with pricing and addresses
-  const regionData = (regions || []).map((region) => ({
+  const regionData: RegionWithData[] = (regions || []).map((region) => ({
     ...region,
     pricing: pricing?.find(p => p.region === region.code || p.region_id === region.id),
     address: addresses?.find(a => a.region === region.code || a.region_id === region.id),
   }));
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = regionData.findIndex((r) => r.id === active.id);
+      const newIndex = regionData.findIndex((r) => r.id === over.id);
+
+      const newOrder = arrayMove(regionData, oldIndex, newIndex);
+      
+      // Update display_order for all affected regions
+      const updates = newOrder.map((region, index) => ({
+        id: region.id,
+        display_order: index,
+      }));
+
+      reorderRegions.mutate(updates);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -318,7 +633,7 @@ export function RegionManagement() {
         <div>
           <h2 className="text-lg font-semibold">Region Configuration</h2>
           <p className="text-sm text-muted-foreground">
-            Manage regions, pricing, and warehouse addresses
+            Manage regions, pricing, and warehouse addresses. Drag to reorder.
           </p>
         </div>
         <Button onClick={() => openRegionDialog()}>
@@ -327,225 +642,31 @@ export function RegionManagement() {
         </Button>
       </div>
 
-      <Accordion type="single" collapsible className="space-y-3">
-        {regionData.map((region) => {
-          const currencySymbol = region.pricing 
-            ? CURRENCY_SYMBOLS[region.pricing.currency] || region.pricing.currency
-            : '$';
-
-          return (
-            <AccordionItem 
-              key={region.id} 
-              value={region.id}
-              className="border rounded-lg bg-card shadow-sm overflow-hidden"
-            >
-              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
-                <div className="flex items-center gap-3 flex-1">
-                  <span className="text-2xl">{region.flag_emoji || '🌍'}</span>
-                  <div className="text-left">
-                    <div className="font-semibold flex items-center gap-2">
-                      {region.name}
-                      <span className="text-xs text-muted-foreground font-mono">({region.code})</span>
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {region.pricing 
-                        ? `${currencySymbol}${region.pricing.customer_rate_per_kg}/kg`
-                        : 'No pricing set'
-                      }
-                    </div>
-                  </div>
-                  {!region.is_active && (
-                    <Badge variant="secondary" className="ml-2">
-                      Inactive
-                    </Badge>
-                  )}
-                  {!region.pricing && (
-                    <Badge variant="outline" className="ml-auto mr-4 text-amber-600 border-amber-300">
-                      Setup Required
-                    </Badge>
-                  )}
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pb-4">
-                <div className="flex justify-end gap-2 mb-4">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => openRegionDialog(region)}
-                  >
-                    <Edit2 className="w-3 h-3 mr-1" />
-                    Edit Region
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="text-destructive hover:text-destructive"
-                    onClick={() => setDeletingRegion(region)}
-                  >
-                    <Trash2 className="w-3 h-3 mr-1" />
-                    Delete
-                  </Button>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Pricing Card */}
-                  <Card className="border-0 shadow-none bg-muted/30">
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-sm font-medium flex items-center gap-2">
-                          <DollarSign className="w-4 h-4 text-primary" />
-                          Pricing
-                        </CardTitle>
-                        {region.pricing && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => openPricingDialog(region.pricing as RegionPricingData)}
-                          >
-                            <Edit2 className="w-3 h-3 mr-1" />
-                            Edit
-                          </Button>
-                        )}
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      {region.pricing ? (
-                        <div className="space-y-2 text-sm">
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Customer Rate</span>
-                            <span className="font-medium">
-                              {currencySymbol}{region.pricing.customer_rate_per_kg}/kg
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Agent Rate</span>
-                            <span className="font-medium">
-                              {currencySymbol}{region.pricing.agent_rate_per_kg}/kg
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Handling Fee</span>
-                            <span className="font-medium">
-                              {currencySymbol}{region.pricing.handling_fee || 0}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Currency</span>
-                            <span className="font-medium">{region.pricing.currency}</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-center py-4">
-                          <p className="text-sm text-muted-foreground mb-2">
-                            No pricing configured
-                          </p>
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => {
-                              setEditingPricing({
-                                id: '',
-                                region: region.code,
-                                region_id: region.id,
-                                customer_rate_per_kg: 0,
-                                agent_rate_per_kg: 0,
-                                handling_fee: 0,
-                                currency: 'USD',
-                              });
-                              pricingForm.reset({
-                                customer_rate_per_kg: 0,
-                                agent_rate_per_kg: 0,
-                                handling_fee: 0,
-                                currency: 'USD',
-                              });
-                            }}
-                          >
-                            <Plus className="w-3 h-3 mr-1" />
-                            Set Pricing
-                          </Button>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  {/* Address Card */}
-                  <Card className="border-0 shadow-none bg-muted/30">
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-sm font-medium flex items-center gap-2">
-                          <MapPin className="w-4 h-4 text-primary" />
-                          Warehouse Address
-                        </CardTitle>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => openAddressDialog(region.code, region.id, region.address as AgentAddressData | null)}
-                        >
-                          {region.address ? (
-                            <>
-                              <Edit2 className="w-3 h-3 mr-1" />
-                              Edit
-                            </>
-                          ) : (
-                            <>
-                              <Plus className="w-3 h-3 mr-1" />
-                              Add
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      {region.address ? (
-                        <div className="space-y-2 text-sm">
-                          <div className="flex items-start gap-2">
-                            <Building className="w-4 h-4 text-muted-foreground mt-0.5" />
-                            <div>
-                              <div>{region.address.address_line1}</div>
-                              {region.address.address_line2 && (
-                                <div>{region.address.address_line2}</div>
-                              )}
-                              <div>
-                                {region.address.city}
-                                {region.address.postal_code && `, ${region.address.postal_code}`}
-                              </div>
-                              <div>{region.address.country}</div>
-                            </div>
-                          </div>
-                          {region.address.contact_name && (
-                            <div className="flex items-center gap-2 pt-2 border-t">
-                              <span className="text-muted-foreground">Contact:</span>
-                              <span>{region.address.contact_name}</span>
-                            </div>
-                          )}
-                          {region.address.contact_phone && (
-                            <div className="flex items-center gap-2">
-                              <Phone className="w-3 h-3 text-muted-foreground" />
-                              <span>{region.address.contact_phone}</span>
-                            </div>
-                          )}
-                          {region.address.contact_email && (
-                            <div className="flex items-center gap-2">
-                              <Mail className="w-3 h-3 text-muted-foreground" />
-                              <span>{region.address.contact_email}</span>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="text-center py-4">
-                          <p className="text-sm text-muted-foreground">
-                            No address configured
-                          </p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-          );
-        })}
-      </Accordion>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={regionData.map((r) => r.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          <Accordion type="single" collapsible className="space-y-3">
+            {regionData.map((region) => (
+              <SortableRegionItem
+                key={region.id}
+                region={region}
+                openRegionDialog={openRegionDialog}
+                openPricingDialog={openPricingDialog}
+                openAddressDialog={openAddressDialog}
+                setDeletingRegion={setDeletingRegion}
+                setEditingPricing={setEditingPricing}
+                pricingForm={pricingForm}
+              />
+            ))}
+          </Accordion>
+        </SortableContext>
+      </DndContext>
 
       {regionData.length === 0 && (
         <Card className="border-dashed">
