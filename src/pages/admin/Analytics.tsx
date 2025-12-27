@@ -18,7 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
-import { REGIONS, type Region } from '@/lib/constants';
+import { useRegions, regionsToMap } from '@/hooks/useRegions';
 import { EXPENSE_CATEGORIES } from '@/hooks/useExpenses';
 import { toast } from 'sonner';
 import {
@@ -83,6 +83,10 @@ export default function AnalyticsPage() {
     to: new Date(),
   });
   const [granularity, setGranularity] = useState<'day' | 'week' | 'month'>('month');
+
+  // Fetch regions from database
+  const { data: regions } = useRegions();
+  const regionsMap = regionsToMap(regions);
 
   // Calculate date range based on preset
   const effectiveDateRange = useMemo(() => {
@@ -271,7 +275,7 @@ export default function AnalyticsPage() {
       
       // Calculate revenue by region
       const regionRevenue: Record<string, number> = {};
-      Object.keys(REGIONS).forEach(r => { regionRevenue[r] = 0; });
+      (regions || []).forEach(r => { regionRevenue[r.code] = 0; });
       
       periodShipments.forEach(shipment => {
         const region = shipment.origin_region || 'unknown';
@@ -293,7 +297,7 @@ export default function AnalyticsPage() {
         ...regionRevenue,
       };
     });
-  }, [shipments, invoices, effectiveDateRange]);
+  }, [shipments, invoices, effectiveDateRange, regions]);
 
   // Customer Lifetime Value (CLV) analysis
   const clvData = useMemo(() => {
@@ -470,11 +474,12 @@ export default function AnalyticsPage() {
       });
 
     return Object.entries(regionCounts).map(([key, value]) => ({
-      name: REGIONS[key as Region]?.label || key.charAt(0).toUpperCase() + key.slice(1),
+      name: regionsMap[key]?.name || key.charAt(0).toUpperCase() + key.slice(1),
       region: key,
+      flag: regionsMap[key]?.flag_emoji || '',
       ...value,
     }));
-  }, [filteredData]);
+  }, [filteredData, regionsMap]);
 
   // Expense breakdown
   const expenseBreakdown = useMemo(() => {
@@ -850,15 +855,15 @@ export default function AnalyticsPage() {
                       />
                       <Tooltip content={<CustomTooltip />} />
                       <Legend />
-                      {Object.entries(REGIONS).map(([region, info]) => (
+                      {(regions || []).map((region) => (
                         <Area
-                          key={region}
+                          key={region.code}
                           type="monotone"
-                          dataKey={region}
+                          dataKey={region.code}
                           stackId="1"
-                          stroke={REGION_COLORS[region] || '#888'}
-                          fill={`url(#grad-${region})`}
-                          name={`${info.flag} ${info.label}`}
+                          stroke={REGION_COLORS[region.code] || '#888'}
+                          fill={`url(#grad-${region.code})`}
+                          name={`${region.flag_emoji || ''} ${region.name}`}
                         />
                       ))}
                     </AreaChart>
@@ -910,7 +915,7 @@ export default function AnalyticsPage() {
                       <div key={region.region} className="space-y-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <span className="text-lg">{REGIONS[region.region as Region]?.flag}</span>
+                            <span className="text-lg">{regionsMap[region.region]?.flag_emoji}</span>
                             <span className="font-medium">{region.name}</span>
                             {index === 0 && <Badge className="bg-yellow-500">Top</Badge>}
                           </div>
