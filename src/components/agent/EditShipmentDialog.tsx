@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/select';
 import { Shipment } from '@/hooks/useShipments';
 import { useUpdateAgentShipment } from '@/hooks/useAgentShipments';
+import { useAgentAssignedRegions } from '@/hooks/useAgentRegions';
 import { useCustomersList } from '@/hooks/useCustomers';
 import { Loader2 } from 'lucide-react';
 
@@ -55,7 +56,9 @@ export function EditShipmentDialog({
   shipment,
 }: EditShipmentDialogProps) {
   const { data: customers, isLoading: customersLoading } = useCustomersList();
-  const updateShipment = useUpdateAgentShipment();
+  const { data: assignedRegions = [] } = useAgentAssignedRegions();
+  const regionCodes = useMemo(() => assignedRegions.map(r => r.region_code), [assignedRegions]);
+  const updateShipment = useUpdateAgentShipment(regionCodes);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
