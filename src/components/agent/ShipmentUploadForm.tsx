@@ -37,11 +37,11 @@ import {
   Plus,
   Trash2,
   Globe,
-  Route
+  Route,
+  DollarSign
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useCustomers } from '@/hooks/useShipments';
-import { useRegionPricingByRegion } from '@/hooks/useRegionPricing';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 import { useAgentAssignedRegions } from '@/hooks/useAgentRegions';
 import { useTransitRoutesByRegion, TRANSIT_POINT_LABELS, TransitPointType } from '@/hooks/useTransitRoutes';
@@ -96,6 +96,16 @@ interface CompletedShipment {
 }
 
 const CONSIGNEE = "Astraline Logistics Limited";
+
+// Available currencies for agent to choose from
+const AVAILABLE_CURRENCIES = [
+  { code: 'GBP', symbol: '£', name: 'British Pound' },
+  { code: 'USD', symbol: '$', name: 'US Dollar' },
+  { code: 'EUR', symbol: '€', name: 'Euro' },
+  { code: 'AED', symbol: 'د.إ', name: 'UAE Dirham' },
+  { code: 'CNY', symbol: '¥', name: 'Chinese Yuan' },
+  { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
+];
 
 function CustomerSelector({ 
   value, 
@@ -202,6 +212,10 @@ export function ShipmentUploadForm() {
   const [shipmentOwner, setShipmentOwner] = useState<ShipmentOwnerType>('astraline');
   const [transitPoint, setTransitPoint] = useState<TransitPointType>('direct');
   
+  // Agent-defined pricing
+  const [ratePerKg, setRatePerKg] = useState<number>(0);
+  const [currency, setCurrency] = useState<string>('GBP');
+  
   // Set default region when assigned regions load
   useEffect(() => {
     if (assignedRegions.length > 0 && !selectedRegion) {
@@ -215,7 +229,6 @@ export function ShipmentUploadForm() {
   const currentRegionInfo = assignedRegions.find(r => r.region_code === selectedRegion);
   
   const { data: customers, isLoading: customersLoading } = useCustomers();
-  const { data: pricing, isLoading: pricingLoading } = useRegionPricingByRegion(selectedRegion);
   const { data: transitRoutes = [] } = useTransitRoutesByRegion(selectedRegion);
   const getOrCreateBatch = useGetOrCreateBatch();
   
@@ -245,9 +258,7 @@ export function ShipmentUploadForm() {
     { id: crypto.randomUUID(), customer_id: '', customer_name: '', description: '', weight_kg: 0 }
   ]);
 
-  const currencySymbol = CURRENCY_SYMBOLS[pricing?.currency || 'USD'] || '$';
-  const ratePerKg = pricing?.agent_rate_per_kg || 0; // Use agent rate for agent invoices
-  const handlingFee = pricing?.handling_fee || 0;
+  const currencySymbol = CURRENCY_SYMBOLS[currency] || currency;
   
   // Get additional transit cost if not direct
   const transitAdditionalCost = useMemo(() => {
@@ -256,10 +267,10 @@ export function ShipmentUploadForm() {
     return route?.additional_cost || 0;
   }, [transitPoint, transitRoutes]);
 
-  // Calculate amount for a line (using agent rate + transit cost)
+  // Calculate amount for a line (weight × rate per kg + transit cost)
   const calculateLineAmount = (weight: number) => {
-    if (!weight || weight <= 0) return 0;
-    return (weight * ratePerKg) + handlingFee + transitAdditionalCost;
+    if (!weight || weight <= 0 || !ratePerKg || ratePerKg <= 0) return 0;
+    return (weight * ratePerKg) + transitAdditionalCost;
   };
 
   // Calculate totals
@@ -268,7 +279,7 @@ export function ShipmentUploadForm() {
     const totalAmount = lines.reduce((sum, line) => sum + calculateLineAmount(line.weight_kg), 0);
     const validLines = lines.filter(l => l.customer_id && l.weight_kg > 0);
     return { totalWeight, totalAmount, validLines: validLines.length };
-  }, [lines, ratePerKg, handlingFee, transitAdditionalCost]);
+  }, [lines, ratePerKg, transitAdditionalCost]);
 
   // Add new line
   const addLine = () => {
@@ -304,6 +315,7 @@ export function ShipmentUploadForm() {
     setLines([{ id: crypto.randomUUID(), customer_id: '', customer_name: '', description: '', weight_kg: 0 }]);
     setShipmentOwner('astraline');
     setTransitPoint('direct');
+    setRatePerKg(0);
   };
 
   const onSubmit = async () => {
@@ -316,6 +328,11 @@ export function ShipmentUploadForm() {
 
     if (!selectedRegion) {
       toast.error('Please select a region');
+      return;
+    }
+
+    if (!ratePerKg || ratePerKg <= 0) {
+      toast.error('Please set a rate per KG');
       return;
     }
 
@@ -388,13 +405,13 @@ export function ShipmentUploadForm() {
             customer_id: line.customer_id,
             shipment_id: shipment.id,
             amount: lineAmount,
-            currency: pricing?.currency || 'USD',
+            currency: currency,
             invoice_type: 'shipping',
             status: 'pending',
             created_by: user?.id,
             agent_id: user?.id,
             invoice_direction: invoiceDirection,
-            notes: `${ownerLabel} shipment from ${currentRegionInfo?.region_name || selectedRegion}${transitLabel}. Weight: ${line.weight_kg}kg`,
+            notes: `${ownerLabel} shipment from ${currentRegionInfo?.region_name || selectedRegion}${transitLabel}. Weight: ${line.weight_kg}kg @ ${currencySymbol}${ratePerKg}/kg`,
           });
 
         if (invoiceError) {
@@ -503,10 +520,41 @@ export function ShipmentUploadForm() {
         </CardHeader>
       </Card>
 
-      {/* Shipment Ownership & Routing Card */}
+      {/* Pricing & Routing Card */}
       <Card className="shadow-lg border-0">
         <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Rate Per KG - Agent defines this */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <DollarSign className="w-4 h-4 text-muted-foreground" />
+                <Label className="text-sm font-medium">Rate Per KG</Label>
+              </div>
+              <div className="flex gap-2">
+                <Select value={currency} onValueChange={setCurrency}>
+                  <SelectTrigger className="w-[100px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {AVAILABLE_CURRENCIES.map((c) => (
+                      <SelectItem key={c.code} value={c.code}>
+                        {c.symbol} {c.code}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={ratePerKg || ''}
+                  onChange={(e) => setRatePerKg(parseFloat(e.target.value) || 0)}
+                  className="flex-1"
+                />
+              </div>
+            </div>
+
             {/* Shipment Owner Selection */}
             <div className="space-y-3">
               <Label className="text-sm font-medium">Shipment For</Label>
@@ -566,7 +614,7 @@ export function ShipmentUploadForm() {
           <div className="grid grid-cols-12 gap-2 p-4 bg-muted/50 border-b text-sm font-medium text-muted-foreground">
             <div className="col-span-4">Customer Name</div>
             <div className="col-span-4">Description</div>
-            <div className="col-span-2 text-right">Kgs</div>
+            <div className="col-span-2 text-right">Weight (kg)</div>
             <div className="col-span-2 text-right">Amount ({currencySymbol})</div>
           </div>
 
@@ -674,18 +722,24 @@ export function ShipmentUploadForm() {
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div className="text-sm text-muted-foreground">
-              <span className="font-medium text-foreground">Rate:</span> {currencySymbol}{ratePerKg}/kg
-              {handlingFee > 0 && (
-                <span className="ml-4">
-                  <span className="font-medium text-foreground">Handling:</span> {currencySymbol}{handlingFee}
-                </span>
+              {ratePerKg > 0 ? (
+                <>
+                  <span className="font-medium text-foreground">Rate:</span> {currencySymbol}{ratePerKg}/kg
+                  {transitAdditionalCost > 0 && (
+                    <span className="ml-4">
+                      <span className="font-medium text-foreground">Transit:</span> +{currencySymbol}{transitAdditionalCost}
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span className="text-amber-600">Please set a rate per KG above</span>
               )}
             </div>
             <Button
               type="button"
               size="lg"
               className="h-12 px-8 text-lg font-semibold"
-              disabled={isSubmitting || pricingLoading || totals.validLines === 0}
+              disabled={isSubmitting || totals.validLines === 0 || !ratePerKg || ratePerKg <= 0}
               onClick={onSubmit}
             >
               {isSubmitting ? (
