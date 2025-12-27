@@ -2,7 +2,7 @@ import { ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, CloudUpload, PackageSearch, Settings2,
-  LogOut, BellRing, ChevronDown, Globe, FileText
+  LogOut, BellRing, ChevronDown, Building2, FileText
 } from 'lucide-react';
 import astralineLogo from '@/assets/astraline-logo-horizontal.svg';
 import { Button } from '@/components/ui/button';
@@ -31,7 +31,6 @@ import {
   SidebarInset,
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
-import { useRegions } from '@/hooks/useRegions';
 import { cn } from '@/lib/utils';
 
 interface AgentLayoutProps {
@@ -52,12 +51,9 @@ const accountNavItems = [
 ];
 
 export function AgentLayout({ children, title, subtitle }: AgentLayoutProps) {
-  const { profile, signOut, getRegion } = useAuth();
+  const { profile, signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const region = getRegion();
-  const { data: regions = [] } = useRegions();
-  const regionInfo = region ? regions.find(r => r.code === region) : null;
 
   const handleSignOut = async () => {
     await signOut();
@@ -86,15 +82,15 @@ export function AgentLayout({ children, title, subtitle }: AgentLayoutProps) {
             </Link>
           </SidebarHeader>
 
-          {/* Region Badge */}
-          {regionInfo && (
+          {/* Company Name Badge */}
+          {profile?.company_name && (
             <div className="px-4 py-3 border-b border-sidebar-border group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:py-2">
               <div className="flex items-center gap-2 text-sm group-data-[collapsible=icon]:justify-center">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400/20 to-teal-500/20 flex items-center justify-center shrink-0">
-                  <span className="text-lg">{regionInfo.flag_emoji}</span>
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent/20 to-primary/20 flex items-center justify-center shrink-0">
+                  <Building2 className="w-4 h-4 text-accent" />
                 </div>
-                <span className="text-muted-foreground font-medium transition-all duration-300 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:overflow-hidden">
-                  {regionInfo.name}
+                <span className="text-muted-foreground font-medium transition-all duration-300 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:overflow-hidden truncate">
+                  {profile.company_name}
                 </span>
               </div>
             </div>
