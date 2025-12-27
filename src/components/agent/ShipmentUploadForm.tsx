@@ -238,8 +238,7 @@ export function ShipmentUploadForm() {
   // State for selected region (for multi-region agents)
   const [selectedRegion, setSelectedRegion] = useState<AgentRegion | undefined>(defaultRegion);
   
-  // Billing party and routing state
-  const [billingParty, setBillingParty] = useState<BillingPartyType>('customer_direct');
+  // Routing state (billing party is now automatic based on cargo type)
   const [transitPoint, setTransitPoint] = useState<TransitPointType>('direct');
   
   // Consignee state
@@ -349,7 +348,6 @@ export function ShipmentUploadForm() {
   const resetForm = () => {
     setCompletedShipments(null);
     setLines([{ id: crypto.randomUUID(), customer_id: '', customer_name: '', description: '', weight_kg: 0 }]);
-    setBillingParty('customer_direct');
     setTransitPoint('direct');
     setRatePerKg(0);
     setConsignee(DEFAULT_CONSIGNEE);
@@ -410,7 +408,7 @@ export function ShipmentUploadForm() {
             agent_id: user?.id,
             tracking_number: '',
             batch_id: batchId,
-            billing_party: billingParty,
+            billing_party: 'customer_direct' as BillingPartyType, // Customer shipments always billed directly
             transit_point: transitPoint,
             rate_per_kg: ratePerKg,
             total_revenue: lineAmount,
@@ -431,15 +429,12 @@ export function ShipmentUploadForm() {
 
         if (parcelError) throw parcelError;
 
-        // Determine invoice direction based on billing party
-        // customer_direct: Astraline invoices customer directly, agent gets commission
-        // agent_collect: Agent collects from customer, settles with Astraline
-        const invoiceDirection = billingParty === 'agent_collect' ? 'from_agent' : 'to_agent';
+        // Customer shipments are always invoiced TO the customer (we bill them)
+        const invoiceDirection = 'to_agent'; // Invoice goes to agent for settlement with customer
         
         // Create invoice
         const invoiceNumber = generateInvoiceNumber();
         const transitLabel = transitPoint !== 'direct' ? ` (${TRANSIT_POINT_LABELS[transitPoint]})` : '';
-        const billingLabel = BILLING_PARTIES[billingParty].label;
         
         const { data: invoice, error: invoiceError } = await supabase
           .from('invoices')
@@ -455,7 +450,7 @@ export function ShipmentUploadForm() {
             agent_id: user?.id,
             invoice_direction: invoiceDirection,
             rate_per_kg: ratePerKg,
-            notes: `${billingLabel} shipment from ${currentRegionInfo?.region_name || selectedRegion}${transitLabel}. Weight: ${line.weight_kg}kg @ ${currencySymbol}${ratePerKg}/kg`,
+            notes: `Customer shipment from ${currentRegionInfo?.region_name || selectedRegion}${transitLabel}. Weight: ${line.weight_kg}kg @ ${currencySymbol}${ratePerKg}/kg`,
           })
           .select()
           .single();
@@ -653,7 +648,7 @@ export function ShipmentUploadForm() {
       {/* Pricing & Routing Card */}
       <Card className="shadow-lg border-0">
         <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Rate Per KG - Agent defines this */}
             <div className="space-y-3">
               <div className="flex items-center gap-2">
@@ -683,31 +678,6 @@ export function ShipmentUploadForm() {
                   className="flex-1"
                 />
               </div>
-            </div>
-
-            {/* Billing Party Selection */}
-            <div className="space-y-3">
-              <Label className="text-sm font-medium">Billing Type</Label>
-              <RadioGroup
-                value={billingParty}
-                onValueChange={(value) => setBillingParty(value as BillingPartyType)}
-                className="flex flex-col gap-2"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="customer_direct" id="billing-customer" />
-                  <Label htmlFor="billing-customer" className="cursor-pointer">
-                    <span className="font-medium">Customer Direct</span>
-                    <span className="text-xs text-muted-foreground ml-1">(We invoice customer)</span>
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="agent_collect" id="billing-agent" />
-                  <Label htmlFor="billing-agent" className="cursor-pointer">
-                    <span className="font-medium">Agent Collect</span>
-                    <span className="text-xs text-muted-foreground ml-1">(You collect & settle)</span>
-                  </Label>
-                </div>
-              </RadioGroup>
             </div>
 
             {/* Transit Point Selection */}
