@@ -112,6 +112,7 @@ const regionSchema = z.object({
   flag_emoji: z.string().optional(),
   is_active: z.boolean().default(true),
   display_order: z.coerce.number().min(0).default(0),
+  default_currency: z.string().min(1, 'Currency is required').default('USD'),
 });
 
 type PricingFormValues = z.infer<typeof pricingSchema>;
@@ -450,6 +451,7 @@ export function RegionManagement() {
     defaultValues: {
       is_active: true,
       display_order: 0,
+      default_currency: 'USD',
     },
   });
 
@@ -500,6 +502,7 @@ export function RegionManagement() {
         flag_emoji: region.flag_emoji || '',
         is_active: region.is_active,
         display_order: region.display_order,
+        default_currency: region.default_currency || 'USD',
       });
     } else {
       setEditingRegion(null);
@@ -510,6 +513,7 @@ export function RegionManagement() {
         flag_emoji: '',
         is_active: true,
         display_order: (regions?.length || 0) + 1,
+        default_currency: 'USD',
       });
     }
   };
@@ -568,6 +572,7 @@ export function RegionManagement() {
         flag_emoji: values.flag_emoji || undefined,
         is_active: values.is_active,
         display_order: values.display_order,
+        default_currency: values.default_currency,
       });
     } else if (editingRegion) {
       await updateRegion.mutateAsync({
@@ -576,6 +581,7 @@ export function RegionManagement() {
         flag_emoji: values.flag_emoji || undefined,
         is_active: values.is_active,
         display_order: values.display_order,
+        default_currency: values.default_currency,
       });
     }
     setEditingRegion(null);
@@ -762,6 +768,22 @@ export function RegionManagement() {
                     <FormControl>
                       <Input type="number" min="0" {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={regionForm.control}
+                name="default_currency"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Default Currency</FormLabel>
+                    <FormControl>
+                      <Input placeholder="USD" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      Default currency for pricing and invoices in this region
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

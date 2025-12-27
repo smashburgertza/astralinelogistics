@@ -9,6 +9,7 @@ export interface Region {
   flag_emoji: string | null;
   is_active: boolean;
   display_order: number;
+  default_currency: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -52,6 +53,7 @@ export function useCreateRegion() {
       flag_emoji?: string;
       is_active?: boolean;
       display_order?: number;
+      default_currency?: string;
     }) => {
       const { data, error } = await supabase
         .from('regions')
