@@ -30,16 +30,14 @@ import {
 } from '@/components/ui/select';
 import { Plus, Loader2, User, Mail, Phone, MapPin, Lock } from 'lucide-react';
 import { useCreateAgent } from '@/hooks/useAgents';
-import { REGIONS } from '@/lib/constants';
+import { useActiveRegions } from '@/hooks/useRegions';
 
 const formSchema = z.object({
   email: z.string().email('Please enter a valid email'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   fullName: z.string().min(2, 'Name must be at least 2 characters').max(100),
   phone: z.string().max(20).optional(),
-  region: z.enum(['europe', 'dubai', 'china', 'india'], {
-    required_error: 'Please select a region',
-  }),
+  region: z.string().min(1, 'Please select a region'),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -47,6 +45,7 @@ type FormValues = z.infer<typeof formSchema>;
 export function CreateAgentDialog() {
   const [open, setOpen] = useState(false);
   const createAgent = useCreateAgent();
+  const { data: regions, isLoading: regionsLoading } = useActiveRegions();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -60,12 +59,14 @@ export function CreateAgentDialog() {
   });
 
   const onSubmit = async (values: FormValues) => {
+    // Find the region code from the region id
+    const selectedRegion = regions?.find(r => r.id === values.region);
     await createAgent.mutateAsync({
       email: values.email,
       password: values.password,
       fullName: values.fullName,
       phone: values.phone,
-      region: values.region,
+      region: selectedRegion?.code as any, // The hook expects the region code
     });
     setOpen(false);
     form.reset();
@@ -176,14 +177,18 @@ export function CreateAgentDialog() {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {Object.entries(REGIONS).map(([key, region]) => (
-                        <SelectItem key={key} value={key}>
-                          <span className="flex items-center gap-2">
-                            <span>{region.flag}</span>
-                            <span>{region.label}</span>
-                          </span>
-                        </SelectItem>
-                      ))}
+                      {regionsLoading ? (
+                        <div className="p-2 text-center text-muted-foreground">Loading...</div>
+                      ) : (
+                        regions?.map((region) => (
+                          <SelectItem key={region.id} value={region.id}>
+                            <span className="flex items-center gap-2">
+                              <span>{region.flag_emoji}</span>
+                              <span>{region.name}</span>
+                            </span>
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                   <FormDescription>

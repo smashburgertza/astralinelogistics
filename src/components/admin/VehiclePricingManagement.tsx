@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useVehiclePricing, VehicleType, ShippingMethod } from '@/hooks/useVehiclePricing';
-import { REGIONS } from '@/lib/constants';
+import { useRegions, regionsToMap } from '@/hooks/useRegions';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const CURRENCIES = ['USD', 'GBP', 'EUR', 'TZS'];
@@ -25,6 +25,9 @@ const SHIPPING_METHOD_LABELS: Record<ShippingMethod, string> = {
 
 export function VehiclePricingManagement() {
   const { vehiclePricing, isLoading, updatePricing } = useVehiclePricing();
+  const { data: regions, isLoading: regionsLoading } = useRegions();
+  const regionsMap = regionsToMap(regions);
+  
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<{ price: string; currency: string }>({ price: '', currency: '' });
   const [activeMethod, setActiveMethod] = useState<ShippingMethod>('roro');
@@ -48,7 +51,7 @@ export function VehiclePricingManagement() {
     setEditValues({ price: '', currency: '' });
   };
 
-  if (isLoading) {
+  if (isLoading || regionsLoading) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-8 w-48" />
@@ -59,6 +62,20 @@ export function VehiclePricingManagement() {
 
   const filteredByMethod = vehiclePricing.filter(p => p.shipping_method === activeMethod);
   const vehicleTypes: VehicleType[] = ['motorcycle', 'sedan', 'suv', 'truck'];
+
+  // Helper to get region info from pricing item
+  const getRegionInfo = (pricing: typeof vehiclePricing[0]) => {
+    // Try to find by region_id first, then fall back to region code
+    if (pricing.region_id && regionsMap[pricing.region]) {
+      // regionsMap is keyed by code, so we need to find by id
+      const region = regions?.find(r => r.id === pricing.region_id);
+      if (region) return { flag: region.flag_emoji, label: region.name };
+    }
+    // Fall back to region code lookup
+    const regionByCode = regions?.find(r => r.code === pricing.region);
+    if (regionByCode) return { flag: regionByCode.flag_emoji, label: regionByCode.name };
+    return { flag: '', label: pricing.region };
+  };
 
   return (
     <div className="space-y-6">
@@ -95,63 +112,66 @@ export function VehiclePricingManagement() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {vehiclePricingData.map((pricing) => (
-                        <TableRow key={pricing.id}>
-                          <TableCell>
-                            <span className="flex items-center gap-2">
-                              <span>{REGIONS[pricing.region]?.flag}</span>
-                              {REGIONS[pricing.region]?.label}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            {editingId === pricing.id ? (
-                              <Input
-                                type="number"
-                                value={editValues.price}
-                                onChange={(e) => setEditValues(prev => ({ ...prev, price: e.target.value }))}
-                                className="w-32"
-                              />
-                            ) : (
-                              pricing.price.toLocaleString()
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {editingId === pricing.id ? (
-                              <Select
-                                value={editValues.currency}
-                                onValueChange={(v) => setEditValues(prev => ({ ...prev, currency: v }))}
-                              >
-                                <SelectTrigger className="w-24">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {CURRENCIES.map(c => (
-                                    <SelectItem key={c} value={c}>{c}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            ) : (
-                              pricing.currency
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {editingId === pricing.id ? (
-                              <div className="flex gap-1">
-                                <Button size="sm" onClick={() => handleSave(pricing.id)} disabled={updatePricing.isPending}>
-                                  <Save className="w-4 h-4" />
+                      {vehiclePricingData.map((pricing) => {
+                        const regionInfo = getRegionInfo(pricing);
+                        return (
+                          <TableRow key={pricing.id}>
+                            <TableCell>
+                              <span className="flex items-center gap-2">
+                                <span>{regionInfo.flag}</span>
+                                {regionInfo.label}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              {editingId === pricing.id ? (
+                                <Input
+                                  type="number"
+                                  value={editValues.price}
+                                  onChange={(e) => setEditValues(prev => ({ ...prev, price: e.target.value }))}
+                                  className="w-32"
+                                />
+                              ) : (
+                                pricing.price.toLocaleString()
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {editingId === pricing.id ? (
+                                <Select
+                                  value={editValues.currency}
+                                  onValueChange={(v) => setEditValues(prev => ({ ...prev, currency: v }))}
+                                >
+                                  <SelectTrigger className="w-24">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {CURRENCIES.map(c => (
+                                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              ) : (
+                                pricing.currency
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {editingId === pricing.id ? (
+                                <div className="flex gap-1">
+                                  <Button size="sm" onClick={() => handleSave(pricing.id)} disabled={updatePricing.isPending}>
+                                    <Save className="w-4 h-4" />
+                                  </Button>
+                                  <Button size="sm" variant="outline" onClick={handleCancel}>
+                                    Cancel
+                                  </Button>
+                                </div>
+                              ) : (
+                                <Button size="sm" variant="outline" onClick={() => handleEdit(pricing.id, pricing.price, pricing.currency)}>
+                                  Edit
                                 </Button>
-                                <Button size="sm" variant="outline" onClick={handleCancel}>
-                                  Cancel
-                                </Button>
-                              </div>
-                            ) : (
-                              <Button size="sm" variant="outline" onClick={() => handleEdit(pricing.id, pricing.price, pricing.currency)}>
-                                Edit
-                              </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>

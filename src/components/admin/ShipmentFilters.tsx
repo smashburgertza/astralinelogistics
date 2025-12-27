@@ -2,7 +2,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Search, X } from 'lucide-react';
-import { REGIONS, SHIPMENT_STATUSES } from '@/lib/constants';
+import { SHIPMENT_STATUSES } from '@/lib/constants';
+import { useActiveRegions } from '@/hooks/useRegions';
 
 interface ShipmentFiltersProps {
   search: string;
@@ -23,6 +24,7 @@ export function ShipmentFilters({
   onRegionChange,
   onClear,
 }: ShipmentFiltersProps) {
+  const { data: regions } = useActiveRegions();
   const hasFilters = search || status !== 'all' || region !== 'all';
 
   return (
@@ -55,9 +57,9 @@ export function ShipmentFilters({
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All Regions</SelectItem>
-          {Object.entries(REGIONS).map(([key, { label, flag }]) => (
-            <SelectItem key={key} value={key}>
-              {flag} {label}
+          {regions?.map((r) => (
+            <SelectItem key={r.id} value={r.code}>
+              {r.flag_emoji} {r.name}
             </SelectItem>
           ))}
         </SelectContent>

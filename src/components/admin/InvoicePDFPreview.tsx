@@ -1,6 +1,7 @@
 import { forwardRef } from 'react';
 import { Invoice } from '@/hooks/useInvoices';
-import { CURRENCY_SYMBOLS, REGIONS } from '@/lib/constants';
+import { CURRENCY_SYMBOLS } from '@/lib/constants';
+import { useRegions } from '@/hooks/useRegions';
 import { format } from 'date-fns';
 
 interface InvoicePDFPreviewProps {
@@ -9,9 +10,10 @@ interface InvoicePDFPreviewProps {
 
 export const InvoicePDFPreview = forwardRef<HTMLDivElement, InvoicePDFPreviewProps>(
   ({ invoice }, ref) => {
+    const { data: regions } = useRegions();
     const currencySymbol = CURRENCY_SYMBOLS[invoice.currency || 'USD'] || '$';
     const regionInfo = invoice.shipments?.origin_region
-      ? REGIONS[invoice.shipments.origin_region as keyof typeof REGIONS]
+      ? regions?.find(r => r.code === invoice.shipments?.origin_region)
       : null;
 
     return (
@@ -81,7 +83,7 @@ export const InvoicePDFPreview = forwardRef<HTMLDivElement, InvoicePDFPreviewPro
               {regionInfo && (
                 <div>
                   <span className="text-muted-foreground">Origin:</span>
-                  <p className="font-medium">{regionInfo.flag} {regionInfo.label}</p>
+                  <p className="font-medium">{regionInfo.flag_emoji} {regionInfo.name}</p>
                 </div>
               )}
               {invoice.shipments.total_weight_kg && (

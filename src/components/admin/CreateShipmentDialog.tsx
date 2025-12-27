@@ -28,15 +28,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Plus, Loader2 } from 'lucide-react';
-import { REGIONS } from '@/lib/constants';
+import { useActiveRegions } from '@/hooks/useRegions';
 import { useCreateShipment, useCustomers } from '@/hooks/useShipments';
 import { useAuth } from '@/hooks/useAuth';
 
 const formSchema = z.object({
   customer_id: z.string().min(1, 'Please select a customer'),
-  origin_region: z.enum(['europe', 'dubai', 'china', 'india'], {
-    required_error: 'Please select a region',
-  }),
+  origin_region: z.string().min(1, 'Please select a region'),
   total_weight_kg: z.coerce.number().positive('Weight must be positive'),
   description: z.string().optional(),
   warehouse_location: z.string().optional(),
@@ -49,6 +47,7 @@ export function CreateShipmentDialog() {
   const { user } = useAuth();
   const createShipment = useCreateShipment();
   const { data: customers, isLoading: customersLoading } = useCustomers();
+  const { data: regions, isLoading: regionsLoading } = useActiveRegions();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -61,7 +60,7 @@ export function CreateShipmentDialog() {
   const onSubmit = async (values: FormValues) => {
     await createShipment.mutateAsync({
       customer_id: values.customer_id,
-      origin_region: values.origin_region,
+      origin_region: values.origin_region as any,
       total_weight_kg: values.total_weight_kg,
       description: values.description || null,
       warehouse_location: values.warehouse_location || null,
@@ -130,11 +129,15 @@ export function CreateShipmentDialog() {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {Object.entries(REGIONS).map(([key, { label, flag }]) => (
-                        <SelectItem key={key} value={key}>
-                          {flag} {label}
-                        </SelectItem>
-                      ))}
+                      {regionsLoading ? (
+                        <div className="p-2 text-center text-muted-foreground">Loading...</div>
+                      ) : (
+                        regions?.map((region) => (
+                          <SelectItem key={region.id} value={region.code}>
+                            {region.flag_emoji} {region.name}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                   <FormMessage />

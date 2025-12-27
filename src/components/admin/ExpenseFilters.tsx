@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/select';
 import { Search, X } from 'lucide-react';
 import { EXPENSE_CATEGORIES, EXPENSE_STATUSES } from '@/hooks/useExpenses';
-import { REGIONS } from '@/lib/constants';
+import { useActiveRegions } from '@/hooks/useRegions';
 
 interface ExpenseFiltersProps {
   search: string;
@@ -34,6 +34,7 @@ export function ExpenseFilters({
   onStatusChange,
   onClear,
 }: ExpenseFiltersProps) {
+  const { data: regions } = useActiveRegions();
   const hasFilters = search || category !== 'all' || region !== 'all' || (status && status !== 'all');
 
   return (
@@ -68,9 +69,9 @@ export function ExpenseFilters({
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All Regions</SelectItem>
-          {Object.entries(REGIONS).map(([key, value]) => (
-            <SelectItem key={key} value={key}>
-              {value.label}
+          {regions?.map((r) => (
+            <SelectItem key={r.id} value={r.code}>
+              {r.name}
             </SelectItem>
           ))}
         </SelectContent>

@@ -8,7 +8,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Package, Plane, MapPin, CheckCircle, Clock, ExternalLink, ChevronDown, CheckCircle2 } from 'lucide-react';
 import { useCustomerShipments } from '@/hooks/useCustomerPortal';
 import { useParcels } from '@/hooks/useParcels';
-import { SHIPMENT_STATUSES, REGIONS } from '@/lib/constants';
+import { SHIPMENT_STATUSES } from '@/lib/constants';
+import { useRegions } from '@/hooks/useRegions';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -95,6 +96,7 @@ function ShipmentParcels({ shipmentId }: { shipmentId: string }) {
 export default function CustomerShipmentsPage() {
   const navigate = useNavigate();
   const { data: shipments, isLoading } = useCustomerShipments();
+  const { data: regions } = useRegions();
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
 
   const toggleExpanded = (id: string) => {
@@ -111,6 +113,10 @@ export default function CustomerShipmentsPage() {
       delivered: CheckCircle,
     };
     return icons[status as keyof typeof icons] || Package;
+  };
+
+  const getRegionInfo = (regionCode: string) => {
+    return regions?.find(r => r.code === regionCode);
   };
 
   return (
@@ -139,7 +145,7 @@ export default function CustomerShipmentsPage() {
           {shipments.map((shipment) => {
             const StatusIcon = getStatusIcon(shipment.status || 'collected');
             const statusConfig = SHIPMENT_STATUSES[shipment.status as keyof typeof SHIPMENT_STATUSES];
-            const region = REGIONS[shipment.origin_region as keyof typeof REGIONS];
+            const region = getRegionInfo(shipment.origin_region);
             const isExpanded = expandedIds.includes(shipment.id);
 
             return (
@@ -176,7 +182,7 @@ export default function CustomerShipmentsPage() {
                               </div>
                               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                                 <span className="flex items-center gap-1">
-                                  {region?.flag} {region?.label}
+                                  {region?.flag_emoji} {region?.name}
                                 </span>
                                 <span className="flex items-center gap-1">
                                   <Package className="h-3 w-3" />

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ParcelLabel } from './ParcelLabel';
 import { Printer, ArrowLeft, CheckCircle, Package } from 'lucide-react';
-import { REGIONS } from '@/lib/constants';
+import { useRegions, regionsToMap } from '@/hooks/useRegions';
 
 interface ParcelData {
   id: string;
@@ -29,7 +29,8 @@ interface PrintableLabelsProps {
 
 export function PrintableLabels({ shipment, parcels, onBack }: PrintableLabelsProps) {
   const printRef = useRef<HTMLDivElement>(null);
-  const regionInfo = REGIONS[shipment.origin_region as keyof typeof REGIONS];
+  const { data: regions } = useRegions();
+  const regionInfo = regions?.find(r => r.code === shipment.origin_region);
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
@@ -73,7 +74,7 @@ export function PrintableLabels({ shipment, parcels, onBack }: PrintableLabelsPr
             </div>
             <div className="p-3 rounded-lg bg-muted/50">
               <p className="text-xs text-muted-foreground">Origin</p>
-              <p className="font-semibold">{regionInfo?.flag} {regionInfo?.label}</p>
+              <p className="font-semibold">{regionInfo?.flag_emoji} {regionInfo?.name}</p>
             </div>
             <div className="p-3 rounded-lg bg-muted/50">
               <p className="text-xs text-muted-foreground">Parcels</p>
