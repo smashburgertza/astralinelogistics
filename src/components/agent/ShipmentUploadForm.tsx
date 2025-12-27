@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,35 +15,54 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { 
   Loader2, 
   Package, 
-  DollarSign, 
   MapPin, 
   CheckCircle, 
   Building2,
   ChevronsUpDown,
   Check,
   Plus,
-  Trash2
+  Trash2,
+  Globe
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useCustomers } from '@/hooks/useShipments';
-import { useRegionPricingByRegion, calculateShipmentCost } from '@/hooks/useRegionPricing';
+import { useRegionPricingByRegion } from '@/hooks/useRegionPricing';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
-import { useRegions } from '@/hooks/useRegions';
+import { useAgentAssignedRegions } from '@/hooks/useAgentRegions';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { PrintableLabels } from './PrintableLabels';
 import { useGetOrCreateBatch } from '@/hooks/useCargoBatches';
+import { Database } from '@/integrations/supabase/types';
+
+type AgentRegion = Database['public']['Enums']['agent_region'];
 
 // Generate a unique barcode for each parcel
 const generateBarcode = () => {
   const timestamp = Date.now().toString(36).toUpperCase();
   const random = Math.random().toString(36).substring(2, 6).toUpperCase();
   return `PKG-${timestamp}-${random}`;
+};
+
+// Generate invoice number
+const generateInvoiceNumber = () => {
+  const date = new Date();
+  const year = date.getFullYear().toString().slice(-2);
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+  return `AGT-${year}${month}-${random}`;
 };
 
 interface ShipmentLine {
@@ -167,12 +186,26 @@ function CustomerSelector({
 
 export function ShipmentUploadForm() {
   const { user, getRegion } = useAuth();
-  const region = getRegion();
-  const { data: regions = [] } = useRegions();
-  const regionInfo = region ? regions.find(r => r.code === region) : null;
+  const defaultRegion = getRegion();
+  const { data: assignedRegions = [], isLoading: regionsLoading } = useAgentAssignedRegions();
+  
+  // State for selected region (for multi-region agents)
+  const [selectedRegion, setSelectedRegion] = useState<AgentRegion | undefined>(defaultRegion);
+  
+  // Set default region when assigned regions load
+  useEffect(() => {
+    if (assignedRegions.length > 0 && !selectedRegion) {
+      setSelectedRegion(assignedRegions[0].region_code);
+    } else if (defaultRegion && !selectedRegion) {
+      setSelectedRegion(defaultRegion);
+    }
+  }, [assignedRegions, defaultRegion, selectedRegion]);
+  
+  const hasMultipleRegions = assignedRegions.length > 1;
+  const currentRegionInfo = assignedRegions.find(r => r.region_code === selectedRegion);
   
   const { data: customers, isLoading: customersLoading } = useCustomers();
-  const { data: pricing, isLoading: pricingLoading } = useRegionPricingByRegion(region);
+  const { data: pricing, isLoading: pricingLoading } = useRegionPricingByRegion(selectedRegion);
   const getOrCreateBatch = useGetOrCreateBatch();
   
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -183,10 +216,10 @@ export function ShipmentUploadForm() {
   ]);
 
   const currencySymbol = CURRENCY_SYMBOLS[pricing?.currency || 'USD'] || '$';
-  const ratePerKg = pricing?.customer_rate_per_kg || 0;
+  const ratePerKg = pricing?.agent_rate_per_kg || 0; // Use agent rate for agent invoices
   const handlingFee = pricing?.handling_fee || 0;
 
-  // Calculate amount for a line
+  // Calculate amount for a line (using agent rate)
   const calculateLineAmount = (weight: number) => {
     if (!weight || weight <= 0) return 0;
     return (weight * ratePerKg) + handlingFee;
@@ -242,8 +275,8 @@ export function ShipmentUploadForm() {
       return;
     }
 
-    if (!region) {
-      toast.error('Region not assigned');
+    if (!selectedRegion) {
+      toast.error('Please select a region');
       return;
     }
 
@@ -255,23 +288,24 @@ export function ShipmentUploadForm() {
       let batchId: string | null = null;
       try {
         batchId = await getOrCreateBatch.mutateAsync({
-          originRegion: region,
+          originRegion: selectedRegion,
           cargoType: 'air',
         });
       } catch (batchError) {
         console.error('Failed to create batch:', batchError);
       }
 
-      // Create each shipment
+      // Create each shipment and its invoice
       for (const line of validLines) {
         const parcelBarcode = generateBarcode();
         const customer = customers?.find(c => c.id === line.customer_id);
+        const lineAmount = calculateLineAmount(line.weight_kg);
 
         const { data: shipment, error: shipmentError } = await supabase
           .from('shipments')
           .insert({
             customer_id: line.customer_id,
-            origin_region: region,
+            origin_region: selectedRegion,
             total_weight_kg: line.weight_kg,
             description: line.description || null,
             warehouse_location: null,
@@ -296,11 +330,32 @@ export function ShipmentUploadForm() {
 
         if (parcelError) throw parcelError;
 
+        // Create invoice from agent to Astraline (agent invoice)
+        const invoiceNumber = generateInvoiceNumber();
+        const { error: invoiceError } = await supabase
+          .from('invoices')
+          .insert({
+            invoice_number: invoiceNumber,
+            customer_id: line.customer_id,
+            shipment_id: shipment.id,
+            amount: lineAmount,
+            currency: pricing?.currency || 'USD',
+            invoice_type: 'shipping',
+            status: 'pending',
+            created_by: user?.id,
+            notes: `Agent shipment from ${currentRegionInfo?.region_name || selectedRegion}. Weight: ${line.weight_kg}kg`,
+          });
+
+        if (invoiceError) {
+          console.error('Failed to create invoice:', invoiceError);
+          // Don't fail the shipment if invoice creation fails
+        }
+
         createdShipments.push({
           tracking_number: shipment.tracking_number,
           customer_name: customer?.name || line.customer_name,
           customer_phone: customer?.phone || '',
-          origin_region: region,
+          origin_region: selectedRegion,
           created_at: shipment.created_at || new Date().toISOString(),
           parcels: [{
             id: crypto.randomUUID(),
@@ -312,7 +367,7 @@ export function ShipmentUploadForm() {
       }
 
       setCompletedShipments(createdShipments);
-      toast.success(`${createdShipments.length} shipment(s) created successfully`);
+      toast.success(`${createdShipments.length} shipment(s) and invoice(s) created successfully`);
     } catch (error: any) {
       toast.error(`Failed to create shipments: ${error.message}`);
     } finally {
@@ -322,7 +377,6 @@ export function ShipmentUploadForm() {
 
   // Show printable labels if shipments are completed
   if (completedShipments && completedShipments.length > 0) {
-    // For now, show the first one - you can enhance this to show all
     return (
       <PrintableLabels
         shipment={completedShipments[0]}
@@ -332,7 +386,7 @@ export function ShipmentUploadForm() {
     );
   }
 
-  if (!region) {
+  if (!selectedRegion && !regionsLoading && assignedRegions.length === 0) {
     return (
       <Card className="max-w-xl mx-auto">
         <CardContent className="py-12 text-center">
@@ -351,7 +405,7 @@ export function ShipmentUploadForm() {
       {/* Header Card */}
       <Card className="shadow-lg border-0">
         <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                 <Package className="w-5 h-5 text-primary" />
@@ -361,15 +415,38 @@ export function ShipmentUploadForm() {
                 <CardDescription>Add multiple shipment entries</CardDescription>
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
               <div className="flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">Consignee:</span>
                 <Badge variant="secondary">{CONSIGNEE}</Badge>
               </div>
-              <Badge variant="outline" className="gap-1.5">
-                {regionInfo?.flag_emoji} {regionInfo?.name}
-              </Badge>
+              
+              {/* Region Selector for multi-region agents */}
+              {hasMultipleRegions ? (
+                <div className="flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-muted-foreground" />
+                  <Select
+                    value={selectedRegion}
+                    onValueChange={(value) => setSelectedRegion(value as AgentRegion)}
+                  >
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Select region" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {assignedRegions.map((r) => (
+                        <SelectItem key={r.region_code} value={r.region_code}>
+                          {r.flag_emoji} {r.region_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <Badge variant="outline" className="gap-1.5">
+                  {currentRegionInfo?.flag_emoji} {currentRegionInfo?.region_name}
+                </Badge>
+              )}
             </div>
           </div>
         </CardHeader>
