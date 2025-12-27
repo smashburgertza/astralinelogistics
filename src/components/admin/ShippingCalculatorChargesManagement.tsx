@@ -31,7 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Pencil, Trash2, Loader2, DollarSign, Percent, PoundSterling, Copy } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, DollarSign, Percent, PoundSterling, Copy, Ship, Plane } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   useShippingCalculatorCharges,
@@ -67,6 +67,8 @@ interface ChargeFormData {
   display_order: number;
   region: AgentRegion;
   currency: string;
+  cargo_type: 'sea' | 'air';
+  service_type: 'door_to_door' | 'airport_to_airport' | null;
 }
 
 export function ShippingCalculatorChargesManagement() {
@@ -76,6 +78,8 @@ export function ShippingCalculatorChargesManagement() {
   const updateCharge = useUpdateShippingCalculatorCharge();
   const deleteCharge = useDeleteShippingCalculatorCharge();
 
+  const [cargoTypeTab, setCargoTypeTab] = useState<'sea' | 'air'>('sea');
+  const [airServiceTab, setAirServiceTab] = useState<'door_to_door' | 'airport_to_airport'>('door_to_door');
   const [selectedRegion, setSelectedRegion] = useState<AgentRegion>('usa');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCopyOpen, setIsCopyOpen] = useState(false);
@@ -94,6 +98,8 @@ export function ShippingCalculatorChargesManagement() {
     display_order: 0,
     region,
     currency: REGION_CURRENCIES[region],
+    cargo_type: cargoTypeTab,
+    service_type: cargoTypeTab === 'air' ? airServiceTab : null,
   });
 
   const [formData, setFormData] = useState<ChargeFormData>(getDefaultFormData('usa'));
@@ -103,7 +109,11 @@ export function ShippingCalculatorChargesManagement() {
   };
 
   const handleOpenCreate = () => {
-    setFormData(getDefaultFormData(selectedRegion));
+    setFormData({
+      ...getDefaultFormData(selectedRegion),
+      cargo_type: cargoTypeTab,
+      service_type: cargoTypeTab === 'air' ? airServiceTab : null,
+    });
     setIsCreateOpen(true);
   };
 
@@ -113,7 +123,7 @@ export function ShippingCalculatorChargesManagement() {
       return;
     }
 
-    const sourceCharges = charges?.filter(c => c.region === selectedRegion) || [];
+    const sourceCharges = getFilteredCharges();
     if (sourceCharges.length === 0) {
       toast.error('No charges to copy from this region');
       return;
@@ -133,6 +143,8 @@ export function ShippingCalculatorChargesManagement() {
         display_order: charge.display_order,
         region: copyTargetRegion,
         currency: targetCurrency,
+        cargo_type: charge.cargo_type,
+        service_type: charge.service_type,
       }));
 
       const { error } = await supabase
@@ -220,6 +232,8 @@ export function ShippingCalculatorChargesManagement() {
       display_order: charge.display_order,
       region: charge.region,
       currency: charge.currency,
+      cargo_type: charge.cargo_type,
+      service_type: charge.service_type,
     });
   };
 
@@ -233,6 +247,17 @@ export function ShippingCalculatorChargesManagement() {
     ) : (
       <DollarSign className="h-4 w-4 text-muted-foreground" />
     );
+  };
+
+  const getFilteredCharges = () => {
+    if (!charges) return [];
+    
+    return charges.filter(c => {
+      if (c.region !== selectedRegion) return false;
+      if (c.cargo_type !== cargoTypeTab) return false;
+      if (cargoTypeTab === 'air' && c.service_type !== airServiceTab) return false;
+      return true;
+    });
   };
 
   const ChargeForm = ({ onSubmit, isSubmitting }: { onSubmit: () => void; isSubmitting: boolean }) => {
@@ -357,7 +382,17 @@ export function ShippingCalculatorChargesManagement() {
     );
   };
 
-  const regionCharges = charges?.filter(c => c.region === selectedRegion) || [];
+  const filteredCharges = getFilteredCharges();
+
+  const getChargeCount = (cargoType: 'sea' | 'air', serviceType?: 'door_to_door' | 'airport_to_airport') => {
+    if (!charges) return 0;
+    return charges.filter(c => {
+      if (c.region !== selectedRegion) return false;
+      if (c.cargo_type !== cargoType) return false;
+      if (cargoType === 'air' && serviceType && c.service_type !== serviceType) return false;
+      return true;
+    }).length;
+  };
 
   if (isLoading) {
     return (
@@ -373,6 +408,101 @@ export function ShippingCalculatorChargesManagement() {
     );
   }
 
+  const renderChargesTable = () => {
+    if (filteredCharges.length === 0) {
+      const tabLabel = cargoTypeTab === 'sea' 
+        ? 'Sea Cargo' 
+        : airServiceTab === 'door_to_door' 
+          ? 'Air Cargo (Door to Door)' 
+          : 'Air Cargo (Airport to Airport)';
+      return (
+        <div className="text-center py-8 text-muted-foreground border rounded-lg">
+          <p>No charges configured for {REGION_LABELS[selectedRegion]} - {tabLabel}.</p>
+          <p className="text-sm mt-1">Click "Create Charge" to add fees in {REGION_CURRENCIES[selectedRegion]}.</p>
+        </div>
+      );
+    }
+
+    return (
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead>Type</TableHead>
+            <TableHead>Value</TableHead>
+            <TableHead>Applies To</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filteredCharges.map((charge) => (
+            <TableRow key={charge.id}>
+              <TableCell>
+                <div>
+                  <p className="font-medium">{charge.charge_name}</p>
+                  <p className="text-xs text-muted-foreground">{charge.charge_key}</p>
+                </div>
+              </TableCell>
+              <TableCell>
+                <div className="flex items-center gap-1">
+                  {charge.charge_type === 'fixed' ? (
+                    <CurrencyIcon currency={charge.currency} />
+                  ) : (
+                    <Percent className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  <span className="capitalize">{charge.charge_type}</span>
+                </div>
+              </TableCell>
+              <TableCell>
+                {charge.charge_type === 'fixed' 
+                  ? `${getCurrencySymbol(charge.currency)}${charge.charge_value}` 
+                  : `${charge.charge_value}%`}
+              </TableCell>
+              <TableCell className="capitalize">
+                {charge.applies_to.replace(/_/g, ' ')}
+              </TableCell>
+              <TableCell>
+                <Switch
+                  checked={charge.is_active}
+                  onCheckedChange={() => handleToggleActive(charge)}
+                />
+              </TableCell>
+              <TableCell className="text-right">
+                <div className="flex justify-end gap-2">
+                  <Dialog open={editingCharge?.id === charge.id} onOpenChange={(open) => !open && setEditingCharge(null)}>
+                    <DialogTrigger asChild>
+                      <Button variant="ghost" size="icon" onClick={() => openEditDialog(charge)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Edit Charge</DialogTitle>
+                        <DialogDescription>
+                          Update the charge details for {REGION_LABELS[charge.region]}
+                        </DialogDescription>
+                      </DialogHeader>
+                      <ChargeForm onSubmit={handleUpdate} isSubmitting={updateCharge.isPending} />
+                    </DialogContent>
+                  </Dialog>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => handleDelete(charge.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    );
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -386,7 +516,7 @@ export function ShippingCalculatorChargesManagement() {
           <div className="flex gap-2">
             <Dialog open={isCopyOpen} onOpenChange={setIsCopyOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline" disabled={regionCharges.length === 0}>
+                <Button variant="outline" disabled={filteredCharges.length === 0}>
                   <Copy className="h-4 w-4 mr-2" />
                   Copy to Region
                 </Button>
@@ -395,7 +525,7 @@ export function ShippingCalculatorChargesManagement() {
                 <DialogHeader>
                   <DialogTitle>Copy Charges to Another Region</DialogTitle>
                   <DialogDescription>
-                    Copy all {regionCharges.length} charges from {REGION_LABELS[selectedRegion]} to another region. 
+                    Copy all {filteredCharges.length} charges from {REGION_LABELS[selectedRegion]} to another region. 
                     Values will be copied as-is but currency will be updated to match the target region.
                   </DialogDescription>
                 </DialogHeader>
@@ -420,7 +550,7 @@ export function ShippingCalculatorChargesManagement() {
                   </div>
                   {copyTargetRegion && (
                     <p className="text-sm text-muted-foreground">
-                      This will create {regionCharges.length} new charges in {REGION_LABELS[copyTargetRegion]} with {REGION_CURRENCIES[copyTargetRegion]} currency.
+                      This will create {filteredCharges.length} new charges in {REGION_LABELS[copyTargetRegion]} with {REGION_CURRENCIES[copyTargetRegion]} currency.
                     </p>
                   )}
                 </div>
@@ -448,7 +578,7 @@ export function ShippingCalculatorChargesManagement() {
                     Create New Charge for {REGION_LABELS[selectedRegion]}
                   </DialogTitle>
                   <DialogDescription>
-                    Add a new charge in {REGION_CURRENCIES[selectedRegion]} for shipments from {REGION_LABELS[selectedRegion]}
+                    Add a new {cargoTypeTab === 'sea' ? 'Sea Cargo' : `Air Cargo (${airServiceTab === 'door_to_door' ? 'Door to Door' : 'Airport to Airport'})`} charge in {REGION_CURRENCIES[selectedRegion]}
                   </DialogDescription>
                 </DialogHeader>
                 <ChargeForm onSubmit={handleCreate} isSubmitting={createCharge.isPending} />
@@ -458,113 +588,142 @@ export function ShippingCalculatorChargesManagement() {
         </div>
       </CardHeader>
       <CardContent>
-        <Tabs value={selectedRegion} onValueChange={(v) => handleRegionChange(v as AgentRegion)}>
-          <TabsList className="mb-4 flex-wrap h-auto gap-1">
-            {REGIONS.map((region) => {
-              const count = charges?.filter(c => c.region === region).length || 0;
-              return (
-                <TabsTrigger key={region} value={region} className="gap-2">
-                  {REGION_LABELS[region]}
-                  <Badge variant="secondary" className="text-xs">
-                    {REGION_CURRENCIES[region]}
-                  </Badge>
-                  {count > 0 && (
-                    <Badge variant="outline" className="text-xs ml-1">
-                      {count}
+        {/* Cargo Type Tabs */}
+        <Tabs value={cargoTypeTab} onValueChange={(v) => setCargoTypeTab(v as 'sea' | 'air')} className="mb-4">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="sea" className="flex items-center gap-2">
+              <Ship className="h-4 w-4" />
+              Sea Cargo
+              {getChargeCount('sea') > 0 && (
+                <Badge variant="secondary" className="text-xs ml-1">
+                  {getChargeCount('sea')}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="air" className="flex items-center gap-2">
+              <Plane className="h-4 w-4" />
+              Air Cargo
+              {(getChargeCount('air', 'door_to_door') + getChargeCount('air', 'airport_to_airport')) > 0 && (
+                <Badge variant="secondary" className="text-xs ml-1">
+                  {getChargeCount('air', 'door_to_door') + getChargeCount('air', 'airport_to_airport')}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="sea" className="mt-4">
+            {/* Region Tabs for Sea */}
+            <Tabs value={selectedRegion} onValueChange={(v) => handleRegionChange(v as AgentRegion)}>
+              <TabsList className="mb-4 flex-wrap h-auto gap-1">
+                {REGIONS.map((region) => {
+                  const count = charges?.filter(c => c.region === region && c.cargo_type === 'sea').length || 0;
+                  return (
+                    <TabsTrigger key={region} value={region} className="gap-2">
+                      {REGION_LABELS[region]}
+                      <Badge variant="secondary" className="text-xs">
+                        {REGION_CURRENCIES[region]}
+                      </Badge>
+                      {count > 0 && (
+                        <Badge variant="outline" className="text-xs ml-1">
+                          {count}
+                        </Badge>
+                      )}
+                    </TabsTrigger>
+                  );
+                })}
+              </TabsList>
+
+              {REGIONS.map((region) => (
+                <TabsContent key={region} value={region}>
+                  {renderChargesTable()}
+                </TabsContent>
+              ))}
+            </Tabs>
+          </TabsContent>
+
+          <TabsContent value="air" className="mt-4">
+            {/* Air Service Type Sub-tabs */}
+            <Tabs value={airServiceTab} onValueChange={(v) => setAirServiceTab(v as 'door_to_door' | 'airport_to_airport')} className="mb-4">
+              <TabsList className="grid w-full max-w-md grid-cols-2">
+                <TabsTrigger value="door_to_door">
+                  Door to Door
+                  {getChargeCount('air', 'door_to_door') > 0 && (
+                    <Badge variant="secondary" className="text-xs ml-2">
+                      {getChargeCount('air', 'door_to_door')}
                     </Badge>
                   )}
                 </TabsTrigger>
-              );
-            })}
-          </TabsList>
+                <TabsTrigger value="airport_to_airport">
+                  Airport to Airport
+                  {getChargeCount('air', 'airport_to_airport') > 0 && (
+                    <Badge variant="secondary" className="text-xs ml-2">
+                      {getChargeCount('air', 'airport_to_airport')}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+              </TabsList>
 
-          {REGIONS.map((region) => (
-            <TabsContent key={region} value={region}>
-              {regionCharges.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Value</TableHead>
-                      <TableHead>Applies To</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {regionCharges.map((charge) => (
-                      <TableRow key={charge.id}>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{charge.charge_name}</p>
-                            <p className="text-xs text-muted-foreground">{charge.charge_key}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            {charge.charge_type === 'fixed' ? (
-                              <CurrencyIcon currency={charge.currency} />
-                            ) : (
-                              <Percent className="h-4 w-4 text-muted-foreground" />
-                            )}
-                            <span className="capitalize">{charge.charge_type}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {charge.charge_type === 'fixed' 
-                            ? `${getCurrencySymbol(charge.currency)}${charge.charge_value}` 
-                            : `${charge.charge_value}%`}
-                        </TableCell>
-                        <TableCell className="capitalize">
-                          {charge.applies_to.replace(/_/g, ' ')}
-                        </TableCell>
-                        <TableCell>
-                          <Switch
-                            checked={charge.is_active}
-                            onCheckedChange={() => handleToggleActive(charge)}
-                          />
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Dialog open={editingCharge?.id === charge.id} onOpenChange={(open) => !open && setEditingCharge(null)}>
-                              <DialogTrigger asChild>
-                                <Button variant="ghost" size="icon" onClick={() => openEditDialog(charge)}>
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                              </DialogTrigger>
-                              <DialogContent>
-                                <DialogHeader>
-                                  <DialogTitle>Edit Charge</DialogTitle>
-                                  <DialogDescription>
-                                    Update the charge details for {REGION_LABELS[charge.region]}
-                                  </DialogDescription>
-                                </DialogHeader>
-                                <ChargeForm onSubmit={handleUpdate} isSubmitting={updateCharge.isPending} />
-                              </DialogContent>
-                            </Dialog>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-destructive hover:text-destructive"
-                              onClick={() => handleDelete(charge.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground border rounded-lg">
-                  <p>No charges configured for {REGION_LABELS[region]}.</p>
-                  <p className="text-sm mt-1">Click "Create Charge" to add fees in {REGION_CURRENCIES[region]}.</p>
-                </div>
-              )}
-            </TabsContent>
-          ))}
+              <TabsContent value="door_to_door" className="mt-4">
+                {/* Region Tabs for Air - Door to Door */}
+                <Tabs value={selectedRegion} onValueChange={(v) => handleRegionChange(v as AgentRegion)}>
+                  <TabsList className="mb-4 flex-wrap h-auto gap-1">
+                    {REGIONS.map((region) => {
+                      const count = charges?.filter(c => c.region === region && c.cargo_type === 'air' && c.service_type === 'door_to_door').length || 0;
+                      return (
+                        <TabsTrigger key={region} value={region} className="gap-2">
+                          {REGION_LABELS[region]}
+                          <Badge variant="secondary" className="text-xs">
+                            {REGION_CURRENCIES[region]}
+                          </Badge>
+                          {count > 0 && (
+                            <Badge variant="outline" className="text-xs ml-1">
+                              {count}
+                            </Badge>
+                          )}
+                        </TabsTrigger>
+                      );
+                    })}
+                  </TabsList>
+
+                  {REGIONS.map((region) => (
+                    <TabsContent key={region} value={region}>
+                      {renderChargesTable()}
+                    </TabsContent>
+                  ))}
+                </Tabs>
+              </TabsContent>
+
+              <TabsContent value="airport_to_airport" className="mt-4">
+                {/* Region Tabs for Air - Airport to Airport */}
+                <Tabs value={selectedRegion} onValueChange={(v) => handleRegionChange(v as AgentRegion)}>
+                  <TabsList className="mb-4 flex-wrap h-auto gap-1">
+                    {REGIONS.map((region) => {
+                      const count = charges?.filter(c => c.region === region && c.cargo_type === 'air' && c.service_type === 'airport_to_airport').length || 0;
+                      return (
+                        <TabsTrigger key={region} value={region} className="gap-2">
+                          {REGION_LABELS[region]}
+                          <Badge variant="secondary" className="text-xs">
+                            {REGION_CURRENCIES[region]}
+                          </Badge>
+                          {count > 0 && (
+                            <Badge variant="outline" className="text-xs ml-1">
+                              {count}
+                            </Badge>
+                          )}
+                        </TabsTrigger>
+                      );
+                    })}
+                  </TabsList>
+
+                  {REGIONS.map((region) => (
+                    <TabsContent key={region} value={region}>
+                      {renderChargesTable()}
+                    </TabsContent>
+                  ))}
+                </Tabs>
+              </TabsContent>
+            </Tabs>
+          </TabsContent>
         </Tabs>
       </CardContent>
     </Card>

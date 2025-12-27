@@ -1640,6 +1640,7 @@ export type Database = {
       shipping_calculator_charges: {
         Row: {
           applies_to: string
+          cargo_type: string
           charge_key: string
           charge_name: string
           charge_type: string
@@ -1652,10 +1653,12 @@ export type Database = {
           is_active: boolean
           region: Database["public"]["Enums"]["agent_region"]
           region_id: string | null
+          service_type: string | null
           updated_at: string | null
         }
         Insert: {
           applies_to?: string
+          cargo_type?: string
           charge_key: string
           charge_name: string
           charge_type?: string
@@ -1668,10 +1671,12 @@ export type Database = {
           is_active?: boolean
           region?: Database["public"]["Enums"]["agent_region"]
           region_id?: string | null
+          service_type?: string | null
           updated_at?: string | null
         }
         Update: {
           applies_to?: string
+          cargo_type?: string
           charge_key?: string
           charge_name?: string
           charge_type?: string
@@ -1684,6 +1689,7 @@ export type Database = {
           is_active?: boolean
           region?: Database["public"]["Enums"]["agent_region"]
           region_id?: string | null
+          service_type?: string | null
           updated_at?: string | null
         }
         Relationships: [
