@@ -55,6 +55,8 @@ const mainNavItems = [
 const financeNavItems = [
   { label: 'Accounting', href: '/admin/accounting', icon: Calculator },
   { label: 'Financial Summary', href: '/admin/financial-summary', icon: PiggyBank },
+  { label: 'Batch Profitability', href: '/admin/batches', icon: Container },
+  { label: 'Settlements', href: '/admin/settlements', icon: TrendingUp },
   { label: 'Expenses', href: '/admin/expenses', icon: Wallet },
   { label: 'Commissions', href: '/admin/commissions', icon: TrendingUp },
   { label: 'Reports', href: '/admin/reports', icon: ChartSpline },

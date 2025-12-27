@@ -51,9 +51,9 @@ import { toast } from 'sonner';
 import { PrintableLabels } from './PrintableLabels';
 import { useGetOrCreateBatch } from '@/hooks/useCargoBatches';
 import { Database } from '@/integrations/supabase/types';
+import { BillingPartyType, BILLING_PARTIES } from '@/lib/billingParty';
 
 type AgentRegion = Database['public']['Enums']['agent_region'];
-type ShipmentOwnerType = 'astraline' | 'agent';
 
 // Generate a unique barcode for each parcel
 const generateBarcode = () => {
@@ -238,8 +238,8 @@ export function ShipmentUploadForm() {
   // State for selected region (for multi-region agents)
   const [selectedRegion, setSelectedRegion] = useState<AgentRegion | undefined>(defaultRegion);
   
-  // Shipment ownership and routing state
-  const [shipmentOwner, setShipmentOwner] = useState<ShipmentOwnerType>('astraline');
+  // Billing party and routing state
+  const [billingParty, setBillingParty] = useState<BillingPartyType>('customer_direct');
   const [transitPoint, setTransitPoint] = useState<TransitPointType>('direct');
   
   // Agent-defined pricing
@@ -343,7 +343,7 @@ export function ShipmentUploadForm() {
   const resetForm = () => {
     setCompletedShipments(null);
     setLines([{ id: crypto.randomUUID(), customer_id: '', customer_name: '', description: '', weight_kg: 0 }]);
-    setShipmentOwner('astraline');
+    setBillingParty('customer_direct');
     setTransitPoint('direct');
     setRatePerKg(0);
   };
@@ -401,8 +401,10 @@ export function ShipmentUploadForm() {
             agent_id: user?.id,
             tracking_number: '',
             batch_id: batchId,
-            shipment_owner: shipmentOwner,
+            billing_party: billingParty,
             transit_point: transitPoint,
+            rate_per_kg: ratePerKg,
+            total_revenue: lineAmount,
           })
           .select()
           .single();
@@ -420,17 +422,17 @@ export function ShipmentUploadForm() {
 
         if (parcelError) throw parcelError;
 
-        // Determine invoice direction based on shipment owner
-        // If agent's shipment: Astraline invoices the agent (from_agent direction)
-        // If Astraline's shipment: Agent invoices Astraline (to_agent direction)
-        const invoiceDirection = shipmentOwner === 'agent' ? 'from_agent' : 'to_agent';
+        // Determine invoice direction based on billing party
+        // customer_direct: Astraline invoices customer directly, agent gets commission
+        // agent_collect: Agent collects from customer, settles with Astraline
+        const invoiceDirection = billingParty === 'agent_collect' ? 'from_agent' : 'to_agent';
         
         // Create invoice
         const invoiceNumber = generateInvoiceNumber();
         const transitLabel = transitPoint !== 'direct' ? ` (${TRANSIT_POINT_LABELS[transitPoint]})` : '';
-        const ownerLabel = shipmentOwner === 'agent' ? 'Agent customer' : 'Astraline';
+        const billingLabel = BILLING_PARTIES[billingParty].label;
         
-        const { error: invoiceError } = await supabase
+        const { data: invoice, error: invoiceError } = await supabase
           .from('invoices')
           .insert({
             invoice_number: invoiceNumber,
@@ -444,8 +446,35 @@ export function ShipmentUploadForm() {
             agent_id: user?.id,
             invoice_direction: invoiceDirection,
             rate_per_kg: ratePerKg,
-            notes: `${ownerLabel} shipment from ${currentRegionInfo?.region_name || selectedRegion}${transitLabel}. Weight: ${line.weight_kg}kg @ ${currencySymbol}${ratePerKg}/kg`,
-          });
+            notes: `${billingLabel} shipment from ${currentRegionInfo?.region_name || selectedRegion}${transitLabel}. Weight: ${line.weight_kg}kg @ ${currencySymbol}${ratePerKg}/kg`,
+          })
+          .select()
+          .single();
+
+        // Create invoice line items for itemized charges
+        if (invoice) {
+          await supabase.from('invoice_items').insert([
+            {
+              invoice_id: invoice.id,
+              item_type: 'shipping',
+              description: `Shipping ${line.weight_kg}kg @ ${currencySymbol}${ratePerKg}/kg`,
+              quantity: line.weight_kg,
+              unit_price: ratePerKg,
+              weight_kg: line.weight_kg,
+              amount: line.weight_kg * ratePerKg,
+              currency: currency,
+            },
+            ...(transitAdditionalCost > 0 ? [{
+              invoice_id: invoice.id,
+              item_type: 'transit_fee',
+              description: `Transit via ${TRANSIT_POINT_LABELS[transitPoint]}`,
+              quantity: 1,
+              unit_price: transitAdditionalCost,
+              amount: transitAdditionalCost,
+              currency: currency,
+            }] : []),
+          ]);
+        }
 
         if (invoiceError) {
           console.error('Failed to create invoice:', invoiceError);
@@ -588,26 +617,26 @@ export function ShipmentUploadForm() {
               </div>
             </div>
 
-            {/* Shipment Owner Selection */}
+            {/* Billing Party Selection */}
             <div className="space-y-3">
-              <Label className="text-sm font-medium">Shipment For</Label>
+              <Label className="text-sm font-medium">Billing Type</Label>
               <RadioGroup
-                value={shipmentOwner}
-                onValueChange={(value) => setShipmentOwner(value as ShipmentOwnerType)}
-                className="flex gap-4"
+                value={billingParty}
+                onValueChange={(value) => setBillingParty(value as BillingPartyType)}
+                className="flex flex-col gap-2"
               >
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="astraline" id="owner-astraline" />
-                  <Label htmlFor="owner-astraline" className="cursor-pointer">
-                    <span className="font-medium">Astraline</span>
-                    <span className="text-xs text-muted-foreground ml-1">(We pay you)</span>
+                  <RadioGroupItem value="customer_direct" id="billing-customer" />
+                  <Label htmlFor="billing-customer" className="cursor-pointer">
+                    <span className="font-medium">Customer Direct</span>
+                    <span className="text-xs text-muted-foreground ml-1">(We invoice customer)</span>
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="agent" id="owner-agent" />
-                  <Label htmlFor="owner-agent" className="cursor-pointer">
-                    <span className="font-medium">My Customer</span>
-                    <span className="text-xs text-muted-foreground ml-1">(You pay us)</span>
+                  <RadioGroupItem value="agent_collect" id="billing-agent" />
+                  <Label htmlFor="billing-agent" className="cursor-pointer">
+                    <span className="font-medium">Agent Collect</span>
+                    <span className="text-xs text-muted-foreground ml-1">(You collect & settle)</span>
                   </Label>
                 </div>
               </RadioGroup>
