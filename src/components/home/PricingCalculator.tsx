@@ -12,6 +12,9 @@ import { useScrollAnimation } from '@/hooks/useScrollAnimation';
 import { useVehicleDutyRates } from '@/hooks/useVehicleDutyRates';
 import { useDeliveryTimes } from '@/hooks/useDeliveryTimes';
 import { useActiveRegions } from '@/hooks/useRegions';
+import { useRegionPricing } from '@/hooks/useRegionPricing';
+import { useContainerPricing } from '@/hooks/useContainerPricing';
+import { useVehiclePricing } from '@/hooks/useVehiclePricing';
 import { InlineAuthGate } from '@/components/auth/InlineAuthGate';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -98,11 +101,40 @@ export function PricingCalculator() {
   const [airRegionId, setAirRegionId] = useState<string>('');
   const [airWeight, setAirWeight] = useState<string>('');
   
-  // Pricing data
-  const [pricing, setPricing] = useState<RegionPricing[]>([]);
-  const [containerPricing, setContainerPricing] = useState<ContainerPricing[]>([]);
-  const [vehiclePricing, setVehiclePricing] = useState<VehiclePricing[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Pricing data from React Query hooks (auto-refreshes)
+  const { data: regionPricingData, isLoading: regionPricingLoading } = useRegionPricing();
+  const { containerPricing: containerPricingData, isLoading: containerPricingLoading } = useContainerPricing();
+  const { vehiclePricing: vehiclePricingData, isLoading: vehiclePricingLoading } = useVehiclePricing();
+
+  // Map to expected formats
+  const pricing = (regionPricingData || []).map(p => ({
+    region: p.region,
+    region_id: p.region_id,
+    customer_rate_per_kg: p.customer_rate_per_kg,
+    handling_fee: p.handling_fee,
+    currency: p.currency,
+  })) as RegionPricing[];
+  
+  const containerPricing = (containerPricingData || []).map(p => ({
+    id: p.id,
+    container_size: p.container_size as '20ft' | '40ft',
+    region: p.region,
+    region_id: (p as any).region_id || null,
+    price: p.price,
+    currency: p.currency,
+  })) as ContainerPricing[];
+  
+  const vehiclePricing = (vehiclePricingData || []).map(p => ({
+    id: p.id,
+    vehicle_type: p.vehicle_type as VehicleInfo['vehicle_type'],
+    shipping_method: p.shipping_method as 'roro' | 'container',
+    region: p.region,
+    region_id: p.region_id,
+    price: p.price,
+    currency: p.currency,
+  })) as VehiclePricing[];
+
+  const loading = regionPricingLoading || containerPricingLoading || vehiclePricingLoading;
 
   // Dynamic regions from database
   const { data: regions, isLoading: regionsLoading } = useActiveRegions();
@@ -123,23 +155,6 @@ export function PricingCalculator() {
       setAirRegionId(defaultRegion.id);
     }
   }, [regions, looseRegionId]);
-
-  useEffect(() => {
-    fetchAllPricing();
-  }, []);
-
-  const fetchAllPricing = async () => {
-    const [regionData, containerData, vehicleData] = await Promise.all([
-      supabase.from('region_pricing').select('region, region_id, customer_rate_per_kg, handling_fee, currency'),
-      supabase.from('container_pricing').select('*'),
-      supabase.from('vehicle_pricing').select('*'),
-    ]);
-    
-    if (regionData.data) setPricing(regionData.data as RegionPricing[]);
-    if (containerData.data) setContainerPricing(containerData.data as ContainerPricing[]);
-    if (vehicleData.data) setVehiclePricing(vehicleData.data as VehiclePricing[]);
-    setLoading(false);
-  };
 
   // Loose cargo calculations
   const loosePricing = pricing.find(p => p.region_id === looseRegionId);

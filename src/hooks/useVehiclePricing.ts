@@ -33,6 +33,8 @@ export function useVehiclePricing() {
       if (error) throw error;
       return data as VehiclePricing[];
     },
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: true,
   });
 
   const updatePricing = useMutation({

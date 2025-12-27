@@ -17,6 +17,8 @@ export function useRegionPricing() {
       if (error) throw error;
       return data as RegionPricing[];
     },
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -48,6 +50,8 @@ export function useAgentAddresses() {
       if (error) throw error;
       return data as AgentAddress[];
     },
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: true,
   });
 }
 

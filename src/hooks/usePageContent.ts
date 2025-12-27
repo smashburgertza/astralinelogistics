@@ -35,6 +35,8 @@ export function usePageContent(sectionKey?: string) {
         return data as PageContent[];
       }
     },
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: true,
   });
 }
 
