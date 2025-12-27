@@ -31,7 +31,7 @@ import { useShopForMeCharges, calculateShopForMeCharges } from '@/hooks/useShopF
 import { useDeliveryTimes } from '@/hooks/useDeliveryTimes';
 import { useAuth } from '@/hooks/useAuth';
 import { InlineAuthGate } from '@/components/auth/InlineAuthGate';
-import { REGIONS, type Region } from '@/lib/constants';
+import { useActiveRegions, regionsToMap } from '@/hooks/useRegions';
 
 type LoadingStep = 'fetching' | 'extracting' | 'analyzing' | 'complete' | 'error';
 
@@ -48,8 +48,8 @@ interface ProductItem {
   isLoading: boolean;
   loadingStep?: LoadingStep;
   error?: string;
-  originRegion?: Region;
-  detectedRegion?: Region;
+  originRegion?: string;
+  detectedRegion?: string;
   isRegionConfirmed?: boolean;
   isPriceManual?: boolean;
   isWeightManual?: boolean;
@@ -64,7 +64,7 @@ interface CustomerDetails {
 
 interface RegionConfirmDialogData {
   itemId: string;
-  detectedRegion: Region;
+  detectedRegion: string;
   productName: string;
 }
 
@@ -84,7 +84,7 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
   const [newUrl, setNewUrl] = useState('');
   const [isAddingUrl, setIsAddingUrl] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedRegion, setSelectedRegion] = useState<Region>('usa');
+  const [selectedRegion, setSelectedRegion] = useState<string>('usa');
   const [regionConfirmDialog, setRegionConfirmDialog] = useState<RegionConfirmDialogData | null>(null);
   const [customerDetails, setCustomerDetails] = useState<CustomerDetails>({
     name: '',
@@ -97,9 +97,20 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
   const { data: exchangeRates } = useExchangeRates();
   const { data: charges } = useShopForMeCharges();
   const { times: deliveryTimes } = useDeliveryTimes();
+  const { data: regions } = useActiveRegions();
+  const regionsMap = regionsToMap(regions);
+
+  // Get currency for a region
+  const getRegionCurrency = (regionCode: string) => {
+    // Use EUR for europe, GBP for UK, USD for others
+    if (regionCode === 'europe') return 'EUR';
+    if (regionCode === 'uk') return 'GBP';
+    return 'USD';
+  };
+
 
   // Get shipping rate for selected region
-  const getShippingRate = (region: Region) => {
+  const getShippingRate = (region: string) => {
     const pricing = regionPricing?.find(r => r.region === region);
     return pricing?.customer_rate_per_kg ?? 8;
   };
@@ -136,7 +147,7 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
       throw new Error(response.error.message);
     }
 
-    const detectedRegion = response.data.origin_region as Region | undefined;
+    const detectedRegion = response.data.origin_region as string | undefined;
     
     return {
       productName: response.data.product_name || 'Unknown Product',
@@ -215,7 +226,7 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
           productName: productInfo.productName || 'this product',
         });
       } else {
-        const regionLabel = productInfo.originRegion ? REGIONS[productInfo.originRegion]?.label : null;
+        const regionLabel = productInfo.originRegion ? regionsMap[productInfo.originRegion]?.name : null;
         toast.success(regionLabel 
           ? `Product added from ${regionLabel}` 
           : 'Product info fetched successfully'
@@ -309,7 +320,7 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
     );
     
     const finalRegion = useDetected ? detectedRegion : items.find(i => i.id === itemId)?.originRegion;
-    toast.success(`Region set to ${REGIONS[finalRegion || 'usa']?.label}`);
+    toast.success(`Region set to ${regionsMap[finalRegion || 'usa']?.name || finalRegion}`);
     setRegionConfirmDialog(null);
   };
 
@@ -326,7 +337,7 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
     );
   };
 
-  const handleRegionChange = (id: string, region: Region) => {
+  const handleRegionChange = (id: string, region: string) => {
     setItems(prev =>
       prev.map(item =>
         item.id === id ? { ...item, originRegion: region, isRegionConfirmed: true } : item
@@ -368,10 +379,10 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
       if (!acc[region]) acc[region] = [];
       acc[region].push(item);
       return acc;
-    }, {} as Record<Region, ProductItem[]>);
+    }, {} as Record<string, ProductItem[]>);
 
     const regionBreakdowns: {
-      region: Region;
+      region: string;
       currency: string;
       productCost: number;
       weight: number;
@@ -385,8 +396,8 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
     let grandTotalInTZS = 0;
 
     Object.entries(itemsByRegion).forEach(([region, regionItems]) => {
-      const regionKey = region as Region;
-      const currency = REGIONS[regionKey]?.currency || 'USD';
+      const regionKey = region;
+      const currency = getRegionCurrency(regionKey);
       const shippingRate = getShippingRate(regionKey);
       const exchangeRate = getExchangeRate(currency);
 
@@ -562,22 +573,22 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
             </DialogTitle>
             <DialogDescription>
               We detected that <strong>{regionConfirmDialog?.productName}</strong> is from{' '}
-              <strong>{regionConfirmDialog?.detectedRegion && REGIONS[regionConfirmDialog.detectedRegion]?.label}</strong>.
+              <strong>{regionConfirmDialog?.detectedRegion && regionsMap[regionConfirmDialog.detectedRegion]?.name}</strong>.
               This affects shipping rates and currency.
             </DialogDescription>
           </DialogHeader>
           <div className="flex gap-3 py-4">
             <Card className="flex-1 p-4 border-2 border-primary cursor-pointer hover:bg-primary/5 transition-colors" onClick={() => handleConfirmRegion(true)}>
               <div className="text-center">
-                <span className="text-3xl">{regionConfirmDialog?.detectedRegion && REGIONS[regionConfirmDialog.detectedRegion]?.flag}</span>
-                <p className="font-semibold mt-2">{regionConfirmDialog?.detectedRegion && REGIONS[regionConfirmDialog.detectedRegion]?.label}</p>
+                <span className="text-3xl">{regionConfirmDialog?.detectedRegion && regionsMap[regionConfirmDialog.detectedRegion]?.flag_emoji}</span>
+                <p className="font-semibold mt-2">{regionConfirmDialog?.detectedRegion && regionsMap[regionConfirmDialog.detectedRegion]?.name}</p>
                 <p className="text-xs text-muted-foreground">Detected</p>
               </div>
             </Card>
             <Card className="flex-1 p-4 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleConfirmRegion(false)}>
               <div className="text-center">
-                <span className="text-3xl">{REGIONS[selectedRegion]?.flag}</span>
-                <p className="font-semibold mt-2">{REGIONS[selectedRegion]?.label}</p>
+                <span className="text-3xl">{regionsMap[selectedRegion]?.flag_emoji}</span>
+                <p className="font-semibold mt-2">{regionsMap[selectedRegion]?.name}</p>
                 <p className="text-xs text-muted-foreground">Selected</p>
               </div>
             </Card>
@@ -601,14 +612,14 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label>Default Origin Region</Label>
-            <Select value={selectedRegion} onValueChange={(v: Region) => setSelectedRegion(v)}>
+            <Select value={selectedRegion} onValueChange={(v: string) => setSelectedRegion(v)}>
               <SelectTrigger className="w-full md:w-64">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {Object.entries(REGIONS).map(([key, { label, flag }]) => (
-                  <SelectItem key={key} value={key}>
-                    {flag} {label}
+                {(regions || []).map((region) => (
+                  <SelectItem key={region.code} value={region.code}>
+                    {region.flag_emoji} {region.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -732,7 +743,7 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
                         <div className="flex items-center gap-2">
                           <Label className="text-sm font-medium whitespace-nowrap">Price:</Label>
                           <div className="flex items-center gap-1">
-                            <span className="text-sm text-muted-foreground">{REGIONS[item.originRegion || selectedRegion]?.currency || 'USD'}</span>
+                            <span className="text-sm text-muted-foreground">{getRegionCurrency(item.originRegion || selectedRegion)}</span>
                             <Input
                               type="number"
                               value={item.productPrice ?? ''}
@@ -782,15 +793,15 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
                           <Label className="text-sm">From:</Label>
                           <Select 
                             value={item.originRegion || selectedRegion} 
-                            onValueChange={(v: Region) => handleRegionChange(item.id, v)}
+                            onValueChange={(v: string) => handleRegionChange(item.id, v)}
                           >
                             <SelectTrigger className="w-36 h-8">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {Object.entries(REGIONS).map(([key, { label, flag }]) => (
-                                <SelectItem key={key} value={key}>
-                                  {flag} {label}
+                              {(regions || []).map((region) => (
+                                <SelectItem key={region.code} value={region.code}>
+                                  {region.flag_emoji} {region.name}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -884,8 +895,8 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
                     <div key={regionData.region} className="space-y-2">
                       {!totals.isSingleRegion && (
                         <div className="flex items-center gap-2 font-medium text-sm bg-muted/50 px-3 py-2 rounded-md -mx-1">
-                          <span>{REGIONS[regionData.region]?.flag}</span>
-                          <span>{REGIONS[regionData.region]?.label}</span>
+                          <span>{regionsMap[regionData.region]?.flag_emoji}</span>
+                          <span>{regionsMap[regionData.region]?.name}</span>
                           <span className="text-muted-foreground">({regionData.currency})</span>
                         </div>
                       )}

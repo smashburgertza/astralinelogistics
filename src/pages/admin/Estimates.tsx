@@ -67,7 +67,8 @@ import {
 import { useCustomers, useShipments } from '@/hooks/useShipments';
 import { useRegionPricing } from '@/hooks/useRegionPricing';
 import { useExchangeRates, convertToTZS } from '@/hooks/useExchangeRates';
-import { REGIONS, CURRENCY_SYMBOLS } from '@/lib/constants';
+import { CURRENCY_SYMBOLS } from '@/lib/constants';
+import { useActiveRegions, regionsToMap } from '@/hooks/useRegions';
 
 const estimateSchema = z.object({
   estimate_type: z.enum(['shipping', 'purchase_shipping']).default('shipping'),
@@ -99,6 +100,8 @@ export default function EstimatesPage() {
   const { data: shipments } = useShipments();
   const { data: pricing } = useRegionPricing();
   const { data: exchangeRates } = useExchangeRates();
+  const { data: regions } = useActiveRegions();
+  const regionsMap = regionsToMap(regions);
   const createEstimate = useCreateEstimate();
   const updateStatus = useUpdateEstimateStatus();
   const convertToInvoice = useConvertEstimateToInvoice();
@@ -337,9 +340,9 @@ export default function EstimatesPage() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {Object.entries(REGIONS).map(([key, value]) => (
-                                <SelectItem key={key} value={key}>
-                                  {value.flag} {value.label}
+                              {(regions || []).map((region) => (
+                                <SelectItem key={region.code} value={region.code}>
+                                  {region.flag_emoji} {region.name}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -584,7 +587,7 @@ export default function EstimatesPage() {
                         {estimate.customers?.name || '-'}
                       </TableCell>
                       <TableCell>
-                        {REGIONS[estimate.origin_region as keyof typeof REGIONS]?.label || estimate.origin_region}
+                        {regionsMap[estimate.origin_region]?.name || estimate.origin_region}
                       </TableCell>
                       <TableCell>{estimate.weight_kg} kg</TableCell>
                       <TableCell>
