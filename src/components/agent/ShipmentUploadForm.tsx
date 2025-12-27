@@ -121,32 +121,46 @@ function CustomerSelector({
   isLoading: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState('');
+  const [inputValue, setInputValue] = useState('');
 
   const filteredCustomers = useMemo(() => {
     if (!customers) return [];
-    if (!search) return customers.slice(0, 20); // Limit initial display
-    const searchLower = search.toLowerCase();
+    if (!inputValue) return customers.slice(0, 20);
+    const searchLower = inputValue.toLowerCase();
     return customers.filter(c => 
       c.name.toLowerCase().includes(searchLower) ||
       c.phone?.toLowerCase().includes(searchLower)
     ).slice(0, 20);
-  }, [customers, search]);
+  }, [customers, inputValue]);
 
   const selectedCustomer = customers?.find(c => c.id === value);
   const displayValue = selectedCustomer?.name || customerName || '';
 
-  // Handle typing in search - allow using the typed value as a new customer
-  const handleSelectNewName = () => {
-    if (search.trim()) {
-      onChange('', search.trim()); // Empty ID means new customer
+  // Handle input blur - use the typed value
+  const handleInputBlur = () => {
+    if (inputValue.trim() && inputValue !== displayValue) {
+      onChange('', inputValue.trim());
+    }
+    setInputValue('');
+  };
+
+  // Handle Enter key - use the typed value
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && inputValue.trim()) {
+      onChange('', inputValue.trim());
       setOpen(false);
-      setSearch('');
+      setInputValue('');
     }
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={(isOpen) => {
+      setOpen(isOpen);
+      if (!isOpen && inputValue.trim()) {
+        onChange('', inputValue.trim());
+        setInputValue('');
+      }
+    }}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -166,61 +180,48 @@ function CustomerSelector({
       <PopoverContent className="w-[280px] p-0" align="start">
         <Command shouldFilter={false}>
           <CommandInput 
-            placeholder="Search or type new name..." 
-            value={search}
-            onValueChange={setSearch}
+            placeholder="Search or type name..." 
+            value={inputValue}
+            onValueChange={setInputValue}
+            onBlur={handleInputBlur}
+            onKeyDown={handleKeyDown}
           />
           <CommandList>
             {isLoading ? (
               <div className="p-4 text-center">
                 <Loader2 className="w-4 h-4 animate-spin mx-auto" />
               </div>
+            ) : filteredCustomers.length === 0 ? (
+              <div className="p-3 text-sm text-muted-foreground text-center">
+                {inputValue ? `Press Enter to use "${inputValue}"` : 'No customers found. Type a name.'}
+              </div>
             ) : (
-              <>
-                {/* Option to use typed name as new customer */}
-                {search.trim() && !filteredCustomers.some(c => c.name.toLowerCase() === search.toLowerCase()) && (
-                  <CommandGroup heading="New Customer">
-                    <CommandItem
-                      value={`new-${search}`}
-                      onSelect={handleSelectNewName}
-                    >
-                      <Plus className="mr-2 h-4 w-4" />
-                      <span>Use "{search}"</span>
-                    </CommandItem>
-                  </CommandGroup>
-                )}
-                
-                {filteredCustomers.length === 0 && !search.trim() ? (
-                  <CommandEmpty>No customers found.</CommandEmpty>
-                ) : filteredCustomers.length > 0 && (
-                  <CommandGroup heading="Existing Customers">
-                    {filteredCustomers.map((customer) => (
-                      <CommandItem
-                        key={customer.id}
-                        value={customer.id}
-                        onSelect={() => {
-                          onChange(customer.id, customer.name);
-                          setOpen(false);
-                          setSearch('');
-                        }}
-                      >
-                        <Check
-                          className={cn(
-                            "mr-2 h-4 w-4",
-                            value === customer.id ? "opacity-100" : "opacity-0"
-                          )}
-                        />
-                        <div className="flex flex-col">
-                          <span className="font-medium">{customer.name}</span>
-                          {customer.phone && (
-                            <span className="text-xs text-muted-foreground">{customer.phone}</span>
-                          )}
-                        </div>
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                )}
-              </>
+              <CommandGroup>
+                {filteredCustomers.map((customer) => (
+                  <CommandItem
+                    key={customer.id}
+                    value={customer.id}
+                    onSelect={() => {
+                      onChange(customer.id, customer.name);
+                      setOpen(false);
+                      setInputValue('');
+                    }}
+                  >
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        value === customer.id ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                    <div className="flex flex-col">
+                      <span className="font-medium">{customer.name}</span>
+                      {customer.phone && (
+                        <span className="text-xs text-muted-foreground">{customer.phone}</span>
+                      )}
+                    </div>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
             )}
           </CommandList>
         </Command>
