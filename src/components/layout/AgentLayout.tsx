@@ -60,7 +60,7 @@ export function AgentLayout({ children, title, subtitle }: AgentLayoutProps) {
 
   const handleSignOut = async () => {
     await signOut();
-    navigate('/system-auth');
+    navigate('/system');
   };
 
   const isActive = (href: string) => location.pathname === href;
