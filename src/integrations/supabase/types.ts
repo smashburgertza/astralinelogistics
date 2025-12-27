@@ -923,6 +923,7 @@ export type Database = {
       }
       invoices: {
         Row: {
+          agent_id: string | null
           amount: number
           amount_in_tzs: number | null
           created_at: string | null
@@ -932,6 +933,9 @@ export type Database = {
           due_date: string | null
           estimate_id: string | null
           id: string
+          invoice_direction:
+            | Database["public"]["Enums"]["invoice_direction_type"]
+            | null
           invoice_number: string
           invoice_type: string
           notes: string | null
@@ -945,6 +949,7 @@ export type Database = {
           stripe_payment_id: string | null
         }
         Insert: {
+          agent_id?: string | null
           amount: number
           amount_in_tzs?: number | null
           created_at?: string | null
@@ -954,6 +959,9 @@ export type Database = {
           due_date?: string | null
           estimate_id?: string | null
           id?: string
+          invoice_direction?:
+            | Database["public"]["Enums"]["invoice_direction_type"]
+            | null
           invoice_number: string
           invoice_type?: string
           notes?: string | null
@@ -967,6 +975,7 @@ export type Database = {
           stripe_payment_id?: string | null
         }
         Update: {
+          agent_id?: string | null
           amount?: number
           amount_in_tzs?: number | null
           created_at?: string | null
@@ -976,6 +985,9 @@ export type Database = {
           due_date?: string | null
           estimate_id?: string | null
           id?: string
+          invoice_direction?:
+            | Database["public"]["Enums"]["invoice_direction_type"]
+            | null
           invoice_number?: string
           invoice_type?: string
           notes?: string | null
@@ -1573,9 +1585,15 @@ export type Database = {
           in_transit_at: string | null
           origin_region: Database["public"]["Enums"]["agent_region"]
           region_id: string | null
+          shipment_owner:
+            | Database["public"]["Enums"]["shipment_owner_type"]
+            | null
           status: Database["public"]["Enums"]["shipment_status"] | null
           total_weight_kg: number
           tracking_number: string
+          transit_point:
+            | Database["public"]["Enums"]["transit_point_type"]
+            | null
           updated_at: string | null
           warehouse_location: string | null
         }
@@ -1593,9 +1611,15 @@ export type Database = {
           in_transit_at?: string | null
           origin_region: Database["public"]["Enums"]["agent_region"]
           region_id?: string | null
+          shipment_owner?:
+            | Database["public"]["Enums"]["shipment_owner_type"]
+            | null
           status?: Database["public"]["Enums"]["shipment_status"] | null
           total_weight_kg: number
           tracking_number: string
+          transit_point?:
+            | Database["public"]["Enums"]["transit_point_type"]
+            | null
           updated_at?: string | null
           warehouse_location?: string | null
         }
@@ -1613,9 +1637,15 @@ export type Database = {
           in_transit_at?: string | null
           origin_region?: Database["public"]["Enums"]["agent_region"]
           region_id?: string | null
+          shipment_owner?:
+            | Database["public"]["Enums"]["shipment_owner_type"]
+            | null
           status?: Database["public"]["Enums"]["shipment_status"] | null
           total_weight_kg?: number
           tracking_number?: string
+          transit_point?:
+            | Database["public"]["Enums"]["transit_point_type"]
+            | null
           updated_at?: string | null
           warehouse_location?: string | null
         }
@@ -1818,6 +1848,53 @@ export type Database = {
         }
         Relationships: []
       }
+      transit_routes: {
+        Row: {
+          additional_cost: number | null
+          created_at: string | null
+          currency: string | null
+          estimated_days: number | null
+          id: string
+          is_active: boolean | null
+          notes: string | null
+          region_id: string
+          transit_point: Database["public"]["Enums"]["transit_point_type"]
+          updated_at: string | null
+        }
+        Insert: {
+          additional_cost?: number | null
+          created_at?: string | null
+          currency?: string | null
+          estimated_days?: number | null
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          region_id: string
+          transit_point: Database["public"]["Enums"]["transit_point_type"]
+          updated_at?: string | null
+        }
+        Update: {
+          additional_cost?: number | null
+          created_at?: string | null
+          currency?: string | null
+          estimated_days?: number | null
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          region_id?: string
+          transit_point?: Database["public"]["Enums"]["transit_point_type"]
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transit_routes_region_id_fkey"
+            columns: ["region_id"]
+            isOneToOne: false
+            referencedRelation: "regions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -1959,7 +2036,18 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      agent_balance_summary: {
+        Row: {
+          agent_id: string | null
+          agent_name: string | null
+          net_balance: number | null
+          paid_from_agent: number | null
+          paid_to_agent: number | null
+          pending_from_agent: number | null
+          pending_to_agent: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       generate_batch_number: { Args: never; Returns: string }
@@ -1997,7 +2085,10 @@ export type Database = {
     Enums: {
       agent_region: "europe" | "dubai" | "china" | "india" | "usa" | "uk"
       app_role: "super_admin" | "employee" | "agent" | "customer"
+      invoice_direction_type: "to_agent" | "from_agent"
+      shipment_owner_type: "astraline" | "agent"
       shipment_status: "collected" | "in_transit" | "arrived" | "delivered"
+      transit_point_type: "direct" | "nairobi" | "zanzibar"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2127,7 +2218,10 @@ export const Constants = {
     Enums: {
       agent_region: ["europe", "dubai", "china", "india", "usa", "uk"],
       app_role: ["super_admin", "employee", "agent", "customer"],
+      invoice_direction_type: ["to_agent", "from_agent"],
+      shipment_owner_type: ["astraline", "agent"],
       shipment_status: ["collected", "in_transit", "arrived", "delivered"],
+      transit_point_type: ["direct", "nairobi", "zanzibar"],
     },
   },
 } as const

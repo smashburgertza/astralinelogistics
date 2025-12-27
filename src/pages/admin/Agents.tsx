@@ -4,9 +4,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CreateAgentDialog } from '@/components/admin/CreateAgentDialog';
 import { AgentTable } from '@/components/admin/AgentTable';
 import { RegionManagement } from '@/components/admin/RegionManagement';
+import { TransitRoutesManagement } from '@/components/admin/TransitRoutesManagement';
 import { useAgents } from '@/hooks/useAgents';
 import { useActiveRegions } from '@/hooks/useRegions';
-import { Users, Globe } from 'lucide-react';
+import { Users, Globe, Route } from 'lucide-react';
 
 export default function AgentsPage() {
   const { data: agents, isLoading } = useAgents();
@@ -35,6 +36,10 @@ export default function AgentsPage() {
           <TabsTrigger value="regions" className="gap-2">
             <Globe className="w-4 h-4" />
             Regions & Pricing
+          </TabsTrigger>
+          <TabsTrigger value="routing" className="gap-2">
+            <Route className="w-4 h-4" />
+            Transit Routes
           </TabsTrigger>
         </TabsList>
 
@@ -87,6 +92,10 @@ export default function AgentsPage() {
 
         <TabsContent value="regions">
           <RegionManagement />
+        </TabsContent>
+
+        <TabsContent value="routing" className="space-y-6">
+          <TransitRoutesManagement />
         </TabsContent>
       </Tabs>
     </AdminLayout>
