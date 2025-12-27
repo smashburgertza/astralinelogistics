@@ -169,11 +169,16 @@ export function ShipmentTable({
                 </TableCell>
                 <TableCell>
                   <div>
-                    <div className="font-medium">{shipment.customers?.name || 'N/A'}</div>
+                    <div className="font-medium">
+                      {shipment.customers?.name || shipment.customer_name || 'N/A'}
+                    </div>
                     {shipment.customers?.company_name && (
                       <div className="text-xs text-muted-foreground">
                         {shipment.customers.company_name}
                       </div>
+                    )}
+                    {!shipment.customers && shipment.customer_name && (
+                      <div className="text-xs text-muted-foreground">(Not in DB)</div>
                     )}
                   </div>
                 </TableCell>

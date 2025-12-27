@@ -207,7 +207,7 @@ export function ShipmentDetailDrawer({ shipment, open, onOpenChange }: ShipmentD
               </div>
 
               {/* Customer Info */}
-              {shipment.customers && (
+              {(shipment.customers || shipment.customer_name) && (
                 <>
                   <Separator />
                   <div>
@@ -216,12 +216,15 @@ export function ShipmentDetailDrawer({ shipment, open, onOpenChange }: ShipmentD
                       Customer
                     </h3>
                     <div className="bg-muted/50 rounded-lg p-4">
-                      <p className="font-medium">{shipment.customers.name}</p>
-                      {shipment.customers.company_name && (
+                      <p className="font-medium">{shipment.customers?.name || shipment.customer_name}</p>
+                      {shipment.customers?.company_name && (
                         <p className="text-sm text-muted-foreground">{shipment.customers.company_name}</p>
                       )}
-                      {shipment.customers.email && (
+                      {shipment.customers?.email && (
                         <p className="text-sm text-muted-foreground">{shipment.customers.email}</p>
+                      )}
+                      {!shipment.customers && shipment.customer_name && (
+                        <p className="text-xs text-muted-foreground mt-1">(Not in customer database)</p>
                       )}
                     </div>
                   </div>

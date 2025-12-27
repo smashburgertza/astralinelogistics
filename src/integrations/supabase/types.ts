@@ -944,6 +944,7 @@ export type Database = {
           payment_method: string | null
           product_cost: number | null
           purchase_fee: number | null
+          rate_per_kg: number | null
           shipment_id: string | null
           status: string | null
           stripe_payment_id: string | null
@@ -970,6 +971,7 @@ export type Database = {
           payment_method?: string | null
           product_cost?: number | null
           purchase_fee?: number | null
+          rate_per_kg?: number | null
           shipment_id?: string | null
           status?: string | null
           stripe_payment_id?: string | null
@@ -996,6 +998,7 @@ export type Database = {
           payment_method?: string | null
           product_cost?: number | null
           purchase_fee?: number | null
+          rate_per_kg?: number | null
           shipment_id?: string | null
           status?: string | null
           stripe_payment_id?: string | null
@@ -1588,6 +1591,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           customer_id: string | null
+          customer_name: string | null
           delivered_at: string | null
           description: string | null
           id: string
@@ -1614,6 +1618,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           customer_id?: string | null
+          customer_name?: string | null
           delivered_at?: string | null
           description?: string | null
           id?: string
@@ -1640,6 +1645,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           customer_id?: string | null
+          customer_name?: string | null
           delivered_at?: string | null
           description?: string | null
           id?: string

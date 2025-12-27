@@ -4,7 +4,7 @@ import { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/type
 import { toast } from 'sonner';
 
 export type Shipment = Tables<'shipments'> & {
-  customers?: Tables<'customers'> | null;
+  customers?: Pick<Tables<'customers'>, 'name' | 'email' | 'company_name' | 'phone'> | null;
 };
 
 export function useShipments(filters?: {
@@ -17,7 +17,7 @@ export function useShipments(filters?: {
     queryFn: async () => {
       let query = supabase
         .from('shipments')
-        .select('*, customers(name, email, company_name)')
+        .select('*, customers(name, email, company_name, phone)')
         .order('created_at', { ascending: false });
 
       if (filters?.status && filters.status !== 'all') {
@@ -43,7 +43,7 @@ export function useShipment(id: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('shipments')
-        .select('*, customers(name, email, company_name)')
+        .select('*, customers(name, email, company_name, phone)')
         .eq('id', id)
         .maybeSingle();
       if (error) throw error;

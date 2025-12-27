@@ -7,13 +7,8 @@ import { createInvoicePaymentJournalEntry, createInvoiceJournalEntry } from '@/l
 export type InvoiceType = 'shipping' | 'purchase_shipping';
 
 export type Invoice = Tables<'invoices'> & {
-  customers?: Tables<'customers'> | null;
-  shipments?: Tables<'shipments'> | null;
-  amount_in_tzs?: number | null;
-  payment_currency?: string | null;
-  invoice_type?: InvoiceType;
-  product_cost?: number;
-  purchase_fee?: number;
+  customers?: Pick<Tables<'customers'>, 'name' | 'email' | 'company_name' | 'address' | 'phone'> | null;
+  shipments?: Pick<Tables<'shipments'>, 'tracking_number' | 'origin_region' | 'customer_name' | 'total_weight_kg' | 'description'> | null;
 };
 
 export const INVOICE_TYPES = {
@@ -30,7 +25,7 @@ export function useInvoices(filters?: {
     queryFn: async () => {
       let query = supabase
         .from('invoices')
-        .select('*, customers(name, email, company_name), shipments(tracking_number, origin_region)')
+        .select('*, customers(name, email, company_name), shipments(tracking_number, origin_region, customer_name, total_weight_kg)')
         .order('created_at', { ascending: false });
 
       if (filters?.status && filters.status !== 'all') {
@@ -53,7 +48,7 @@ export function useInvoice(id: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('invoices')
-        .select('*, customers(name, email, company_name, address, phone), shipments(tracking_number, origin_region, total_weight_kg, description)')
+        .select('*, customers(name, email, company_name, address, phone), shipments(tracking_number, origin_region, total_weight_kg, description, customer_name)')
         .eq('id', id)
         .maybeSingle();
       if (error) throw error;
