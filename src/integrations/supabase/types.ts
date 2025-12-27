@@ -921,6 +921,53 @@ export type Database = {
         }
         Relationships: []
       }
+      invoice_items: {
+        Row: {
+          amount: number
+          created_at: string | null
+          currency: string
+          description: string | null
+          id: string
+          invoice_id: string
+          item_type: string
+          quantity: number
+          unit_price: number
+          weight_kg: number | null
+        }
+        Insert: {
+          amount?: number
+          created_at?: string | null
+          currency?: string
+          description?: string | null
+          id?: string
+          invoice_id: string
+          item_type: string
+          quantity?: number
+          unit_price?: number
+          weight_kg?: number | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          currency?: string
+          description?: string | null
+          id?: string
+          invoice_id?: string
+          item_type?: string
+          quantity?: number
+          unit_price?: number
+          weight_kg?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           agent_id: string | null
@@ -1582,11 +1629,164 @@ export type Database = {
         }
         Relationships: []
       }
+      settlement_items: {
+        Row: {
+          amount: number
+          created_at: string | null
+          currency: string
+          id: string
+          invoice_id: string
+          settlement_id: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string | null
+          currency?: string
+          id?: string
+          invoice_id: string
+          settlement_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          currency?: string
+          id?: string
+          invoice_id?: string
+          settlement_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "settlement_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "settlement_items_settlement_id_fkey"
+            columns: ["settlement_id"]
+            isOneToOne: false
+            referencedRelation: "settlements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      settlements: {
+        Row: {
+          agent_id: string
+          amount_in_tzs: number | null
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string | null
+          created_by: string | null
+          currency: string
+          id: string
+          notes: string | null
+          paid_at: string | null
+          payment_reference: string | null
+          period_end: string
+          period_start: string
+          settlement_number: string
+          settlement_type: string
+          status: string
+          total_amount: number
+          updated_at: string | null
+        }
+        Insert: {
+          agent_id: string
+          amount_in_tzs?: number | null
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          payment_reference?: string | null
+          period_end: string
+          period_start: string
+          settlement_number: string
+          settlement_type: string
+          status?: string
+          total_amount?: number
+          updated_at?: string | null
+        }
+        Update: {
+          agent_id?: string
+          amount_in_tzs?: number | null
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          payment_reference?: string | null
+          period_end?: string
+          period_start?: string
+          settlement_number?: string
+          settlement_type?: string
+          status?: string
+          total_amount?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      shipment_cost_allocations: {
+        Row: {
+          allocated_amount: number
+          allocation_method: string
+          batch_cost_id: string
+          created_at: string | null
+          currency: string
+          id: string
+          shipment_id: string
+        }
+        Insert: {
+          allocated_amount?: number
+          allocation_method?: string
+          batch_cost_id: string
+          created_at?: string | null
+          currency?: string
+          id?: string
+          shipment_id: string
+        }
+        Update: {
+          allocated_amount?: number
+          allocation_method?: string
+          batch_cost_id?: string
+          created_at?: string | null
+          currency?: string
+          id?: string
+          shipment_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipment_cost_allocations_batch_cost_id_fkey"
+            columns: ["batch_cost_id"]
+            isOneToOne: false
+            referencedRelation: "batch_costs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipment_cost_allocations_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shipments: {
         Row: {
           agent_id: string | null
           arrived_at: string | null
           batch_id: string | null
+          billing_party:
+            | Database["public"]["Enums"]["billing_party_type"]
+            | null
           collected_at: string | null
           created_at: string | null
           created_by: string | null
@@ -1597,11 +1797,15 @@ export type Database = {
           id: string
           in_transit_at: string | null
           origin_region: Database["public"]["Enums"]["agent_region"]
+          profit: number | null
+          rate_per_kg: number | null
           region_id: string | null
           shipment_owner:
             | Database["public"]["Enums"]["shipment_owner_type"]
             | null
           status: Database["public"]["Enums"]["shipment_status"] | null
+          total_cost: number | null
+          total_revenue: number | null
           total_weight_kg: number
           tracking_number: string
           transit_point:
@@ -1614,6 +1818,9 @@ export type Database = {
           agent_id?: string | null
           arrived_at?: string | null
           batch_id?: string | null
+          billing_party?:
+            | Database["public"]["Enums"]["billing_party_type"]
+            | null
           collected_at?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -1624,11 +1831,15 @@ export type Database = {
           id?: string
           in_transit_at?: string | null
           origin_region: Database["public"]["Enums"]["agent_region"]
+          profit?: number | null
+          rate_per_kg?: number | null
           region_id?: string | null
           shipment_owner?:
             | Database["public"]["Enums"]["shipment_owner_type"]
             | null
           status?: Database["public"]["Enums"]["shipment_status"] | null
+          total_cost?: number | null
+          total_revenue?: number | null
           total_weight_kg: number
           tracking_number: string
           transit_point?:
@@ -1641,6 +1852,9 @@ export type Database = {
           agent_id?: string | null
           arrived_at?: string | null
           batch_id?: string | null
+          billing_party?:
+            | Database["public"]["Enums"]["billing_party_type"]
+            | null
           collected_at?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -1651,11 +1865,15 @@ export type Database = {
           id?: string
           in_transit_at?: string | null
           origin_region?: Database["public"]["Enums"]["agent_region"]
+          profit?: number | null
+          rate_per_kg?: number | null
           region_id?: string | null
           shipment_owner?:
             | Database["public"]["Enums"]["shipment_owner_type"]
             | null
           status?: Database["public"]["Enums"]["shipment_status"] | null
+          total_cost?: number | null
+          total_revenue?: number | null
           total_weight_kg?: number
           tracking_number?: string
           transit_point?:
@@ -2065,9 +2283,11 @@ export type Database = {
       }
     }
     Functions: {
+      allocate_batch_costs: { Args: { p_batch_id: string }; Returns: undefined }
       generate_batch_number: { Args: never; Returns: string }
       generate_document_number: { Args: { prefix: string }; Returns: string }
       generate_journal_number: { Args: never; Returns: string }
+      generate_settlement_number: { Args: never; Returns: string }
       generate_tracking_number: { Args: never; Returns: string }
       get_or_create_batch: {
         Args: {
@@ -2100,6 +2320,10 @@ export type Database = {
     Enums: {
       agent_region: "europe" | "dubai" | "china" | "india" | "usa" | "uk"
       app_role: "super_admin" | "employee" | "agent" | "customer"
+      billing_party_type:
+        | "customer_direct"
+        | "agent_collect"
+        | "astraline_internal"
       invoice_direction_type: "to_agent" | "from_agent"
       shipment_owner_type: "astraline" | "agent"
       shipment_status: "collected" | "in_transit" | "arrived" | "delivered"
@@ -2233,6 +2457,11 @@ export const Constants = {
     Enums: {
       agent_region: ["europe", "dubai", "china", "india", "usa", "uk"],
       app_role: ["super_admin", "employee", "agent", "customer"],
+      billing_party_type: [
+        "customer_direct",
+        "agent_collect",
+        "astraline_internal",
+      ],
       invoice_direction_type: ["to_agent", "from_agent"],
       shipment_owner_type: ["astraline", "agent"],
       shipment_status: ["collected", "in_transit", "arrived", "delivered"],
