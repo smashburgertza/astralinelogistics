@@ -182,6 +182,27 @@ export function useCreateAgentAddress() {
   });
 }
 
+export function useDeleteRegionPricing() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('region_pricing')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['region_pricing'] });
+      toast.success('Pricing deleted successfully');
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to delete pricing: ${error.message}`);
+    },
+  });
+}
+
 export function calculateShipmentCost(
   weightKg: number,
   pricing: RegionPricing | null | undefined
