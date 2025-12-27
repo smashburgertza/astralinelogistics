@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Calculator, Ship, Plane, Container, Package, Car } from 'lucide-react';
+import { Calculator, Ship, Plane, Container, Package, Car, Info } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useScrollAnimation } from '@/hooks/useScrollAnimation';
 import { useActiveRegions } from '@/hooks/useRegions';
 import { useRegionPricing } from '@/hooks/useRegionPricing';
@@ -193,12 +194,34 @@ export function PricingCalculator() {
               <TabsContent value="air-cargo" className="mt-0">
                 <Tabs value={airSubTab} onValueChange={setAirSubTab} className="w-full">
                   <TabsList className="grid w-full grid-cols-2 mb-4 h-auto">
-                    <TabsTrigger value="door-to-door" className="flex items-center gap-1.5 text-xs sm:text-sm py-2">
-                      Door to Door
-                    </TabsTrigger>
-                    <TabsTrigger value="airport-to-airport" className="flex items-center gap-1.5 text-xs sm:text-sm py-2">
-                      Airport to Airport
-                    </TabsTrigger>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <TabsTrigger value="door-to-door" className="flex items-center gap-1.5 text-xs sm:text-sm py-2">
+                            Door to Door
+                            <Info className="w-3 h-3 text-muted-foreground" />
+                          </TabsTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="max-w-[250px] text-center">
+                          <p className="font-medium mb-1">Door to Door Service</p>
+                          <p className="text-xs">Complete delivery from origin to your doorstep. Includes customs clearance, local handling, and final delivery to your address.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <TabsTrigger value="airport-to-airport" className="flex items-center gap-1.5 text-xs sm:text-sm py-2">
+                            Airport to Airport
+                            <Info className="w-3 h-3 text-muted-foreground" />
+                          </TabsTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="max-w-[250px] text-center">
+                          <p className="font-medium mb-1">Airport to Airport Service</p>
+                          <p className="text-xs">Cargo is delivered to destination airport only. You arrange pickup and customs clearance. Lower cost but requires self-collection.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </TabsList>
 
                   <TabsContent value="door-to-door" className="mt-0">
