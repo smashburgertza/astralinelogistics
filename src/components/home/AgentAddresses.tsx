@@ -1,52 +1,35 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { MapPin, Copy, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
-import { REGIONS, type Region } from '@/lib/constants';
+import { useAgentAddresses } from '@/hooks/useRegionPricing';
+import { useActiveRegions, regionsToMap } from '@/hooks/useRegions';
 import { toast } from 'sonner';
 import { useScrollAnimation } from '@/hooks/useScrollAnimation';
 import { cn } from '@/lib/utils';
 
-interface AgentAddress {
-  region: Region;
-  address_line1: string;
-  address_line2?: string;
-  city: string;
-  postal_code?: string;
-  country: string;
-  contact_name?: string;
-  contact_phone?: string;
-  contact_email?: string;
-}
-
 export function AgentAddresses() {
-  const [addresses, setAddresses] = useState<AgentAddress[]>([]);
+  const { data: addresses } = useAgentAddresses();
+  const { data: regions } = useActiveRegions();
+  const regionsMap = regionsToMap(regions);
   const [copied, setCopied] = useState<string | null>(null);
 
   const { ref: headerRef, isVisible: headerVisible } = useScrollAnimation();
   const { ref: gridRef, isVisible: gridVisible } = useScrollAnimation();
 
-  useEffect(() => {
-    fetchAddresses();
-  }, []);
-
-  const fetchAddresses = async () => {
-    const { data } = await supabase
-      .from('agent_addresses')
-      .select('*');
-    
-    if (data) {
-      setAddresses(data as AgentAddress[]);
-    }
-  };
-
-  const copyAddress = (address: AgentAddress) => {
+  const copyAddress = (address: typeof addresses extends (infer T)[] | undefined ? T : never) => {
+    if (!address) return;
     const fullAddress = `${address.address_line1}${address.address_line2 ? ', ' + address.address_line2 : ''}, ${address.city}${address.postal_code ? ' ' + address.postal_code : ''}, ${address.country}`;
     navigator.clipboard.writeText(fullAddress);
-    setCopied(address.region);
+    setCopied(address.id);
     toast.success('Address copied to clipboard');
     setTimeout(() => setCopied(null), 2000);
   };
+
+  // Filter addresses to only show those with active regions
+  const visibleAddresses = (addresses || []).filter(addr => {
+    const regionInfo = regionsMap[addr.region];
+    return regionInfo?.is_active !== false;
+  });
 
   return (
     <section className="section-padding bg-brand-navy-dark overflow-hidden">
@@ -69,11 +52,11 @@ export function AgentAddresses() {
 
         {/* Addresses Grid */}
         <div ref={gridRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-          {addresses.map((address, index) => {
-            const regionInfo = REGIONS[address.region];
+          {visibleAddresses.map((address, index) => {
+            const regionInfo = regionsMap[address.region];
             return (
               <div 
-                key={address.region} 
+                key={address.id} 
                 className={cn(
                   "bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10 hover:bg-white/10 transition-all duration-300 group scroll-animate-scale",
                   gridVisible && "visible"
@@ -81,9 +64,9 @@ export function AgentAddresses() {
                 style={{ transitionDelay: `${index * 100}ms` }}
               >
                 <div className="flex items-center gap-3 mb-4">
-                  <span className="text-4xl">{regionInfo?.flag}</span>
+                  <span className="text-4xl">{regionInfo?.flag_emoji || '🌍'}</span>
                   <h3 className="font-heading text-lg font-semibold text-white">
-                    {regionInfo?.label || address.region}
+                    {regionInfo?.name || address.region}
                   </h3>
                 </div>
 
@@ -109,7 +92,7 @@ export function AgentAddresses() {
                   className="w-full bg-transparent border-white/20 text-white hover:bg-white hover:text-brand-navy transition-all"
                   onClick={() => copyAddress(address)}
                 >
-                  {copied === address.region ? (
+                  {copied === address.id ? (
                     <>
                       <Check className="w-4 h-4 mr-2" />
                       Copied!

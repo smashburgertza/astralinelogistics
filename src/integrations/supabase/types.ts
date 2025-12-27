@@ -78,6 +78,7 @@ export type Database = {
           id: string
           postal_code: string | null
           region: Database["public"]["Enums"]["agent_region"]
+          region_id: string | null
         }
         Insert: {
           address_line1: string
@@ -91,6 +92,7 @@ export type Database = {
           id?: string
           postal_code?: string | null
           region: Database["public"]["Enums"]["agent_region"]
+          region_id?: string | null
         }
         Update: {
           address_line1?: string
@@ -104,8 +106,17 @@ export type Database = {
           id?: string
           postal_code?: string | null
           region?: Database["public"]["Enums"]["agent_region"]
+          region_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "agent_addresses_region_id_fkey"
+            columns: ["region_id"]
+            isOneToOne: false
+            referencedRelation: "regions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       audit_logs: {
         Row: {
@@ -421,6 +432,7 @@ export type Database = {
           id: string
           price: number
           region: Database["public"]["Enums"]["agent_region"]
+          region_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -430,6 +442,7 @@ export type Database = {
           id?: string
           price: number
           region: Database["public"]["Enums"]["agent_region"]
+          region_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -439,9 +452,18 @@ export type Database = {
           id?: string
           price?: number
           region?: Database["public"]["Enums"]["agent_region"]
+          region_id?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "container_pricing_region_id_fkey"
+            columns: ["region_id"]
+            isOneToOne: false
+            referencedRelation: "regions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       currency_exchange_rates: {
         Row: {
@@ -671,6 +693,7 @@ export type Database = {
           id: string
           receipt_url: string | null
           region: Database["public"]["Enums"]["agent_region"] | null
+          region_id: string | null
           shipment_id: string | null
           status: string
           submitted_by: string | null
@@ -689,6 +712,7 @@ export type Database = {
           id?: string
           receipt_url?: string | null
           region?: Database["public"]["Enums"]["agent_region"] | null
+          region_id?: string | null
           shipment_id?: string | null
           status?: string
           submitted_by?: string | null
@@ -707,11 +731,19 @@ export type Database = {
           id?: string
           receipt_url?: string | null
           region?: Database["public"]["Enums"]["agent_region"] | null
+          region_id?: string | null
           shipment_id?: string | null
           status?: string
           submitted_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "expenses_region_id_fkey"
+            columns: ["region_id"]
+            isOneToOne: false
+            referencedRelation: "regions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "expenses_shipment_id_fkey"
             columns: ["shipment_id"]
@@ -1258,6 +1290,7 @@ export type Database = {
           handling_fee: number | null
           id: string
           region: Database["public"]["Enums"]["agent_region"]
+          region_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -1268,6 +1301,7 @@ export type Database = {
           handling_fee?: number | null
           id?: string
           region: Database["public"]["Enums"]["agent_region"]
+          region_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -1278,6 +1312,48 @@ export type Database = {
           handling_fee?: number | null
           id?: string
           region?: Database["public"]["Enums"]["agent_region"]
+          region_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "region_pricing_region_id_fkey"
+            columns: ["region_id"]
+            isOneToOne: false
+            referencedRelation: "regions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      regions: {
+        Row: {
+          code: string
+          created_at: string | null
+          display_order: number | null
+          flag_emoji: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          display_order?: number | null
+          flag_emoji?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          display_order?: number | null
+          flag_emoji?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
           updated_at?: string | null
         }
         Relationships: []
@@ -1325,6 +1401,7 @@ export type Database = {
           id: string
           in_transit_at: string | null
           origin_region: Database["public"]["Enums"]["agent_region"]
+          region_id: string | null
           status: Database["public"]["Enums"]["shipment_status"] | null
           total_weight_kg: number
           tracking_number: string
@@ -1343,6 +1420,7 @@ export type Database = {
           id?: string
           in_transit_at?: string | null
           origin_region: Database["public"]["Enums"]["agent_region"]
+          region_id?: string | null
           status?: Database["public"]["Enums"]["shipment_status"] | null
           total_weight_kg: number
           tracking_number: string
@@ -1361,6 +1439,7 @@ export type Database = {
           id?: string
           in_transit_at?: string | null
           origin_region?: Database["public"]["Enums"]["agent_region"]
+          region_id?: string | null
           status?: Database["public"]["Enums"]["shipment_status"] | null
           total_weight_kg?: number
           tracking_number?: string
@@ -1373,6 +1452,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipments_region_id_fkey"
+            columns: ["region_id"]
+            isOneToOne: false
+            referencedRelation: "regions"
             referencedColumns: ["id"]
           },
         ]
@@ -1391,6 +1477,7 @@ export type Database = {
           id: string
           is_active: boolean
           region: Database["public"]["Enums"]["agent_region"]
+          region_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -1406,6 +1493,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           region?: Database["public"]["Enums"]["agent_region"]
+          region_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -1421,9 +1509,18 @@ export type Database = {
           id?: string
           is_active?: boolean
           region?: Database["public"]["Enums"]["agent_region"]
+          region_id?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "shipping_calculator_charges_region_id_fkey"
+            columns: ["region_id"]
+            isOneToOne: false
+            referencedRelation: "regions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       shop_for_me_charges: {
         Row: {
@@ -1542,6 +1639,7 @@ export type Database = {
           id: string
           permissions: Json | null
           region: Database["public"]["Enums"]["agent_region"] | null
+          region_id: string | null
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
@@ -1551,6 +1649,7 @@ export type Database = {
           id?: string
           permissions?: Json | null
           region?: Database["public"]["Enums"]["agent_region"] | null
+          region_id?: string | null
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
@@ -1560,10 +1659,19 @@ export type Database = {
           id?: string
           permissions?: Json | null
           region?: Database["public"]["Enums"]["agent_region"] | null
+          region_id?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_region_id_fkey"
+            columns: ["region_id"]
+            isOneToOne: false
+            referencedRelation: "regions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vehicle_duty_rates: {
         Row: {
@@ -1626,6 +1734,7 @@ export type Database = {
           id: string
           price: number
           region: Database["public"]["Enums"]["agent_region"]
+          region_id: string | null
           shipping_method: string
           updated_at: string | null
           vehicle_type: string
@@ -1636,6 +1745,7 @@ export type Database = {
           id?: string
           price: number
           region: Database["public"]["Enums"]["agent_region"]
+          region_id?: string | null
           shipping_method: string
           updated_at?: string | null
           vehicle_type: string
@@ -1646,11 +1756,20 @@ export type Database = {
           id?: string
           price?: number
           region?: Database["public"]["Enums"]["agent_region"]
+          region_id?: string | null
           shipping_method?: string
           updated_at?: string | null
           vehicle_type?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_pricing_region_id_fkey"
+            columns: ["region_id"]
+            isOneToOne: false
+            referencedRelation: "regions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -1660,6 +1779,7 @@ export type Database = {
       generate_document_number: { Args: { prefix: string }; Returns: string }
       generate_journal_number: { Args: never; Returns: string }
       generate_tracking_number: { Args: never; Returns: string }
+      get_region_id_by_code: { Args: { _code: string }; Returns: string }
       get_user_region: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["agent_region"]
