@@ -36,7 +36,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { MoreHorizontal, UserX, MapPin, User, Loader2, Settings } from 'lucide-react';
+import { MoreHorizontal, UserX, MapPin, User, Loader2, Settings, Package } from 'lucide-react';
 import { format } from 'date-fns';
 import { Agent, useDeleteAgent, useUpdateAgentRegions } from '@/hooks/useAgents';
 import { useRegions } from '@/hooks/useRegions';
@@ -216,6 +216,12 @@ export function AgentTable({ agents, isLoading }: AgentTableProps) {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2 justify-end">
+                      {agent.settings?.can_have_consolidated_cargo && (
+                        <Badge variant="outline" className="gap-1 text-xs bg-primary/10 text-primary border-primary/20">
+                          <Package className="w-3 h-3" />
+                          Cargo
+                        </Badge>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
