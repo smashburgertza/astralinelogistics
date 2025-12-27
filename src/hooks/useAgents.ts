@@ -119,12 +119,14 @@ export function useCreateAgent() {
         throw new Error('Failed to create user');
       }
 
-      // Restore admin session immediately after user creation
+      const userId = authData.user.id;
+
+      // Restore admin session and wait for it to be ready
       if (adminSession) {
         await supabase.auth.setSession(adminSession);
+        // Small delay to ensure session is propagated
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
-
-      const userId = authData.user.id;
 
       // Update the profile with phone if provided
       if (phone) {
@@ -146,7 +148,10 @@ export function useCreateAgent() {
         })
         .eq('user_id', userId);
 
-      if (roleError) throw roleError;
+      if (roleError) {
+        console.error('Failed to update role:', roleError);
+        throw roleError;
+      }
 
       // Insert all regions into agent_regions
       if (regions.length > 0) {
@@ -159,7 +164,10 @@ export function useCreateAgent() {
           .from('agent_regions')
           .insert(regionInserts);
 
-        if (regionsError) throw regionsError;
+        if (regionsError) {
+          console.error('Failed to insert regions:', regionsError);
+          throw regionsError;
+        }
       }
 
       return { userId };
