@@ -69,8 +69,12 @@ import {
   Plus,
   Trash2,
   Globe,
-  GripVertical
+  GripVertical,
+  Eye,
+  Copy,
+  Check
 } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { 
   useRegionPricing, 
   useAgentAddresses, 
@@ -421,6 +425,133 @@ function SortableRegionItem({
   );
 }
 
+// Preview component showing how regions appear on the public site
+function PublicSitePreview({ regions }: { regions: RegionWithData[] }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const activeRegions = regions.filter(r => r.is_active);
+
+  const copyAddress = (region: RegionWithData) => {
+    if (!region.address) return;
+    const address = region.address;
+    const fullAddress = `${address.address_line1}${address.address_line2 ? ', ' + address.address_line2 : ''}, ${address.city}${address.postal_code ? ' ' + address.postal_code : ''}, ${address.country}`;
+    navigator.clipboard.writeText(fullAddress);
+    setCopiedId(region.id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  return (
+    <Card className="mt-6">
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CollapsibleTrigger asChild>
+          <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Eye className="w-5 h-5 text-primary" />
+                <CardTitle className="text-lg">Public Site Preview</CardTitle>
+              </div>
+              <Badge variant="outline" className="text-xs">
+                {isOpen ? 'Click to collapse' : 'Click to expand'}
+              </Badge>
+            </div>
+          </CardHeader>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <CardContent className="space-y-6">
+            {/* Footer "We Ship From" Preview */}
+            <div className="rounded-xl bg-[#0f172a] p-6">
+              <h4 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">
+                Footer: "We Ship From" Section
+              </h4>
+              <div className="bg-[#1e293b] rounded-lg p-4">
+                <h5 className="font-semibold text-white mb-4">We Ship From</h5>
+                <ul className="space-y-2 text-sm text-white/70">
+                  {activeRegions.map((region) => (
+                    <li key={region.id} className="flex items-center gap-2">
+                      <span className="text-lg">{region.flag_emoji || '🌍'}</span>
+                      {region.name}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            {/* Agent Addresses Preview */}
+            <div className="rounded-xl bg-[#0f172a] p-6">
+              <h4 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">
+                Agent Delivery Addresses Section
+              </h4>
+              <div className="text-center mb-6">
+                <span className="inline-block px-4 py-2 rounded-full bg-primary/20 text-primary font-semibold text-xs uppercase tracking-wide mb-3">
+                  Global Network
+                </span>
+                <h5 className="text-2xl font-bold text-white mb-2">
+                  Agent Delivery Addresses
+                </h5>
+                <p className="text-white/70 text-sm max-w-xl mx-auto">
+                  Send your goods to our trusted agents in these locations.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {activeRegions.map((region) => (
+                  <div 
+                    key={region.id}
+                    className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10"
+                  >
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-3xl">{region.flag_emoji || '🌍'}</span>
+                      <h6 className="font-semibold text-white">{region.name}</h6>
+                    </div>
+                    {region.address ? (
+                      <>
+                        <div className="flex items-start gap-2 text-xs text-white/80 mb-3">
+                          <MapPin className="w-3 h-3 mt-0.5 text-primary shrink-0" />
+                          <div>
+                            <p>{region.address.address_line1}</p>
+                            {region.address.address_line2 && <p>{region.address.address_line2}</p>}
+                            <p>{region.address.city} {region.address.postal_code}</p>
+                            <p>{region.address.country}</p>
+                          </div>
+                        </div>
+                        <Button 
+                          variant="outline"
+                          size="sm" 
+                          className="w-full bg-transparent border-white/20 text-white hover:bg-white hover:text-[#0f172a] transition-all text-xs"
+                          onClick={() => copyAddress(region)}
+                        >
+                          {copiedId === region.id ? (
+                            <>
+                              <Check className="w-3 h-3 mr-1" />
+                              Copied!
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3 h-3 mr-1" />
+                              Copy Address
+                            </>
+                          )}
+                        </Button>
+                      </>
+                    ) : (
+                      <p className="text-xs text-amber-400 italic">No address configured</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {activeRegions.length === 0 && (
+                <p className="text-center text-white/50 py-8">
+                  No active regions to display
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </CollapsibleContent>
+      </Collapsible>
+    </Card>
+  );
+}
+
 export function RegionManagement() {
   const { data: regions, isLoading: regionsLoading } = useRegions();
   const { data: pricing, isLoading: pricingLoading } = useRegionPricing();
@@ -703,7 +834,8 @@ export function RegionManagement() {
         </Card>
       )}
 
-      {/* Region Edit/Create Dialog */}
+      {/* Public Site Preview */}
+      <PublicSitePreview regions={regionData} />
       <Dialog open={!!editingRegion || isCreatingRegion} onOpenChange={(open) => {
         if (!open) {
           setEditingRegion(null);
