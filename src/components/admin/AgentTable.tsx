@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,15 +30,15 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { MoreHorizontal, UserX, MapPin, User } from 'lucide-react';
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { MoreHorizontal, UserX, MapPin, User, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
-import { Agent, useDeleteAgent, useUpdateAgentRegion } from '@/hooks/useAgents';
+import { Agent, useDeleteAgent, useUpdateAgentRegions } from '@/hooks/useAgents';
 import { useRegions } from '@/hooks/useRegions';
 
 interface AgentTableProps {
@@ -48,8 +49,11 @@ interface AgentTableProps {
 export function AgentTable({ agents, isLoading }: AgentTableProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [agentToDelete, setAgentToDelete] = useState<Agent | null>(null);
+  const [editRegionsAgent, setEditRegionsAgent] = useState<Agent | null>(null);
+  const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
+  
   const deleteAgent = useDeleteAgent();
-  const updateRegion = useUpdateAgentRegion();
+  const updateRegions = useUpdateAgentRegions();
   const { data: regions = [] } = useRegions();
 
   const handleDelete = async () => {
@@ -60,11 +64,41 @@ export function AgentTable({ agents, isLoading }: AgentTableProps) {
     }
   };
 
-  const handleRegionChange = async (userId: string, region: string) => {
-    await updateRegion.mutateAsync({ 
-      userId, 
-      region: region as 'europe' | 'dubai' | 'china' | 'india' 
-    });
+  const handleOpenEditRegions = (agent: Agent) => {
+    const currentRegions = agent.regions.map(r => r.region_code);
+    // Fallback to legacy region if no regions in new table
+    if (currentRegions.length === 0 && agent.region) {
+      setSelectedRegions([agent.region]);
+    } else {
+      setSelectedRegions(currentRegions);
+    }
+    setEditRegionsAgent(agent);
+  };
+
+  const handleSaveRegions = async () => {
+    if (editRegionsAgent && selectedRegions.length > 0) {
+      await updateRegions.mutateAsync({
+        userId: editRegionsAgent.user_id,
+        regions: selectedRegions,
+      });
+      setEditRegionsAgent(null);
+    }
+  };
+
+  const toggleRegion = (regionCode: string) => {
+    setSelectedRegions(prev => 
+      prev.includes(regionCode)
+        ? prev.filter(r => r !== regionCode)
+        : [...prev, regionCode]
+    );
+  };
+
+  const getAgentRegions = (agent: Agent) => {
+    // Use new regions array if available, otherwise fallback to legacy
+    if (agent.regions.length > 0) {
+      return agent.regions.map(r => r.region_code);
+    }
+    return agent.region ? [agent.region] : [];
   };
 
   if (isLoading) {
@@ -75,7 +109,7 @@ export function AgentTable({ agents, isLoading }: AgentTableProps) {
             <TableRow className="bg-muted/50">
               <TableHead>Agent</TableHead>
               <TableHead>Email</TableHead>
-              <TableHead>Region</TableHead>
+              <TableHead>Regions</TableHead>
               <TableHead>Created</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
@@ -116,14 +150,16 @@ export function AgentTable({ agents, isLoading }: AgentTableProps) {
             <TableRow className="bg-muted/50 hover:bg-muted/50">
               <TableHead className="font-semibold">Agent</TableHead>
               <TableHead className="font-semibold">Email</TableHead>
-              <TableHead className="font-semibold">Region</TableHead>
+              <TableHead className="font-semibold">Regions</TableHead>
               <TableHead className="font-semibold">Created</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-          {agents.map((agent) => {
-              const regionInfo = regions.find(r => r.code === agent.region);
+            {agents.map((agent) => {
+              const agentRegionCodes = getAgentRegions(agent);
+              const agentRegionInfos = regions.filter(r => agentRegionCodes.includes(r.code));
+              
               return (
                 <TableRow key={agent.id}>
                   <TableCell>
@@ -149,33 +185,26 @@ export function AgentTable({ agents, isLoading }: AgentTableProps) {
                     {agent.profile?.email || 'No email'}
                   </TableCell>
                   <TableCell>
-                    <Select
-                      value={agent.region || ''}
-                      onValueChange={(value) => handleRegionChange(agent.user_id, value)}
-                    >
-                      <SelectTrigger className="w-[140px] h-8">
-                        <SelectValue>
-                          {regionInfo ? (
-                            <span className="flex items-center gap-2">
-                              <span>{regionInfo.flag_emoji}</span>
-                              <span>{regionInfo.name}</span>
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground">Not assigned</span>
-                          )}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {regions.map((r) => (
-                          <SelectItem key={r.code} value={r.code}>
-                            <span className="flex items-center gap-2">
-                              <span>{r.flag_emoji}</span>
-                              <span>{r.name}</span>
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex flex-wrap gap-1">
+                      {agentRegionInfos.length > 0 ? (
+                        agentRegionInfos.map((r) => (
+                          <Badge key={r.code} variant="secondary" className="text-xs">
+                            {r.flag_emoji} {r.name}
+                          </Badge>
+                        ))
+                      ) : (
+                        <span className="text-muted-foreground text-sm">Not assigned</span>
+                      )}
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-6 px-2 text-xs"
+                        onClick={() => handleOpenEditRegions(agent)}
+                      >
+                        <MapPin className="w-3 h-3 mr-1" />
+                        Edit
+                      </Button>
+                    </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {agent.created_at 
@@ -192,6 +221,11 @@ export function AgentTable({ agents, isLoading }: AgentTableProps) {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => handleOpenEditRegions(agent)}>
+                          <MapPin className="w-4 h-4 mr-2" />
+                          Edit Regions
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           className="text-destructive focus:text-destructive"
@@ -213,6 +247,65 @@ export function AgentTable({ agents, isLoading }: AgentTableProps) {
         </Table>
       </div>
 
+      {/* Edit Regions Dialog */}
+      <Dialog open={!!editRegionsAgent} onOpenChange={(open) => !open && setEditRegionsAgent(null)}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MapPin className="w-5 h-5" />
+              Edit Regions for {editRegionsAgent?.profile?.full_name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground mb-4">
+              Select the regions this agent can manage.
+            </p>
+            <div className="space-y-2">
+              {regions.map((region) => (
+                <div
+                  key={region.code}
+                  className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer"
+                  onClick={() => toggleRegion(region.code)}
+                >
+                  <Checkbox
+                    checked={selectedRegions.includes(region.code)}
+                    onCheckedChange={() => toggleRegion(region.code)}
+                  />
+                  <span className="flex items-center gap-2 flex-1">
+                    <span className="text-lg">{region.flag_emoji}</span>
+                    <span className="font-medium">{region.name}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+            {selectedRegions.length === 0 && (
+              <p className="text-sm text-destructive mt-2">
+                Please select at least one region.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditRegionsAgent(null)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSaveRegions} 
+              disabled={selectedRegions.length === 0 || updateRegions.isPending}
+            >
+              {updateRegions.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save Regions'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
