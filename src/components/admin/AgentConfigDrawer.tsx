@@ -37,12 +37,15 @@ import {
   Loader2,
   Plus,
   Trash2,
-  User
+  User,
+  Tag,
+  Save
 } from 'lucide-react';
 import { Agent } from '@/hooks/useAgents';
 import { useTransitRoutes, TRANSIT_POINT_LABELS, TRANSIT_POINT_OPTIONS, TransitPointType, useCreateTransitRoute, useUpdateTransitRoute, useDeleteTransitRoute } from '@/hooks/useTransitRoutes';
 import { useAllAgentBalances } from '@/hooks/useAgentBalance';
 import { useRegions } from '@/hooks/useRegions';
+import { useRegionPricing, useUpdateRegionPricing } from '@/hooks/useRegionPricing';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 
 interface AgentConfigDrawerProps {
@@ -55,9 +58,11 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
   const { data: allRoutes = [], isLoading: routesLoading } = useTransitRoutes();
   const { data: allBalances = [] } = useAllAgentBalances();
   const { data: regions = [] } = useRegions();
+  const { data: allPricing = [] } = useRegionPricing();
   const createRoute = useCreateTransitRoute();
   const updateRoute = useUpdateTransitRoute();
   const deleteRoute = useDeleteTransitRoute();
+  const updatePricing = useUpdateRegionPricing();
 
   const [newRoute, setNewRoute] = useState({
     region_id: '',
@@ -66,6 +71,8 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
     currency: 'USD',
     estimated_days: 0,
   });
+
+  const [editingPricing, setEditingPricing] = useState<Record<string, { agent_rate_per_kg: number }>>({});
 
   if (!agent) return null;
 
@@ -83,6 +90,34 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
 
   // Get agent's balance
   const agentBalance = allBalances.find(b => b.agent_id === agent.user_id);
+
+  // Filter pricing for agent's regions
+  const agentPricing = allPricing.filter(p => 
+    agentRegionCodes.includes(p.region)
+  );
+
+  const handlePricingChange = (pricingId: string, value: number) => {
+    setEditingPricing(prev => ({
+      ...prev,
+      [pricingId]: { agent_rate_per_kg: value }
+    }));
+  };
+
+  const handleSavePricing = async (pricingId: string) => {
+    const editedValue = editingPricing[pricingId];
+    if (!editedValue) return;
+    
+    await updatePricing.mutateAsync({
+      id: pricingId,
+      agent_rate_per_kg: editedValue.agent_rate_per_kg,
+    });
+    
+    setEditingPricing(prev => {
+      const newState = { ...prev };
+      delete newState[pricingId];
+      return newState;
+    });
+  };
 
   const handleAddRoute = async () => {
     if (!newRoute.region_id) return;
@@ -131,8 +166,12 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
         </SheetHeader>
 
         <div className="mt-6">
-          <Tabs defaultValue="routes" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+          <Tabs defaultValue="pricing" className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="pricing" className="gap-1.5">
+                <Tag className="w-4 h-4" />
+                Pricing
+              </TabsTrigger>
               <TabsTrigger value="routes" className="gap-1.5">
                 <Route className="w-4 h-4" />
                 Routes
@@ -146,6 +185,102 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
                 Settings
               </TabsTrigger>
             </TabsList>
+
+            {/* Pricing Tab */}
+            <TabsContent value="pricing" className="mt-4 space-y-4">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Agent Shipping Rates</CardTitle>
+                  <CardDescription>
+                    Configure rates the agent charges for shipping per kg
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {agentPricing.length > 0 ? (
+                    <div className="rounded-lg border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Region</TableHead>
+                            <TableHead>Cargo</TableHead>
+                            <TableHead>Service</TableHead>
+                            <TableHead>Agent Rate/kg</TableHead>
+                            <TableHead></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {agentPricing.map((pricing) => {
+                            const isEditing = editingPricing[pricing.id] !== undefined;
+                            const currentRate = isEditing 
+                              ? editingPricing[pricing.id].agent_rate_per_kg 
+                              : pricing.agent_rate_per_kg;
+                            const regionInfo = regions.find(r => r.code === pricing.region);
+                            
+                            return (
+                              <TableRow key={pricing.id}>
+                                <TableCell>
+                                  <span className="flex items-center gap-1.5">
+                                    {regionInfo?.flag_emoji}
+                                    <span className="text-sm">{regionInfo?.name || pricing.region}</span>
+                                  </span>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className="text-xs capitalize">
+                                    {pricing.cargo_type}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <span className="text-xs text-muted-foreground">
+                                    {pricing.service_type?.replace(/_/g, ' ') || '—'}
+                                  </span>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-muted-foreground text-sm">
+                                      {CURRENCY_SYMBOLS[pricing.currency] || pricing.currency}
+                                    </span>
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      value={currentRate}
+                                      onChange={(e) => handlePricingChange(pricing.id, parseFloat(e.target.value) || 0)}
+                                      className="w-24 h-8"
+                                    />
+                                    <span className="text-xs text-muted-foreground">/kg</span>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  {isEditing && (
+                                    <Button
+                                      size="sm"
+                                      onClick={() => handleSavePricing(pricing.id)}
+                                      disabled={updatePricing.isPending}
+                                    >
+                                      {updatePricing.isPending ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                      ) : (
+                                        <Save className="w-4 h-4" />
+                                      )}
+                                    </Button>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ) : (
+                    <div className="text-center py-6 text-muted-foreground text-sm">
+                      No pricing configured for this agent's regions yet.
+                      <br />
+                      <span className="text-xs">Configure region pricing in Settings → Pricing first.</span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
 
             {/* Transit Routes Tab */}
             <TabsContent value="routes" className="mt-4 space-y-4">
