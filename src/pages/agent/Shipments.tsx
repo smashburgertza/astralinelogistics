@@ -4,13 +4,12 @@ import { StatCard } from '@/components/admin/StatCard';
 import { AgentShipmentFilters } from '@/components/agent/ShipmentFilters';
 import { AgentShipmentTable } from '@/components/agent/ShipmentTable';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAgentShipments, useAgentShipmentStats, useAgentDraftShipments, useFinalizeDraftShipment, useDeleteDraftShipment } from '@/hooks/useAgentShipments';
+import { useAgentAssignedRegions } from '@/hooks/useAgentRegions';
 import { useDebounce } from '@/hooks/useDebounce';
-import { useAuth } from '@/hooks/useAuth';
-import { useRegions } from '@/hooks/useRegions';
 import { Package, Plane, MapPin, CheckCircle, Upload, Scale, FileEdit, Trash2, Check, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -28,10 +27,13 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export default function AgentShipmentsPage() {
-  const { getRegion } = useAuth();
-  const region = getRegion();
-  const { data: regions = [] } = useRegions();
-  const regionInfo = region ? regions.find(r => r.code === region) : null;
+  // Get assigned regions first - this is the single source of truth for agent's regions
+  const { data: assignedRegions = [] } = useAgentAssignedRegions();
+  const regionCodes = useMemo(
+    () => assignedRegions.map(r => r.region_code),
+    [assignedRegions]
+  );
+  const regionNames = assignedRegions.map(r => r.region_name).filter(Boolean).join(', ');
 
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
@@ -44,8 +46,9 @@ export default function AgentShipmentsPage() {
     search: debouncedSearch,
   }), [status, debouncedSearch]);
 
-  const { data: shipments, isLoading } = useAgentShipments(filters);
-  const { data: stats } = useAgentShipmentStats();
+  // Pass regionCodes to hooks that need them
+  const { data: shipments, isLoading } = useAgentShipments(regionCodes, filters);
+  const { data: stats } = useAgentShipmentStats(regionCodes);
   const { data: drafts, isLoading: draftsLoading } = useAgentDraftShipments();
   const finalizeDraft = useFinalizeDraftShipment();
   const deleteDraft = useDeleteDraftShipment();
@@ -58,7 +61,7 @@ export default function AgentShipmentsPage() {
   return (
     <AgentLayout 
       title="My Shipments" 
-      subtitle={regionInfo ? `Shipments from ${regionInfo.name}` : 'View all your uploaded shipments'}
+      subtitle={regionNames ? `Shipments from ${regionNames}` : 'View all your uploaded shipments'}
     >
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">

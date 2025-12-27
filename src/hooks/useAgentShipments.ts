@@ -1,22 +1,24 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Tables } from '@/integrations/supabase/types';
+import { Tables, Database } from '@/integrations/supabase/types';
 import { useAuth } from '@/hooks/useAuth';
-import { useAgentAssignedRegions } from '@/hooks/useAgentRegions';
 import { toast } from 'sonner';
+
+type AgentRegion = Database['public']['Enums']['agent_region'];
 
 export type Shipment = Tables<'shipments'> & {
   customers?: Tables<'customers'> | null;
 };
 
-export function useAgentShipments(filters?: {
-  status?: string;
-  search?: string;
-  includeDrafts?: boolean;
-}) {
+export function useAgentShipments(
+  regionCodes: AgentRegion[],
+  filters?: {
+    status?: string;
+    search?: string;
+    includeDrafts?: boolean;
+  }
+) {
   const { user } = useAuth();
-  const { data: assignedRegions } = useAgentAssignedRegions();
-  const regionCodes = assignedRegions?.map(r => r.region_code) || [];
 
   return useQuery({
     queryKey: ['agent-shipments', user?.id, regionCodes, filters],
@@ -72,10 +74,8 @@ export function useAgentDraftShipments() {
   });
 }
 
-export function useAgentShipmentStats() {
+export function useAgentShipmentStats(regionCodes: AgentRegion[]) {
   const { user } = useAuth();
-  const { data: assignedRegions } = useAgentAssignedRegions();
-  const regionCodes = assignedRegions?.map(r => r.region_code) || [];
 
   return useQuery({
     queryKey: ['agent-shipment-stats', user?.id, regionCodes],
@@ -204,10 +204,8 @@ export function useUpdateDraftShipment() {
   });
 }
 
-export function useUpdateAgentShipment() {
+export function useUpdateAgentShipment(regionCodes: AgentRegion[]) {
   const queryClient = useQueryClient();
-  const { data: assignedRegions } = useAgentAssignedRegions();
-  const regionCodes = assignedRegions?.map(r => r.region_code) || [];
 
   return useMutation({
     mutationFn: async (data: {

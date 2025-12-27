@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { AgentLayout } from '@/components/layout/AgentLayout';
 import { StatCard } from '@/components/admin/StatCard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -6,21 +7,20 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Package, Upload, TrendingUp, ArrowRight, Plus, Clock, CloudUpload, Sparkles, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
-import { useAuth } from '@/hooks/useAuth';
 import { useAgentShipments, useAgentShipmentStats } from '@/hooks/useAgentShipments';
+import { useAgentAssignedRegions } from '@/hooks/useAgentRegions';
 import { ShipmentStatusBadge } from '@/components/admin/ShipmentStatusBadge';
-import { useRegions } from '@/hooks/useRegions';
 import { BatchFreightCostCard } from '@/components/agent/BatchFreightCostCard';
 import { useAgentBalance } from '@/hooks/useAgentBalance';
 
 export default function AgentDashboard() {
-  const { getRegion } = useAuth();
-  const regionCode = getRegion();
-  const { data: regions } = useRegions();
-  const regionInfo = regions?.find(r => r.code === regionCode);
+  // Get assigned regions first - single source of truth
+  const { data: assignedRegions = [] } = useAgentAssignedRegions();
+  const regionCodes = useMemo(() => assignedRegions.map(r => r.region_code), [assignedRegions]);
+  const regionNames = assignedRegions.map(r => r.region_name).filter(Boolean).join(', ');
 
-  const { data: stats, isLoading: statsLoading } = useAgentShipmentStats();
-  const { data: shipments, isLoading: shipmentsLoading } = useAgentShipments();
+  const { data: stats, isLoading: statsLoading } = useAgentShipmentStats(regionCodes);
+  const { data: shipments, isLoading: shipmentsLoading } = useAgentShipments(regionCodes);
   const { data: balance, isLoading: balanceLoading } = useAgentBalance();
   
   const recentShipments = shipments?.slice(0, 5) || [];
@@ -38,7 +38,7 @@ export default function AgentDashboard() {
   return (
     <AgentLayout 
       title="Agent Dashboard" 
-      subtitle={regionInfo ? `Managing shipments from ${regionInfo.name}` : 'Upload and manage shipments'}
+      subtitle={regionNames ? `Managing shipments from ${regionNames}` : 'Upload and manage shipments'}
     >
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
