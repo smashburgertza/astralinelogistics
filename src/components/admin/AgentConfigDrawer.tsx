@@ -43,21 +43,15 @@ import {
   Settings, 
   Route, 
   DollarSign, 
-  TrendingUp,
   Loader2,
   Plus,
   Trash2,
-  User,
-  Tag,
-  Save,
-  Pencil,
-  X
+  User
 } from 'lucide-react';
 import { Agent } from '@/hooks/useAgents';
 import { useTransitRoutes, TRANSIT_POINT_LABELS, TRANSIT_POINT_OPTIONS, TransitPointType, useCreateTransitRoute, useUpdateTransitRoute, useDeleteTransitRoute } from '@/hooks/useTransitRoutes';
 import { useAllAgentBalances } from '@/hooks/useAgentBalance';
 import { useRegions } from '@/hooks/useRegions';
-import { useRegionPricing, useUpdateRegionPricing, useCreateRegionPricing, useDeleteRegionPricing } from '@/hooks/useRegionPricing';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 
 interface AgentConfigDrawerProps {
@@ -70,13 +64,9 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
   const { data: allRoutes = [], isLoading: routesLoading } = useTransitRoutes();
   const { data: allBalances = [] } = useAllAgentBalances();
   const { data: regions = [] } = useRegions();
-  const { data: allPricing = [] } = useRegionPricing();
   const createRoute = useCreateTransitRoute();
   const updateRoute = useUpdateTransitRoute();
   const deleteRoute = useDeleteTransitRoute();
-  const updatePricing = useUpdateRegionPricing();
-  const createPricing = useCreateRegionPricing();
-  const deletePricing = useDeleteRegionPricing();
 
   const [newRoute, setNewRoute] = useState({
     region_id: '',
@@ -86,22 +76,8 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
     estimated_days: 0,
   });
 
-  const [editingPricing, setEditingPricing] = useState<Record<string, {
-    cargo_type: 'sea' | 'air';
-    service_type: 'door_to_door' | 'airport_to_airport' | null;
-    transit_point: 'direct' | 'nairobi' | 'zanzibar';
-    agent_rate_per_kg: number;
-  }>>({});
+  const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'route'; id: string } | null>(null);
 
-  const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'pricing' | 'route'; id: string } | null>(null);
-  const [newPricing, setNewPricing] = useState({
-    region: '' as 'europe' | 'dubai' | 'china' | 'india' | 'usa' | 'uk' | '',
-    cargo_type: 'air' as 'sea' | 'air',
-    service_type: '' as 'door_to_door' | 'airport_to_airport' | '',
-    transit_point: 'direct' as 'direct' | 'nairobi' | 'zanzibar',
-    agent_rate_per_kg: 0,
-    currency: 'USD',
-  });
   if (!agent) return null;
 
   // Get agent's assigned regions
@@ -118,85 +94,6 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
 
   // Get agent's balance
   const agentBalance = allBalances.find(b => b.agent_id === agent.user_id);
-
-  // Filter pricing for agent's regions
-  const agentPricing = allPricing.filter(p => 
-    agentRegionCodes.includes(p.region)
-  );
-
-  const handleStartEditPricing = (pricing: typeof agentPricing[0]) => {
-    setEditingPricing(prev => ({
-      ...prev,
-      [pricing.id]: {
-        cargo_type: pricing.cargo_type as 'sea' | 'air',
-        service_type: pricing.service_type as 'door_to_door' | 'airport_to_airport' | null,
-        transit_point: (pricing.transit_point || 'direct') as 'direct' | 'nairobi' | 'zanzibar',
-        agent_rate_per_kg: pricing.agent_rate_per_kg,
-      }
-    }));
-  };
-
-  const handleEditPricingField = <K extends keyof typeof editingPricing[string]>(
-    pricingId: string, 
-    field: K, 
-    value: typeof editingPricing[string][K]
-  ) => {
-    setEditingPricing(prev => ({
-      ...prev,
-      [pricingId]: { ...prev[pricingId], [field]: value }
-    }));
-  };
-
-  const handleCancelEditPricing = (pricingId: string) => {
-    setEditingPricing(prev => {
-      const newState = { ...prev };
-      delete newState[pricingId];
-      return newState;
-    });
-  };
-
-  const handleSavePricing = async (pricingId: string) => {
-    const editedValue = editingPricing[pricingId];
-    if (!editedValue) return;
-    
-    await updatePricing.mutateAsync({
-      id: pricingId,
-      cargo_type: editedValue.cargo_type,
-      service_type: editedValue.service_type,
-      transit_point: editedValue.transit_point,
-      agent_rate_per_kg: editedValue.agent_rate_per_kg,
-    });
-    
-    setEditingPricing(prev => {
-      const newState = { ...prev };
-      delete newState[pricingId];
-      return newState;
-    });
-  };
-
-  const handleAddPricing = async () => {
-    if (!newPricing.region) return;
-    
-    await createPricing.mutateAsync({
-      region: newPricing.region as 'europe' | 'dubai' | 'china' | 'india' | 'usa' | 'uk',
-      cargo_type: newPricing.cargo_type,
-      service_type: newPricing.service_type || null,
-      transit_point: newPricing.transit_point,
-      agent_rate_per_kg: newPricing.agent_rate_per_kg,
-      customer_rate_per_kg: 0, // Will be configured separately in customer pricing
-      handling_fee: 0, // Will be configured separately in customer pricing
-      currency: newPricing.currency,
-    });
-    
-    setNewPricing({
-      region: '',
-      cargo_type: 'air',
-      service_type: '',
-      transit_point: 'direct',
-      agent_rate_per_kg: 0,
-      currency: 'USD',
-    });
-  };
 
   const handleAddRoute = async () => {
     if (!newRoute.region_id) return;
@@ -226,18 +123,9 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
     setDeleteConfirm(null);
   };
 
-  const handleDeletePricing = async (pricingId: string) => {
-    await deletePricing.mutateAsync(pricingId);
-    setDeleteConfirm(null);
-  };
-
   const handleConfirmDelete = () => {
     if (!deleteConfirm) return;
-    if (deleteConfirm.type === 'route') {
-      handleDeleteRoute(deleteConfirm.id);
-    } else {
-      handleDeletePricing(deleteConfirm.id);
-    }
+    handleDeleteRoute(deleteConfirm.id);
   };
 
   return (
@@ -258,12 +146,8 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
         </SheetHeader>
 
         <div className="mt-6">
-          <Tabs defaultValue="pricing" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="pricing" className="gap-1.5">
-                <Tag className="w-4 h-4" />
-                Pricing
-              </TabsTrigger>
+          <Tabs defaultValue="routes" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="routes" className="gap-1.5">
                 <Route className="w-4 h-4" />
                 Routes
@@ -277,293 +161,6 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
                 Settings
               </TabsTrigger>
             </TabsList>
-
-            {/* Pricing Tab */}
-            <TabsContent value="pricing" className="mt-4 space-y-4">
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Agent Shipping Rates</CardTitle>
-                  <CardDescription>
-                    Configure rates the agent charges for shipping per kg
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {agentPricing.length > 0 ? (
-                    <div className="rounded-lg border">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Region</TableHead>
-                            <TableHead>Cargo</TableHead>
-                            <TableHead>Route</TableHead>
-                            <TableHead>Service</TableHead>
-                            <TableHead>Agent Rate/kg</TableHead>
-                            <TableHead></TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {agentPricing.map((pricing) => {
-                            const isEditing = editingPricing[pricing.id] !== undefined;
-                            const editData = editingPricing[pricing.id];
-                            const regionInfo = regions.find(r => r.code === pricing.region);
-                            
-                            return (
-                              <TableRow key={pricing.id}>
-                                <TableCell>
-                                  <span className="flex items-center gap-1.5">
-                                    {regionInfo?.flag_emoji}
-                                    <span className="text-sm">{regionInfo?.name || pricing.region}</span>
-                                  </span>
-                                </TableCell>
-                                <TableCell>
-                                  {isEditing ? (
-                                    <Select
-                                      value={editData.cargo_type}
-                                      onValueChange={(value) => handleEditPricingField(pricing.id, 'cargo_type', value as 'sea' | 'air')}
-                                    >
-                                      <SelectTrigger className="h-8 w-20">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="air">Air</SelectItem>
-                                        <SelectItem value="sea">Sea</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  ) : (
-                                    <Badge variant="outline" className="text-xs capitalize">
-                                      {pricing.cargo_type}
-                                    </Badge>
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  {isEditing ? (
-                                    <Select
-                                      value={editData.transit_point}
-                                      onValueChange={(value) => handleEditPricingField(pricing.id, 'transit_point', value as 'direct' | 'nairobi' | 'zanzibar')}
-                                    >
-                                      <SelectTrigger className="h-8 w-28">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="direct">Direct</SelectItem>
-                                        <SelectItem value="nairobi">Via Nairobi</SelectItem>
-                                        <SelectItem value="zanzibar">Via Zanzibar</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  ) : (
-                                    <Badge variant="secondary" className="text-xs">
-                                      {TRANSIT_POINT_LABELS[pricing.transit_point || 'direct']}
-                                    </Badge>
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  {isEditing ? (
-                                    <Select
-                                      value={editData.service_type || ''}
-                                      onValueChange={(value) => handleEditPricingField(pricing.id, 'service_type', value as 'door_to_door' | 'airport_to_airport' | null)}
-                                    >
-                                      <SelectTrigger className="h-8 w-28">
-                                        <SelectValue placeholder="Select" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="door_to_door">Door to Door</SelectItem>
-                                        <SelectItem value="airport_to_airport">Airport to Airport</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground">
-                                      {pricing.service_type?.replace(/_/g, ' ') || '—'}
-                                    </span>
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  {isEditing ? (
-                                    <div className="flex items-center gap-1">
-                                      <span className="text-muted-foreground text-xs">
-                                        {CURRENCY_SYMBOLS[pricing.currency] || pricing.currency}
-                                      </span>
-                                      <Input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        value={editData.agent_rate_per_kg}
-                                        onChange={(e) => handleEditPricingField(pricing.id, 'agent_rate_per_kg', parseFloat(e.target.value) || 0)}
-                                        className="w-20 h-8"
-                                      />
-                                    </div>
-                                  ) : (
-                                    <span className="text-sm font-medium">
-                                      {CURRENCY_SYMBOLS[pricing.currency] || pricing.currency}{pricing.agent_rate_per_kg}/kg
-                                    </span>
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center gap-1">
-                                    {isEditing ? (
-                                      <>
-                                        <Button
-                                          size="sm"
-                                          onClick={() => handleSavePricing(pricing.id)}
-                                          disabled={updatePricing.isPending}
-                                        >
-                                          {updatePricing.isPending ? (
-                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                          ) : (
-                                            <Save className="w-4 h-4" />
-                                          )}
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-8 w-8"
-                                          onClick={() => handleCancelEditPricing(pricing.id)}
-                                        >
-                                          <X className="w-4 h-4" />
-                                        </Button>
-                                      </>
-                                    ) : (
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8"
-                                        onClick={() => handleStartEditPricing(pricing)}
-                                      >
-                                        <Pencil className="w-4 h-4" />
-                                      </Button>
-                                    )}
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8"
-                                      onClick={() => setDeleteConfirm({ type: 'pricing', id: pricing.id })}
-                                      disabled={deletePricing.isPending}
-                                    >
-                                      <Trash2 className="w-4 h-4 text-destructive" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  ) : (
-                    <div className="text-center py-6 text-muted-foreground text-sm">
-                      No pricing configured for this agent's regions yet.
-                      <br />
-                      <span className="text-xs">Configure region pricing in Settings → Pricing first.</span>
-                    </div>
-                  )}
-
-                  <Separator />
-
-                  {/* Add New Pricing */}
-                  <div className="space-y-3">
-                    <Label className="text-sm font-medium">Add New Pricing</Label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <Select
-                        value={newPricing.region}
-                        onValueChange={(value) => setNewPricing({ ...newPricing, region: value as any })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select region" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {agentRegions.map((region) => (
-                            <SelectItem key={region.code} value={region.code}>
-                              {region.flag_emoji} {region.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-
-                      <Select
-                        value={newPricing.cargo_type}
-                        onValueChange={(value) => setNewPricing({ ...newPricing, cargo_type: value as 'sea' | 'air' })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="air">Air Cargo</SelectItem>
-                          <SelectItem value="sea">Sea Cargo</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-3">
-                      <Select
-                        value={newPricing.service_type}
-                        onValueChange={(value) => setNewPricing({ ...newPricing, service_type: value as any })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Service type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="door_to_door">Door to Door</SelectItem>
-                          <SelectItem value="airport_to_airport">Airport to Airport</SelectItem>
-                        </SelectContent>
-                      </Select>
-
-                      <Select
-                        value={newPricing.transit_point}
-                        onValueChange={(value) => setNewPricing({ ...newPricing, transit_point: value as any })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="direct">Direct</SelectItem>
-                          <SelectItem value="nairobi">Via Nairobi</SelectItem>
-                          <SelectItem value="zanzibar">Via Zanzibar</SelectItem>
-                        </SelectContent>
-                      </Select>
-
-                      <Select
-                        value={newPricing.currency}
-                        onValueChange={(value) => setNewPricing({ ...newPricing, currency: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="USD">USD</SelectItem>
-                          <SelectItem value="EUR">EUR</SelectItem>
-                          <SelectItem value="GBP">GBP</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-3">
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Agent Rate/kg</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={newPricing.agent_rate_per_kg}
-                          onChange={(e) => setNewPricing({ ...newPricing, agent_rate_per_kg: parseFloat(e.target.value) || 0 })}
-                        />
-                      </div>
-                    </div>
-
-                    <Button
-                      onClick={handleAddPricing}
-                      disabled={!newPricing.region || createPricing.isPending}
-                      className="w-full"
-                    >
-                      {createPricing.isPending ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <Plus className="w-4 h-4 mr-2" />
-                      )}
-                      Add Pricing
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
 
             {/* Transit Routes Tab */}
             <TabsContent value="routes" className="mt-4 space-y-4">
@@ -802,7 +399,7 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
                     </div>
                   ) : (
                     <div className="text-center py-6 text-muted-foreground text-sm">
-                      No invoice history for this agent yet.
+                      No balance data available for this agent.
                     </div>
                   )}
                 </CardContent>
@@ -813,71 +410,84 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
             <TabsContent value="settings" className="mt-4 space-y-4">
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Agent Settings</CardTitle>
+                  <CardTitle className="text-base">Agent Details</CardTitle>
                   <CardDescription>
-                    General configuration for this agent
+                    View agent information and assigned regions
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Assigned Regions</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {agentRegions.map((region) => (
-                        <Badge key={region.code} variant="secondary">
-                          {region.flag_emoji} {region.name}
-                        </Badge>
-                      ))}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Name</Label>
+                      <p className="text-sm font-medium">{agent.profile?.full_name || '—'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Email</Label>
+                      <p className="text-sm font-medium">{agent.profile?.email || '—'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Phone</Label>
+                      <p className="text-sm font-medium">{agent.profile?.phone || '—'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">User ID</Label>
+                      <p className="text-sm font-medium font-mono text-xs">{agent.user_id?.slice(0, 8) || '—'}...</p>
                     </div>
                   </div>
 
                   <Separator />
 
-                  <div className="space-y-2">
-                    <Label>Contact Information</Label>
-                    <div className="text-sm space-y-1">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Email</span>
-                        <span>{agent.profile?.email}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Phone</span>
-                        <span>{agent.profile?.phone || '—'}</span>
-                      </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Assigned Regions</Label>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {agentRegions.length > 0 ? (
+                        agentRegions.map((region) => (
+                          <Badge key={region.id} variant="secondary" className="gap-1.5">
+                            {region.flag_emoji} {region.name}
+                          </Badge>
+                        ))
+                      ) : (
+                        <span className="text-sm text-muted-foreground">No regions assigned</span>
+                      )}
                     </div>
                   </div>
 
                   <Separator />
 
-                  <div className="text-sm text-muted-foreground">
-                    More agent-specific settings coming soon (custom rates, commission rules, etc.)
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Account Status</Label>
+                    <div className="flex items-center gap-2 mt-2">
+                      <Badge variant="outline" className="gap-1.5">
+                        <User className="w-3 h-3" />
+                        Agent
+                      </Badge>
+                      <Badge variant="secondary">Active</Badge>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
             </TabsContent>
           </Tabs>
         </div>
-      </SheetContent>
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete {deleteConfirm?.type === 'route' ? 'Transit Route' : 'Pricing Entry'}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the {deleteConfirm?.type === 'route' ? 'transit route' : 'pricing entry'}.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleConfirmDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Route</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this transit route? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </SheetContent>
     </Sheet>
   );
 }
