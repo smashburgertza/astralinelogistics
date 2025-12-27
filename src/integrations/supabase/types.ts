@@ -118,6 +118,38 @@ export type Database = {
           },
         ]
       }
+      agent_regions: {
+        Row: {
+          created_at: string | null
+          id: string
+          region_code: string
+          region_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          region_code: string
+          region_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          region_code?: string
+          region_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_regions_region_id_fkey"
+            columns: ["region_id"]
+            isOneToOne: false
+            referencedRelation: "regions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -1942,6 +1974,13 @@ export type Database = {
         Returns: boolean
       }
       is_admin_or_employee: { Args: { _user_id: string }; Returns: boolean }
+      user_has_region: {
+        Args: {
+          _region: Database["public"]["Enums"]["agent_region"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       agent_region: "europe" | "dubai" | "china" | "india" | "usa" | "uk"

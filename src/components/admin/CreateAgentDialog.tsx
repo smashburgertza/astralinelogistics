@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Form,
   FormControl,
@@ -21,13 +22,6 @@ import {
   FormMessage,
   FormDescription,
 } from '@/components/ui/form';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Plus, Loader2, User, Mail, Phone, MapPin, Lock } from 'lucide-react';
 import { useCreateAgent } from '@/hooks/useAgents';
 import { useActiveRegions } from '@/hooks/useRegions';
@@ -37,7 +31,7 @@ const formSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters'),
   fullName: z.string().min(2, 'Name must be at least 2 characters').max(100),
   phone: z.string().max(20).optional(),
-  region: z.string().min(1, 'Please select a region'),
+  regions: z.array(z.string()).min(1, 'Please select at least one region'),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -54,19 +48,17 @@ export function CreateAgentDialog() {
       password: '',
       fullName: '',
       phone: '',
-      region: undefined,
+      regions: [],
     },
   });
 
   const onSubmit = async (values: FormValues) => {
-    // Find the region code from the region id
-    const selectedRegion = regions?.find(r => r.id === values.region);
     await createAgent.mutateAsync({
       email: values.email,
       password: values.password,
       fullName: values.fullName,
       phone: values.phone,
-      region: selectedRegion?.code as any, // The hook expects the region code
+      regions: values.regions,
     });
     setOpen(false);
     form.reset();
@@ -84,7 +76,7 @@ export function CreateAgentDialog() {
         <DialogHeader>
           <DialogTitle className="font-heading">Create New Agent</DialogTitle>
           <DialogDescription>
-            Create a new agent account. They will be able to log in and manage shipments for their assigned region.
+            Create a new agent account. They will be able to log in and manage shipments for their assigned regions.
           </DialogDescription>
         </DialogHeader>
 
@@ -163,37 +155,50 @@ export function CreateAgentDialog() {
 
             <FormField
               control={form.control}
-              name="region"
-              render={({ field }) => (
+              name="regions"
+              render={() => (
                 <FormItem>
                   <FormLabel className="flex items-center gap-2">
                     <MapPin className="w-4 h-4" />
-                    Assigned Region
+                    Assigned Regions
                   </FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a region" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {regionsLoading ? (
-                        <div className="p-2 text-center text-muted-foreground">Loading...</div>
-                      ) : (
-                        regions?.map((region) => (
-                          <SelectItem key={region.id} value={region.id}>
-                            <span className="flex items-center gap-2">
-                              <span>{region.flag_emoji}</span>
-                              <span>{region.name}</span>
-                            </span>
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
                   <FormDescription>
-                    The agent will only be able to manage shipments from this region.
+                    Select one or more regions the agent can manage.
                   </FormDescription>
+                  <div className="grid grid-cols-2 gap-3 mt-2">
+                    {regionsLoading ? (
+                      <div className="col-span-2 p-4 text-center text-muted-foreground">
+                        <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                      </div>
+                    ) : (
+                      regions?.map((region) => (
+                        <FormField
+                          key={region.id}
+                          control={form.control}
+                          name="regions"
+                          render={({ field }) => (
+                            <FormItem className="flex items-center space-x-3 space-y-0 p-3 rounded-lg border hover:bg-muted/50 transition-colors">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value?.includes(region.code)}
+                                  onCheckedChange={(checked) => {
+                                    const newValue = checked
+                                      ? [...field.value, region.code]
+                                      : field.value.filter((v) => v !== region.code);
+                                    field.onChange(newValue);
+                                  }}
+                                />
+                              </FormControl>
+                              <FormLabel className="font-normal cursor-pointer flex items-center gap-2">
+                                <span>{region.flag_emoji}</span>
+                                <span>{region.name}</span>
+                              </FormLabel>
+                            </FormItem>
+                          )}
+                        />
+                      ))
+                    )}
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
