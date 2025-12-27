@@ -1,0 +1,9 @@
+-- Enable realtime for public-facing tables
+ALTER PUBLICATION supabase_realtime ADD TABLE public.regions;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.region_pricing;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.agent_addresses;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.container_pricing;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.vehicle_pricing;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.page_content;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.shop_for_me_charges;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.shipping_calculator_charges;
