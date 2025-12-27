@@ -16,6 +16,7 @@ interface AirCargoCalculatorProps {
   weight: string;
   setWeight: (weight: string) => void;
   deliveryTimes: DeliveryTimes | undefined;
+  serviceType?: 'door-to-door' | 'airport-to-airport';
 }
 
 export function AirCargoCalculator({
@@ -26,6 +27,7 @@ export function AirCargoCalculator({
   weight,
   setWeight,
   deliveryTimes,
+  serviceType = 'door-to-door',
 }: AirCargoCalculatorProps) {
   const pricingItem = pricing.find(p => p.region_id === regionId);
   const weightNum = parseFloat(weight) || 0;
@@ -39,7 +41,11 @@ export function AirCargoCalculator({
     <div className="space-y-4 sm:space-y-6">
       <div className="flex items-center gap-2 p-3 bg-amber-50 rounded-lg border border-amber-100">
         <Plane className="w-5 h-5 text-amber-600" />
-        <p className="text-sm text-amber-700">Air freight - fast delivery for urgent shipments</p>
+        <p className="text-sm text-amber-700">
+          {serviceType === 'door-to-door' 
+            ? 'Door to Door - Complete delivery to your address' 
+            : 'Airport to Airport - Pickup from destination airport'}
+        </p>
       </div>
 
       <div className="space-y-2">

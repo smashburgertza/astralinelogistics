@@ -16,6 +16,8 @@ export interface ShippingCalculatorCharge {
   display_order: number;
   region: AgentRegion;
   currency: string;
+  cargo_type: 'sea' | 'air';
+  service_type: 'door_to_door' | 'airport_to_airport' | null;
   created_at: string;
   updated_at: string;
 }

@@ -18,6 +18,7 @@ import type { RegionPricing, ContainerPricingItem, VehiclePricingItem } from './
 export function PricingCalculator() {
   const [activeTab, setActiveTab] = useState('sea-cargo');
   const [seaSubTab, setSeaSubTab] = useState('loose-cargo');
+  const [airSubTab, setAirSubTab] = useState('door-to-door');
   
   const [looseRegionId, setLooseRegionId] = useState<string>('');
   const [looseWeight, setLooseWeight] = useState<string>('');
@@ -172,15 +173,42 @@ export function PricingCalculator() {
               </TabsContent>
 
               <TabsContent value="air-cargo" className="mt-0">
-                <AirCargoCalculator
-                  regions={regions}
-                  pricing={pricing}
-                  regionId={airRegionId}
-                  setRegionId={setAirRegionId}
-                  weight={airWeight}
-                  setWeight={setAirWeight}
-                  deliveryTimes={airDeliveryTimes}
-                />
+                <Tabs value={airSubTab} onValueChange={setAirSubTab} className="w-full">
+                  <TabsList className="grid w-full grid-cols-2 mb-4 h-auto">
+                    <TabsTrigger value="door-to-door" className="flex items-center gap-1.5 text-xs sm:text-sm py-2">
+                      Door to Door
+                    </TabsTrigger>
+                    <TabsTrigger value="airport-to-airport" className="flex items-center gap-1.5 text-xs sm:text-sm py-2">
+                      Airport to Airport
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="door-to-door" className="mt-0">
+                    <AirCargoCalculator
+                      regions={regions}
+                      pricing={pricing}
+                      regionId={airRegionId}
+                      setRegionId={setAirRegionId}
+                      weight={airWeight}
+                      setWeight={setAirWeight}
+                      deliveryTimes={airDeliveryTimes}
+                      serviceType="door-to-door"
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="airport-to-airport" className="mt-0">
+                    <AirCargoCalculator
+                      regions={regions}
+                      pricing={pricing}
+                      regionId={airRegionId}
+                      setRegionId={setAirRegionId}
+                      weight={airWeight}
+                      setWeight={setAirWeight}
+                      deliveryTimes={airDeliveryTimes}
+                      serviceType="airport-to-airport"
+                    />
+                  </TabsContent>
+                </Tabs>
               </TabsContent>
             </Tabs>
           </div>
