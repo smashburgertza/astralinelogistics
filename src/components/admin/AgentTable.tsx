@@ -36,10 +36,11 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { MoreHorizontal, UserX, MapPin, User, Loader2 } from 'lucide-react';
+import { MoreHorizontal, UserX, MapPin, User, Loader2, Settings } from 'lucide-react';
 import { format } from 'date-fns';
 import { Agent, useDeleteAgent, useUpdateAgentRegions } from '@/hooks/useAgents';
 import { useRegions } from '@/hooks/useRegions';
+import { AgentConfigDrawer } from './AgentConfigDrawer';
 
 interface AgentTableProps {
   agents: Agent[] | undefined;
@@ -51,6 +52,7 @@ export function AgentTable({ agents, isLoading }: AgentTableProps) {
   const [agentToDelete, setAgentToDelete] = useState<Agent | null>(null);
   const [editRegionsAgent, setEditRegionsAgent] = useState<Agent | null>(null);
   const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
+  const [configAgent, setConfigAgent] = useState<Agent | null>(null);
   
   const deleteAgent = useDeleteAgent();
   const updateRegions = useUpdateAgentRegions();
@@ -152,7 +154,7 @@ export function AgentTable({ agents, isLoading }: AgentTableProps) {
               <TableHead className="font-semibold">Email</TableHead>
               <TableHead className="font-semibold">Regions</TableHead>
               <TableHead className="font-semibold">Created</TableHead>
-              <TableHead className="w-[50px]"></TableHead>
+              <TableHead className="w-[120px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -213,32 +215,47 @@ export function AgentTable({ agents, isLoading }: AgentTableProps) {
                     }
                   </TableCell>
                   <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleOpenEditRegions(agent)}>
-                          <MapPin className="w-4 h-4 mr-2" />
-                          Edit Regions
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onClick={() => {
-                            setAgentToDelete(agent);
-                            setDeleteDialogOpen(true);
-                          }}
-                        >
-                          <UserX className="w-4 h-4 mr-2" />
-                          Remove Agent
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <div className="flex items-center gap-2 justify-end">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5"
+                        onClick={() => setConfigAgent(agent)}
+                      >
+                        <Settings className="w-3.5 h-3.5" />
+                        Configure
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => setConfigAgent(agent)}>
+                            <Settings className="w-4 h-4 mr-2" />
+                            Configure Agent
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleOpenEditRegions(agent)}>
+                            <MapPin className="w-4 h-4 mr-2" />
+                            Edit Regions
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => {
+                              setAgentToDelete(agent);
+                              setDeleteDialogOpen(true);
+                            }}
+                          >
+                            <UserX className="w-4 h-4 mr-2" />
+                            Remove Agent
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </TableCell>
                 </TableRow>
               );
@@ -329,6 +346,13 @@ export function AgentTable({ agents, isLoading }: AgentTableProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Agent Config Drawer */}
+      <AgentConfigDrawer
+        agent={configAgent}
+        open={!!configAgent}
+        onOpenChange={(open) => !open && setConfigAgent(null)}
+      />
     </>
   );
 }
