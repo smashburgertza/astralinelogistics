@@ -90,6 +90,10 @@ export function useCreateAgent() {
       phone?: string;
       regions: string[]; // Array of region codes
     }) => {
+      // Store current admin session before creating new user
+      const { data: currentSession } = await supabase.auth.getSession();
+      const adminSession = currentSession.session;
+
       // First, create the user via Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
@@ -101,8 +105,24 @@ export function useCreateAgent() {
         },
       });
 
-      if (authError) throw authError;
-      if (!authData.user) throw new Error('Failed to create user');
+      if (authError) {
+        // Restore admin session if signup failed
+        if (adminSession) {
+          await supabase.auth.setSession(adminSession);
+        }
+        throw authError;
+      }
+      if (!authData.user) {
+        if (adminSession) {
+          await supabase.auth.setSession(adminSession);
+        }
+        throw new Error('Failed to create user');
+      }
+
+      // Restore admin session immediately after user creation
+      if (adminSession) {
+        await supabase.auth.setSession(adminSession);
+      }
 
       const userId = authData.user.id;
 
