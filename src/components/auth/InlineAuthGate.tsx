@@ -45,6 +45,7 @@ export function InlineAuthGate({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const viewTrackedRef = useRef(false);
+  const formStartedTrackedRef = useRef(false);
 
   // Track teaser view (once per component mount)
   useEffect(() => {
@@ -59,6 +60,20 @@ export function InlineAuthGate({
         });
     }
   }, [user, source]);
+
+  // Track form_started when user begins typing
+  const trackFormStarted = () => {
+    if (!formStartedTrackedRef.current) {
+      formStartedTrackedRef.current = true;
+      const sessionId = getSessionId();
+      supabase
+        .from('teaser_conversion_events')
+        .insert({ event_type: 'form_started', source, session_id: sessionId })
+        .then(({ error }) => {
+          if (error) console.error('Failed to track form started:', error);
+        });
+    }
+  };
 
   // If user is authenticated, show full content
   if (user) {
@@ -193,7 +208,10 @@ export function InlineAuthGate({
                   type="text"
                   placeholder="John Doe"
                   value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
+                  onChange={(e) => {
+                    setFullName(e.target.value);
+                    trackFormStarted();
+                  }}
                   className="pl-9"
                 />
               </div>
@@ -211,6 +229,7 @@ export function InlineAuthGate({
                 value={email}
                 onChange={(e) => {
                   setEmail(e.target.value);
+                  trackFormStarted();
                   if (errors.email) setErrors({ ...errors, email: undefined });
                 }}
                 className={`pl-9 ${errors.email ? 'border-destructive' : ''}`}
@@ -232,6 +251,7 @@ export function InlineAuthGate({
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);
+                  trackFormStarted();
                   if (errors.password) setErrors({ ...errors, password: undefined });
                 }}
                 className={`pl-9 pr-9 ${errors.password ? 'border-destructive' : ''}`}

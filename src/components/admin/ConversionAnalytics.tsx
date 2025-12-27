@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useConversionAnalytics } from '@/hooks/useConversionAnalytics';
-import { TrendingUp, Eye, UserPlus, Percent } from 'lucide-react';
+import { TrendingUp, Eye, UserPlus, Percent, MousePointerClick, UserX } from 'lucide-react';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { Area, AreaChart, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { format, parseISO } from 'date-fns';
@@ -15,6 +15,10 @@ const chartConfig = {
   views: {
     label: 'Views',
     color: 'hsl(var(--chart-1))',
+  },
+  formStarts: {
+    label: 'Form Starts',
+    color: 'hsl(var(--chart-3))',
   },
   signups: {
     label: 'Signups',
@@ -46,12 +50,17 @@ export function ConversionAnalytics() {
     );
   }
 
-  const { stats, dailyStats, totals } = data || { stats: [], dailyStats: [], totals: { views: 0, signups: 0, conversionRate: 0 } };
+  const { stats, dailyStats, totals } = data || { 
+    stats: [], 
+    dailyStats: [], 
+    totals: { views: 0, formStarts: 0, signups: 0, conversionRate: 0, formAbandonmentRate: 0 } 
+  };
 
   // Format daily stats for the chart
   const chartData = dailyStats.map((day) => ({
     date: day.date,
     views: day.views,
+    formStarts: day.formStarts,
     signups: day.signups,
     formattedDate: format(parseISO(day.date), 'MMM d'),
   }));
@@ -67,14 +76,23 @@ export function ConversionAnalytics() {
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Overall Stats */}
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
+        <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
           <div className="bg-muted/50 rounded-lg p-4 flex items-center gap-3">
             <div className="p-2 bg-blue-500/10 rounded-lg">
               <Eye className="h-5 w-5 text-blue-500" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Total Views</p>
+              <p className="text-sm text-muted-foreground">Views</p>
               <p className="text-2xl font-bold">{totals.views.toLocaleString()}</p>
+            </div>
+          </div>
+          <div className="bg-muted/50 rounded-lg p-4 flex items-center gap-3">
+            <div className="p-2 bg-orange-500/10 rounded-lg">
+              <MousePointerClick className="h-5 w-5 text-orange-500" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Form Starts</p>
+              <p className="text-2xl font-bold">{totals.formStarts.toLocaleString()}</p>
             </div>
           </div>
           <div className="bg-muted/50 rounded-lg p-4 flex items-center gap-3">
@@ -82,7 +100,7 @@ export function ConversionAnalytics() {
               <UserPlus className="h-5 w-5 text-green-500" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Total Signups</p>
+              <p className="text-sm text-muted-foreground">Signups</p>
               <p className="text-2xl font-bold">{totals.signups.toLocaleString()}</p>
             </div>
           </div>
@@ -91,8 +109,17 @@ export function ConversionAnalytics() {
               <Percent className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Conversion Rate</p>
+              <p className="text-sm text-muted-foreground">Conversion</p>
               <p className="text-2xl font-bold">{totals.conversionRate.toFixed(1)}%</p>
+            </div>
+          </div>
+          <div className="bg-muted/50 rounded-lg p-4 flex items-center gap-3">
+            <div className="p-2 bg-red-500/10 rounded-lg">
+              <UserX className="h-5 w-5 text-red-500" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Abandonment</p>
+              <p className="text-2xl font-bold">{totals.formAbandonmentRate.toFixed(1)}%</p>
             </div>
           </div>
         </div>
@@ -107,6 +134,10 @@ export function ConversionAnalytics() {
                   <linearGradient id="fillViews" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.8} />
                     <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0.1} />
+                  </linearGradient>
+                  <linearGradient id="fillFormStarts" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--chart-3))" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="hsl(var(--chart-3))" stopOpacity={0.1} />
                   </linearGradient>
                   <linearGradient id="fillSignups" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="hsl(var(--chart-2))" stopOpacity={0.8} />
@@ -134,6 +165,13 @@ export function ConversionAnalytics() {
                 />
                 <Area
                   type="monotone"
+                  dataKey="formStarts"
+                  stroke="hsl(var(--chart-3))"
+                  fill="url(#fillFormStarts)"
+                  strokeWidth={2}
+                />
+                <Area
+                  type="monotone"
                   dataKey="signups"
                   stroke="hsl(var(--chart-2))"
                   fill="url(#fillSignups)"
@@ -153,14 +191,22 @@ export function ConversionAnalytics() {
                 <div>
                   <p className="font-medium">{SOURCE_LABELS[stat.source] || stat.source}</p>
                   <p className="text-sm text-muted-foreground">
-                    {stat.totalViews} views → {stat.totalSignups} signups
+                    {stat.totalViews} views → {stat.totalFormStarts} form starts → {stat.totalSignups} signups
                   </p>
                 </div>
-                <div className="text-right">
-                  <p className={`text-lg font-bold ${stat.conversionRate > 0 ? 'text-green-600' : 'text-muted-foreground'}`}>
-                    {stat.conversionRate.toFixed(1)}%
-                  </p>
-                  <p className="text-xs text-muted-foreground">conversion</p>
+                <div className="text-right flex gap-4">
+                  <div>
+                    <p className={`text-lg font-bold ${stat.conversionRate > 0 ? 'text-green-600' : 'text-muted-foreground'}`}>
+                      {stat.conversionRate.toFixed(1)}%
+                    </p>
+                    <p className="text-xs text-muted-foreground">conversion</p>
+                  </div>
+                  <div>
+                    <p className={`text-lg font-bold ${stat.formAbandonmentRate > 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
+                      {stat.formAbandonmentRate.toFixed(1)}%
+                    </p>
+                    <p className="text-xs text-muted-foreground">abandoned</p>
+                  </div>
                 </div>
               </div>
             ))}
