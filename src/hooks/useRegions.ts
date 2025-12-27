@@ -119,6 +119,34 @@ export function useDeleteRegion() {
   });
 }
 
+export function useReorderRegions() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (regions: { id: string; display_order: number }[]) => {
+      // Update all regions in a single transaction-like manner
+      const promises = regions.map(({ id, display_order }) =>
+        supabase
+          .from('regions')
+          .update({ display_order })
+          .eq('id', id)
+      );
+      const results = await Promise.all(promises);
+      const errors = results.filter(r => r.error);
+      if (errors.length > 0) {
+        throw new Error('Failed to update some regions');
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['regions'] });
+      toast.success('Region order updated');
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to reorder regions: ${error.message}`);
+    },
+  });
+}
+
 // Helper to convert regions array to a map for easy lookup
 export function regionsToMap(regions: Region[] | undefined): Record<string, Region> {
   if (!regions) return {};
