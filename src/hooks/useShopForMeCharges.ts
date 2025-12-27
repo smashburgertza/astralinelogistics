@@ -29,6 +29,8 @@ export function useShopForMeCharges() {
       if (error) throw error;
       return data as ShopForMeCharge[];
     },
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -44,6 +46,8 @@ export function useAllShopForMeCharges() {
       if (error) throw error;
       return data as ShopForMeCharge[];
     },
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: true,
   });
 }
 

@@ -57,6 +57,8 @@ export function useShippingCalculatorCharges(region?: AgentRegion) {
       if (error) throw error;
       return data as ShippingCalculatorCharge[];
     },
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: true,
   });
 }
 
