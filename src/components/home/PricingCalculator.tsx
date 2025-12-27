@@ -27,13 +27,31 @@ export function PricingCalculator() {
   const [airRegionId, setAirRegionId] = useState<string>('');
   const [airWeight, setAirWeight] = useState<string>('');
 
-  const { data: regionPricingData } = useRegionPricing();
+  const { data: seaPricingData } = useRegionPricing('sea');
+  const { data: airD2DPricingData } = useRegionPricing('air', 'door_to_door');
+  const { data: airA2APricingData } = useRegionPricing('air', 'airport_to_airport');
   const { containerPricing: containerPricingData } = useContainerPricing();
   const { vehiclePricing: vehiclePricingData } = useVehiclePricing();
   const { data: regions } = useActiveRegions();
   const { rates: exchangeRates } = useExchangeRatesMap();
 
-  const pricing = (regionPricingData || []).map(p => ({
+  const seaPricing = (seaPricingData || []).map(p => ({
+    region: p.region,
+    region_id: p.region_id,
+    customer_rate_per_kg: p.customer_rate_per_kg,
+    handling_fee: p.handling_fee,
+    currency: p.currency,
+  })) as RegionPricing[];
+
+  const airD2DPricing = (airD2DPricingData || []).map(p => ({
+    region: p.region,
+    region_id: p.region_id,
+    customer_rate_per_kg: p.customer_rate_per_kg,
+    handling_fee: p.handling_fee,
+    currency: p.currency,
+  })) as RegionPricing[];
+
+  const airA2APricing = (airA2APricingData || []).map(p => ({
     region: p.region,
     region_id: p.region_id,
     customer_rate_per_kg: p.customer_rate_per_kg,
@@ -152,7 +170,7 @@ export function PricingCalculator() {
                   <TabsContent value="loose-cargo" className="mt-0">
                     <LooseCargoCalculator
                       regions={regions}
-                      pricing={pricing}
+                      pricing={seaPricing}
                       regionId={looseRegionId}
                       setRegionId={setLooseRegionId}
                       weight={looseWeight}
@@ -186,7 +204,7 @@ export function PricingCalculator() {
                   <TabsContent value="door-to-door" className="mt-0">
                     <AirCargoCalculator
                       regions={regions}
-                      pricing={pricing}
+                      pricing={airD2DPricing}
                       regionId={airRegionId}
                       setRegionId={setAirRegionId}
                       weight={airWeight}
@@ -199,7 +217,7 @@ export function PricingCalculator() {
                   <TabsContent value="airport-to-airport" className="mt-0">
                     <AirCargoCalculator
                       regions={regions}
-                      pricing={pricing}
+                      pricing={airA2APricing}
                       regionId={airRegionId}
                       setRegionId={setAirRegionId}
                       weight={airWeight}

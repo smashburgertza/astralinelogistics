@@ -1445,6 +1445,7 @@ export type Database = {
       region_pricing: {
         Row: {
           agent_rate_per_kg: number
+          cargo_type: string
           created_at: string | null
           currency: string
           customer_rate_per_kg: number
@@ -1452,10 +1453,12 @@ export type Database = {
           id: string
           region: Database["public"]["Enums"]["agent_region"]
           region_id: string | null
+          service_type: string | null
           updated_at: string | null
         }
         Insert: {
           agent_rate_per_kg: number
+          cargo_type?: string
           created_at?: string | null
           currency?: string
           customer_rate_per_kg: number
@@ -1463,10 +1466,12 @@ export type Database = {
           id?: string
           region: Database["public"]["Enums"]["agent_region"]
           region_id?: string | null
+          service_type?: string | null
           updated_at?: string | null
         }
         Update: {
           agent_rate_per_kg?: number
+          cargo_type?: string
           created_at?: string | null
           currency?: string
           customer_rate_per_kg?: number
@@ -1474,6 +1479,7 @@ export type Database = {
           id?: string
           region?: Database["public"]["Enums"]["agent_region"]
           region_id?: string | null
+          service_type?: string | null
           updated_at?: string | null
         }
         Relationships: [
