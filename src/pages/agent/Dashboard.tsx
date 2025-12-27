@@ -3,7 +3,7 @@ import { StatCard } from '@/components/admin/StatCard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Package, Upload, TrendingUp, ArrowRight, Plus, Clock, CloudUpload, Sparkles } from 'lucide-react';
+import { Package, Upload, TrendingUp, ArrowRight, Plus, Clock, CloudUpload, Sparkles, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
@@ -11,6 +11,7 @@ import { useAgentShipments, useAgentShipmentStats } from '@/hooks/useAgentShipme
 import { ShipmentStatusBadge } from '@/components/admin/ShipmentStatusBadge';
 import { useRegions } from '@/hooks/useRegions';
 import { BatchFreightCostCard } from '@/components/agent/BatchFreightCostCard';
+import { useAgentBalance } from '@/hooks/useAgentBalance';
 
 export default function AgentDashboard() {
   const { getRegion } = useAuth();
@@ -20,8 +21,19 @@ export default function AgentDashboard() {
 
   const { data: stats, isLoading: statsLoading } = useAgentShipmentStats();
   const { data: shipments, isLoading: shipmentsLoading } = useAgentShipments();
+  const { data: balance, isLoading: balanceLoading } = useAgentBalance();
   
   const recentShipments = shipments?.slice(0, 5) || [];
+
+  // Format currency
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
 
   return (
     <AgentLayout 
@@ -59,6 +71,60 @@ export default function AgentDashboard() {
               icon={Upload}
               variant="warning"
             />
+          </>
+        )}
+      </div>
+
+      {/* Balance Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        {balanceLoading ? (
+          <>
+            <Skeleton className="h-32" />
+            <Skeleton className="h-32" />
+          </>
+        ) : (
+          <>
+            {/* Astraline Owes Agent */}
+            <Card className="shadow-lg border-0 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 overflow-hidden relative">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+              <CardContent className="p-6 relative z-10">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground mb-1">Astraline Owes You</p>
+                    <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">
+                      {formatCurrency(balance?.pending_to_agent || 0)}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Paid: {formatCurrency(balance?.paid_to_agent || 0)}
+                    </p>
+                  </div>
+                  <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                    <ArrowDownLeft className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Agent Owes Astraline */}
+            <Card className="shadow-lg border-0 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 overflow-hidden relative">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+              <CardContent className="p-6 relative z-10">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground mb-1">You Owe Astraline</p>
+                    <p className="text-3xl font-bold text-amber-600 dark:text-amber-400">
+                      {formatCurrency(balance?.pending_from_agent || 0)}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Paid: {formatCurrency(balance?.paid_from_agent || 0)}
+                    </p>
+                  </div>
+                  <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                    <ArrowUpRight className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </>
         )}
       </div>
