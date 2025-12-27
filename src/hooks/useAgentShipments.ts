@@ -11,6 +11,7 @@ export type Shipment = Tables<'shipments'> & {
 export function useAgentShipments(filters?: {
   status?: string;
   search?: string;
+  includeDrafts?: boolean;
 }) {
   const { getRegion } = useAuth();
   const region = getRegion();
@@ -26,6 +27,11 @@ export function useAgentShipments(filters?: {
         .eq('origin_region', region)
         .order('created_at', { ascending: false });
 
+      // By default, exclude drafts unless explicitly requested
+      if (!filters?.includeDrafts) {
+        query = query.eq('is_draft', false);
+      }
+
       if (filters?.status && filters.status !== 'all') {
         query = query.eq('status', filters.status as 'collected' | 'in_transit' | 'arrived' | 'delivered');
       }
@@ -38,6 +44,29 @@ export function useAgentShipments(filters?: {
       return data as Shipment[];
     },
     enabled: !!region,
+  });
+}
+
+// Hook specifically for draft shipments
+export function useAgentDraftShipments() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['agent-draft-shipments', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+
+      const { data, error } = await supabase
+        .from('shipments')
+        .select('*, customers(name, email, company_name), parcels(*)')
+        .eq('agent_id', user.id)
+        .eq('is_draft', true)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id,
   });
 }
 
@@ -77,6 +106,98 @@ export function useAgentShipmentStats() {
       return stats;
     },
     enabled: !!region,
+  });
+}
+
+// Hook to finalize a draft shipment
+export function useFinalizeDraftShipment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (shipmentId: string) => {
+      const { error } = await supabase
+        .from('shipments')
+        .update({ is_draft: false })
+        .eq('id', shipmentId)
+        .eq('is_draft', true);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agent-shipments'] });
+      queryClient.invalidateQueries({ queryKey: ['agent-draft-shipments'] });
+      queryClient.invalidateQueries({ queryKey: ['agent-shipment-stats'] });
+      toast.success('Shipment finalized successfully');
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to finalize shipment: ' + error.message);
+    },
+  });
+}
+
+// Hook to delete a draft shipment
+export function useDeleteDraftShipment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (shipmentId: string) => {
+      // First delete related parcels
+      const { error: parcelError } = await supabase
+        .from('parcels')
+        .delete()
+        .eq('shipment_id', shipmentId);
+
+      if (parcelError) throw parcelError;
+
+      // Then delete the shipment
+      const { error } = await supabase
+        .from('shipments')
+        .delete()
+        .eq('id', shipmentId)
+        .eq('is_draft', true);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agent-draft-shipments'] });
+      toast.success('Draft deleted');
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to delete draft: ' + error.message);
+    },
+  });
+}
+
+// Hook to update a draft shipment
+export function useUpdateDraftShipment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: {
+      id: string;
+      customer_id?: string | null;
+      customer_name?: string | null;
+      total_weight_kg?: number;
+      description?: string | null;
+      rate_per_kg?: number;
+      transit_point?: 'direct' | 'nairobi' | 'zanzibar';
+    }) => {
+      const { id, ...updates } = data;
+      const { error } = await supabase
+        .from('shipments')
+        .update(updates)
+        .eq('id', id)
+        .eq('is_draft', true);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agent-draft-shipments'] });
+      toast.success('Draft updated');
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to update draft: ' + error.message);
+    },
   });
 }
 

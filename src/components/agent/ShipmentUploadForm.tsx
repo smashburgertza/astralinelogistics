@@ -38,7 +38,8 @@ import {
   Trash2,
   Globe,
   Route,
-  DollarSign
+  DollarSign,
+  Save
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useCustomers } from '@/hooks/useShipments';
@@ -291,6 +292,7 @@ export function ShipmentUploadForm() {
   }, [transitRoutes]);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [completedShipments, setCompletedShipments] = useState<CompletedShipment[] | null>(null);
   
   const [lines, setLines] = useState<ShipmentLine[]>([
@@ -355,6 +357,123 @@ export function ShipmentUploadForm() {
     setTransitPoint('direct');
     setRatePerKg(0);
     setAgentCargoWeight(0);
+  };
+
+  // Save as draft function
+  const onSaveAsDraft = async () => {
+    const validLines = lines.filter(l => (l.customer_id || l.customer_name) && l.weight_kg > 0);
+    
+    if (validLines.length === 0 && (!canHaveConsolidatedCargo || agentCargoWeight <= 0)) {
+      toast.error('Please add at least one shipment to save as draft');
+      return;
+    }
+
+    if (!selectedRegion) {
+      toast.error('Please select a region');
+      return;
+    }
+
+    setIsSavingDraft(true);
+
+    try {
+      // Get or create batch
+      let batchId: string | null = null;
+      try {
+        batchId = await getOrCreateBatch.mutateAsync({
+          originRegion: selectedRegion,
+          cargoType: 'air',
+        });
+      } catch (batchError) {
+        console.error('Failed to create batch:', batchError);
+      }
+
+      // Create each draft shipment
+      for (const line of validLines) {
+        const parcelBarcode = generateBarcode();
+        const customer = customers?.find(c => c.id === line.customer_id);
+        const lineAmount = calculateLineAmount(line.weight_kg);
+
+        const { data: shipment, error: shipmentError } = await supabase
+          .from('shipments')
+          .insert({
+            customer_id: line.customer_id || null,
+            customer_name: line.customer_name || customer?.name || null,
+            origin_region: selectedRegion,
+            total_weight_kg: line.weight_kg,
+            description: line.description || null,
+            warehouse_location: null,
+            created_by: user?.id,
+            agent_id: user?.id,
+            tracking_number: '',
+            batch_id: batchId,
+            billing_party: 'customer_direct' as BillingPartyType,
+            transit_point: transitPoint,
+            rate_per_kg: ratePerKg || 0,
+            total_revenue: lineAmount,
+            is_draft: true, // Mark as draft
+          })
+          .select()
+          .single();
+
+        if (shipmentError) throw shipmentError;
+
+        // Create parcel for draft
+        await supabase
+          .from('parcels')
+          .insert({
+            shipment_id: shipment.id,
+            barcode: parcelBarcode,
+            weight_kg: line.weight_kg,
+            description: line.description || null,
+          });
+      }
+
+      // Handle agent cargo if present
+      if (canHaveConsolidatedCargo && agentCargoWeight > 0) {
+        const agentCargoAmount = (agentCargoWeight * (ratePerKg || 0)) + transitAdditionalCost;
+        const parcelBarcode = generateBarcode();
+
+        const { data: agentShipment, error: agentError } = await supabase
+          .from('shipments')
+          .insert({
+            customer_id: null,
+            customer_name: null,
+            origin_region: selectedRegion,
+            total_weight_kg: agentCargoWeight,
+            description: "Agent's Consolidated Cargo",
+            agent_cargo_weight_kg: agentCargoWeight,
+            created_by: user?.id,
+            agent_id: user?.id,
+            tracking_number: '',
+            batch_id: batchId,
+            billing_party: 'agent_collect' as BillingPartyType,
+            transit_point: transitPoint,
+            rate_per_kg: ratePerKg || 0,
+            total_revenue: agentCargoAmount,
+            is_draft: true,
+          })
+          .select()
+          .single();
+
+        if (!agentError && agentShipment) {
+          await supabase
+            .from('parcels')
+            .insert({
+              shipment_id: agentShipment.id,
+              barcode: parcelBarcode,
+              weight_kg: agentCargoWeight,
+              description: "Agent's Consolidated Cargo",
+            });
+        }
+      }
+
+      toast.success('Draft saved successfully! You can continue editing from My Shipments.');
+      resetForm();
+    } catch (error: any) {
+      toast.error(`Failed to save draft: ${error.message}`);
+    } finally {
+      setIsSavingDraft(false);
+    }
   };
 
   const onSubmit = async () => {
@@ -863,7 +982,7 @@ export function ShipmentUploadForm() {
       {/* Submit Section */}
       <Card className="shadow-lg border-0">
         <CardContent className="p-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="text-sm text-muted-foreground">
               {ratePerKg > 0 ? (
                 <>
@@ -875,30 +994,53 @@ export function ShipmentUploadForm() {
                   )}
                 </>
               ) : (
-                <span className="text-amber-600">Please set a rate per KG above</span>
+                <span className="text-amber-600">Set a rate per KG to finalize</span>
               )}
             </div>
-            <Button
-              type="button"
-              size="lg"
-              className="h-12 px-8 text-lg font-semibold"
-              disabled={isSubmitting || (totals.validLines === 0 && (!canHaveConsolidatedCargo || agentCargoWeight <= 0)) || !ratePerKg || ratePerKg <= 0}
-              onClick={onSubmit}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="w-5 h-5 mr-2" />
-                  Create Shipment{totals.validLines + (canHaveConsolidatedCargo && agentCargoWeight > 0 ? 1 : 0) !== 1 ? 's' : ''}
-                  {canHaveConsolidatedCargo && agentCargoWeight > 0 && totals.validLines > 0 && ` (${totals.validLines} + Agent)`}
-                  {canHaveConsolidatedCargo && agentCargoWeight > 0 && totals.validLines === 0 && ' (Agent Cargo)'}
-                </>
-              )}
-            </Button>
+            <div className="flex items-center gap-3">
+              {/* Save as Draft Button */}
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                className="h-12 px-6"
+                disabled={isSavingDraft || isSubmitting || (totals.validLines === 0 && (!canHaveConsolidatedCargo || agentCargoWeight <= 0))}
+                onClick={onSaveAsDraft}
+              >
+                {isSavingDraft ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-5 h-5 mr-2" />
+                    Save Draft
+                  </>
+                )}
+              </Button>
+
+              {/* Create (Finalize) Button */}
+              <Button
+                type="button"
+                size="lg"
+                className="h-12 px-8 text-lg font-semibold"
+                disabled={isSubmitting || isSavingDraft || (totals.validLines === 0 && (!canHaveConsolidatedCargo || agentCargoWeight <= 0)) || !ratePerKg || ratePerKg <= 0}
+                onClick={onSubmit}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-5 h-5 mr-2" />
+                    Finalize Shipment{totals.validLines + (canHaveConsolidatedCargo && agentCargoWeight > 0 ? 1 : 0) !== 1 ? 's' : ''}
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
