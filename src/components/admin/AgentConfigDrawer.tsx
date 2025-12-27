@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -79,6 +79,14 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
   });
 
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'route'; id: string } | null>(null);
+  const [consolidatedCargoEnabled, setConsolidatedCargoEnabled] = useState(false);
+
+  // Sync local state with agent settings when agent changes
+  useEffect(() => {
+    if (agent) {
+      setConsolidatedCargoEnabled(agent.settings?.can_have_consolidated_cargo ?? false);
+    }
+  }, [agent, agent?.settings?.can_have_consolidated_cargo]);
 
   if (!agent) return null;
 
@@ -489,8 +497,9 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
                       </p>
                     </div>
                     <Switch
-                      checked={agent.settings?.can_have_consolidated_cargo ?? false}
+                      checked={consolidatedCargoEnabled}
                       onCheckedChange={(checked) => {
+                        setConsolidatedCargoEnabled(checked);
                         updateAgentSettings.mutate({
                           userId: agent.user_id,
                           canHaveConsolidatedCargo: checked,
