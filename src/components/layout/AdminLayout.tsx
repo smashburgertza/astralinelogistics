@@ -75,7 +75,7 @@ export function AdminLayout({ children, title, subtitle }: AdminLayoutProps) {
 
   const handleSignOut = async () => {
     await signOut();
-    navigate('/');
+    navigate('/system-auth');
   };
 
   const isActive = (href: string) => location.pathname === href;
