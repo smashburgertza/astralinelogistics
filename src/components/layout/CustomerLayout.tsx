@@ -63,7 +63,7 @@ export function CustomerLayout({ children, title, subtitle }: CustomerLayoutProp
 
   const handleSignOut = async () => {
     await signOut();
-    navigate('/');
+    navigate('/auth');
   };
 
   const isActive = (href: string) => location.pathname === href;
