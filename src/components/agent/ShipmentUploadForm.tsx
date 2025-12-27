@@ -95,7 +95,7 @@ interface CompletedShipment {
   parcels: ParcelEntry[];
 }
 
-const CONSIGNEE = "Astraline Logistics Limited";
+const DEFAULT_CONSIGNEE = "Astraline Logistics Limited";
 
 // Available currencies for agent to choose from
 const AVAILABLE_CURRENCIES = [
@@ -242,6 +242,9 @@ export function ShipmentUploadForm() {
   const [billingParty, setBillingParty] = useState<BillingPartyType>('customer_direct');
   const [transitPoint, setTransitPoint] = useState<TransitPointType>('direct');
   
+  // Consignee state
+  const [consignee, setConsignee] = useState<string>(DEFAULT_CONSIGNEE);
+  
   // Agent-defined pricing
   const [ratePerKg, setRatePerKg] = useState<number>(0);
   const [currency, setCurrency] = useState<string>('GBP');
@@ -346,6 +349,7 @@ export function ShipmentUploadForm() {
     setBillingParty('customer_direct');
     setTransitPoint('direct');
     setRatePerKg(0);
+    setConsignee(DEFAULT_CONSIGNEE);
   };
 
   const onSubmit = async () => {
@@ -549,7 +553,12 @@ export function ShipmentUploadForm() {
               <div className="flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">Consignee:</span>
-                <Badge variant="secondary">{CONSIGNEE}</Badge>
+                <Input
+                  value={consignee}
+                  onChange={(e) => setConsignee(e.target.value)}
+                  placeholder="Enter consignee name"
+                  className="w-[220px] h-8"
+                />
               </div>
               
               {/* Region Selector for multi-region agents */}
