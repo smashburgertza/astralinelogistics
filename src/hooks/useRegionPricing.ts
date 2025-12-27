@@ -6,14 +6,23 @@ import { toast } from 'sonner';
 export type RegionPricing = Tables<'region_pricing'>;
 export type AgentAddress = Tables<'agent_addresses'>;
 
-export function useRegionPricing() {
+export function useRegionPricing(cargoType?: 'sea' | 'air', serviceType?: 'door_to_door' | 'airport_to_airport') {
   return useQuery({
-    queryKey: ['region_pricing'],
+    queryKey: ['region_pricing', cargoType, serviceType],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('region_pricing')
         .select('*')
         .order('region');
+
+      if (cargoType) {
+        query = query.eq('cargo_type', cargoType);
+      }
+      if (serviceType) {
+        query = query.eq('service_type', serviceType);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data as RegionPricing[];
     },
@@ -87,11 +96,13 @@ export function useCreateRegionPricing() {
 
   return useMutation({
     mutationFn: async (pricing: {
-      region: 'europe' | 'dubai' | 'china' | 'india';
+      region: 'europe' | 'dubai' | 'china' | 'india' | 'usa' | 'uk';
       customer_rate_per_kg: number;
       agent_rate_per_kg: number;
       handling_fee: number;
       currency: string;
+      cargo_type?: 'sea' | 'air';
+      service_type?: 'door_to_door' | 'airport_to_airport' | null;
     }) => {
       const { data, error } = await supabase
         .from('region_pricing')
