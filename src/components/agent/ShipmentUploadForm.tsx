@@ -349,10 +349,11 @@ export function ShipmentUploadForm() {
   };
 
   const onSubmit = async () => {
-    const validLines = lines.filter(l => l.customer_id && l.weight_kg > 0);
+    // Allow lines with either customer_id OR customer_name, and valid weight
+    const validLines = lines.filter(l => (l.customer_id || l.customer_name) && l.weight_kg > 0);
     
     if (validLines.length === 0) {
-      toast.error('Please add at least one valid shipment line');
+      toast.error('Please add at least one valid shipment line with customer and weight');
       return;
     }
 
@@ -390,7 +391,8 @@ export function ShipmentUploadForm() {
         const { data: shipment, error: shipmentError } = await supabase
           .from('shipments')
           .insert({
-            customer_id: line.customer_id,
+            customer_id: line.customer_id || null,
+            customer_name: line.customer_name || customer?.name || null,
             origin_region: selectedRegion,
             total_weight_kg: line.weight_kg,
             description: line.description || null,
@@ -432,7 +434,7 @@ export function ShipmentUploadForm() {
           .from('invoices')
           .insert({
             invoice_number: invoiceNumber,
-            customer_id: line.customer_id,
+            customer_id: line.customer_id || null,
             shipment_id: shipment.id,
             amount: lineAmount,
             currency: currency,
@@ -441,6 +443,7 @@ export function ShipmentUploadForm() {
             created_by: user?.id,
             agent_id: user?.id,
             invoice_direction: invoiceDirection,
+            rate_per_kg: ratePerKg,
             notes: `${ownerLabel} shipment from ${currentRegionInfo?.region_name || selectedRegion}${transitLabel}. Weight: ${line.weight_kg}kg @ ${currencySymbol}${ratePerKg}/kg`,
           });
 

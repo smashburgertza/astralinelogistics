@@ -114,7 +114,9 @@ export function InvoiceTable({ invoices, isLoading }: InvoiceTableProps) {
                   </TableCell>
                   <TableCell>
                     <div>
-                      <p className="font-medium">{invoice.customers?.name || 'Unknown'}</p>
+                      <p className="font-medium">
+                        {invoice.customers?.name || invoice.shipments?.customer_name || 'Unknown'}
+                      </p>
                       {invoice.customers?.company_name && (
                         <p className="text-sm text-muted-foreground">{invoice.customers.company_name}</p>
                       )}
@@ -135,6 +137,11 @@ export function InvoiceTable({ invoices, isLoading }: InvoiceTableProps) {
                       <span className="font-medium">
                         {currencySymbol}{Number(invoice.amount).toFixed(2)}
                       </span>
+                      {invoice.rate_per_kg && (
+                        <p className="text-xs text-muted-foreground">
+                          @ {currencySymbol}{Number(invoice.rate_per_kg).toFixed(2)}/kg
+                        </p>
+                      )}
                       {invoice.currency !== 'TZS' && invoice.amount_in_tzs && (
                         <p className="text-xs text-muted-foreground">
                           ≈ TZS {Number(invoice.amount_in_tzs).toLocaleString()}
