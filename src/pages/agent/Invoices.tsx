@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import { useReactToPrint } from 'react-to-print';
 import { AgentLayout } from '@/components/layout/AgentLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -19,17 +20,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { format } from 'date-fns';
-import { Loader2, Search, FileText, Download } from 'lucide-react';
+import { Loader2, Search, FileText, Download, Printer, Eye } from 'lucide-react';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
+import { InvoicePDF } from '@/components/agent/InvoicePDF';
 
 function AgentInvoicesPage() {
   const { user } = useAuth();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  
+  const printRef = useRef<HTMLDivElement>(null);
 
   const { data: invoices, isLoading } = useQuery({
     queryKey: ['agent-invoices', user?.id],
@@ -40,8 +52,8 @@ function AgentInvoicesPage() {
         .from('invoices')
         .select(`
           *,
-          customer:customers(name, phone),
-          shipment:shipments(tracking_number, origin_region)
+          customer:customers(name, phone, email, address),
+          shipment:shipments(tracking_number, origin_region, total_weight_kg)
         `)
         .eq('created_by', user.id)
         .order('created_at', { ascending: false });
@@ -51,6 +63,24 @@ function AgentInvoicesPage() {
     },
     enabled: !!user?.id,
   });
+
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: selectedInvoice ? `Invoice-${selectedInvoice.invoice_number}` : 'Invoice',
+  });
+
+  const handleViewInvoice = (invoice: any) => {
+    setSelectedInvoice(invoice);
+    setPreviewOpen(true);
+  };
+
+  const handleDownloadPDF = (invoice: any) => {
+    setSelectedInvoice(invoice);
+    // Small timeout to ensure the ref is updated
+    setTimeout(() => {
+      handlePrint();
+    }, 100);
+  };
 
   const filteredInvoices = invoices?.filter(inv => {
     const matchesSearch = 
@@ -183,6 +213,7 @@ function AgentInvoicesPage() {
                     <TableHead>Date</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -213,6 +244,28 @@ function AgentInvoicesPage() {
                         <TableCell>
                           {getStatusBadge(invoice.status || 'pending')}
                         </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleViewInvoice(invoice)}
+                              title="Preview Invoice"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleDownloadPDF(invoice)}
+                              title="Download PDF"
+                            >
+                              <Download className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     );
                   })}
@@ -221,6 +274,38 @@ function AgentInvoicesPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Hidden print container */}
+        <div className="hidden">
+          <div ref={printRef}>
+            {selectedInvoice && <InvoicePDF invoice={selectedInvoice} />}
+          </div>
+        </div>
+
+        {/* Invoice Preview Dialog */}
+        <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center justify-between">
+                <span>Invoice Preview</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => {
+                    handlePrint();
+                  }}
+                >
+                  <Printer className="w-4 h-4" />
+                  Print / Download
+                </Button>
+              </DialogTitle>
+            </DialogHeader>
+            <div className="border rounded-lg overflow-hidden">
+              {selectedInvoice && <InvoicePDF invoice={selectedInvoice} />}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </AgentLayout>
   );
