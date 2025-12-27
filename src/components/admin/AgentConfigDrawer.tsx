@@ -6,6 +6,16 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -76,6 +86,7 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
 
   const [editingPricing, setEditingPricing] = useState<Record<string, { agent_rate_per_kg: number }>>({});
 
+  const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'pricing' | 'route'; id: string } | null>(null);
   const [newPricing, setNewPricing] = useState({
     region: '' as 'europe' | 'dubai' | 'china' | 'india' | 'usa' | 'uk' | '',
     cargo_type: 'air' as 'sea' | 'air',
@@ -178,8 +189,21 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
   };
 
   const handleDeleteRoute = async (routeId: string) => {
-    if (confirm('Delete this transit route?')) {
-      await deleteRoute.mutateAsync(routeId);
+    await deleteRoute.mutateAsync(routeId);
+    setDeleteConfirm(null);
+  };
+
+  const handleDeletePricing = async (pricingId: string) => {
+    await deletePricing.mutateAsync(pricingId);
+    setDeleteConfirm(null);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deleteConfirm) return;
+    if (deleteConfirm.type === 'route') {
+      handleDeleteRoute(deleteConfirm.id);
+    } else {
+      handleDeletePricing(deleteConfirm.id);
     }
   };
 
@@ -304,11 +328,7 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
                                       variant="ghost"
                                       size="icon"
                                       className="h-8 w-8"
-                                      onClick={() => {
-                                        if (confirm('Delete this pricing entry?')) {
-                                          deletePricing.mutate(pricing.id);
-                                        }
-                                      }}
+                                      onClick={() => setDeleteConfirm({ type: 'pricing', id: pricing.id })}
                                       disabled={deletePricing.isPending}
                                     >
                                       <Trash2 className="w-4 h-4 text-destructive" />
@@ -502,7 +522,7 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
                                   variant="ghost"
                                   size="icon"
                                   className="h-8 w-8"
-                                  onClick={() => handleDeleteRoute(route.id)}
+                                  onClick={() => setDeleteConfirm({ type: 'route', id: route.id })}
                                   disabled={deleteRoute.isPending}
                                 >
                                   <Trash2 className="w-4 h-4 text-destructive" />
@@ -736,6 +756,27 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
           </Tabs>
         </div>
       </SheetContent>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {deleteConfirm?.type === 'route' ? 'Transit Route' : 'Pricing Entry'}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the {deleteConfirm?.type === 'route' ? 'transit route' : 'pricing entry'}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sheet>
   );
 }
