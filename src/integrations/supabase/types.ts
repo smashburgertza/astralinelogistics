@@ -264,6 +264,100 @@ export type Database = {
           },
         ]
       }
+      batch_costs: {
+        Row: {
+          amount: number
+          batch_id: string
+          cost_category: string
+          created_at: string | null
+          currency: string
+          description: string | null
+          entered_by: string | null
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount?: number
+          batch_id: string
+          cost_category: string
+          created_at?: string | null
+          currency?: string
+          description?: string | null
+          entered_by?: string | null
+          id?: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          batch_id?: string
+          cost_category?: string
+          created_at?: string | null
+          currency?: string
+          description?: string | null
+          entered_by?: string | null
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batch_costs_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "cargo_batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cargo_batches: {
+        Row: {
+          arrival_week_end: string
+          arrival_week_start: string
+          batch_number: string
+          cargo_type: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          origin_region: Database["public"]["Enums"]["agent_region"]
+          region_id: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          arrival_week_end: string
+          arrival_week_start: string
+          batch_number: string
+          cargo_type?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          origin_region: Database["public"]["Enums"]["agent_region"]
+          region_id?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          arrival_week_end?: string
+          arrival_week_start?: string
+          batch_number?: string
+          cargo_type?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          origin_region?: Database["public"]["Enums"]["agent_region"]
+          region_id?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cargo_batches_region_id_fkey"
+            columns: ["region_id"]
+            isOneToOne: false
+            referencedRelation: "regions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chart_of_accounts: {
         Row: {
           account_code: string
@@ -1430,6 +1524,7 @@ export type Database = {
         Row: {
           agent_id: string | null
           arrived_at: string | null
+          batch_id: string | null
           collected_at: string | null
           created_at: string | null
           created_by: string | null
@@ -1449,6 +1544,7 @@ export type Database = {
         Insert: {
           agent_id?: string | null
           arrived_at?: string | null
+          batch_id?: string | null
           collected_at?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -1468,6 +1564,7 @@ export type Database = {
         Update: {
           agent_id?: string | null
           arrived_at?: string | null
+          batch_id?: string | null
           collected_at?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -1485,6 +1582,13 @@ export type Database = {
           warehouse_location?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "shipments_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "cargo_batches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "shipments_customer_id_fkey"
             columns: ["customer_id"]
@@ -1814,9 +1918,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_batch_number: { Args: never; Returns: string }
       generate_document_number: { Args: { prefix: string }; Returns: string }
       generate_journal_number: { Args: never; Returns: string }
       generate_tracking_number: { Args: never; Returns: string }
+      get_or_create_batch: {
+        Args: {
+          _cargo_type?: string
+          _origin_region: Database["public"]["Enums"]["agent_region"]
+        }
+        Returns: string
+      }
       get_region_id_by_code: { Args: { _code: string }; Returns: string }
       get_user_region: {
         Args: { _user_id: string }

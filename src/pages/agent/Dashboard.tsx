@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useAgentShipments, useAgentShipmentStats } from '@/hooks/useAgentShipments';
 import { ShipmentStatusBadge } from '@/components/admin/ShipmentStatusBadge';
 import { useRegions } from '@/hooks/useRegions';
+import { BatchFreightCostCard } from '@/components/agent/BatchFreightCostCard';
 
 export default function AgentDashboard() {
   const { getRegion } = useAuth();
@@ -60,6 +61,12 @@ export default function AgentDashboard() {
             />
           </>
         )}
+      </div>
+
+      {/* Batch Freight Costs */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <BatchFreightCostCard cargoType="air" />
+        <BatchFreightCostCard cargoType="sea" />
       </div>
 
       {/* Main Content */}
