@@ -1821,6 +1821,7 @@ export type Database = {
           description: string | null
           id: string
           in_transit_at: string | null
+          is_draft: boolean
           origin_region: Database["public"]["Enums"]["agent_region"]
           profit: number | null
           rate_per_kg: number | null
@@ -1856,6 +1857,7 @@ export type Database = {
           description?: string | null
           id?: string
           in_transit_at?: string | null
+          is_draft?: boolean
           origin_region: Database["public"]["Enums"]["agent_region"]
           profit?: number | null
           rate_per_kg?: number | null
@@ -1891,6 +1893,7 @@ export type Database = {
           description?: string | null
           id?: string
           in_transit_at?: string | null
+          is_draft?: boolean
           origin_region?: Database["public"]["Enums"]["agent_region"]
           profit?: number | null
           rate_per_kg?: number | null
