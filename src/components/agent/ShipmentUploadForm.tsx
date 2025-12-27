@@ -245,6 +245,9 @@ export function ShipmentUploadForm() {
   // Consignee state
   const [consignee, setConsignee] = useState<string>(DEFAULT_CONSIGNEE);
   
+  // Agent's consolidated cargo (not tracked individually)
+  const [agentCargoWeight, setAgentCargoWeight] = useState<number>(0);
+  
   // Agent-defined pricing
   const [ratePerKg, setRatePerKg] = useState<number>(0);
   const [currency, setCurrency] = useState<string>('GBP');
@@ -350,14 +353,16 @@ export function ShipmentUploadForm() {
     setTransitPoint('direct');
     setRatePerKg(0);
     setConsignee(DEFAULT_CONSIGNEE);
+    setAgentCargoWeight(0);
   };
 
   const onSubmit = async () => {
     // Allow lines with either customer_id OR customer_name, and valid weight
     const validLines = lines.filter(l => (l.customer_id || l.customer_name) && l.weight_kg > 0);
     
-    if (validLines.length === 0) {
-      toast.error('Please add at least one valid shipment line with customer and weight');
+    // Must have at least one customer shipment OR agent cargo
+    if (validLines.length === 0 && agentCargoWeight <= 0) {
+      toast.error('Please add at least one shipment or agent cargo weight');
       return;
     }
 
@@ -500,8 +505,62 @@ export function ShipmentUploadForm() {
         });
       }
 
+      // Create a separate shipment for agent's consolidated cargo if any
+      if (agentCargoWeight > 0) {
+        const agentCargoAmount = agentCargoWeight * ratePerKg + transitAdditionalCost;
+        
+        const { data: agentShipment, error: agentShipmentError } = await supabase
+          .from('shipments')
+          .insert({
+            customer_id: null,
+            customer_name: 'Agent Cargo (Consolidated)',
+            origin_region: selectedRegion,
+            total_weight_kg: agentCargoWeight,
+            agent_cargo_weight_kg: agentCargoWeight,
+            description: 'Consolidated agent cargo - not tracked individually',
+            warehouse_location: null,
+            created_by: user?.id,
+            agent_id: user?.id,
+            tracking_number: '',
+            batch_id: batchId,
+            billing_party: 'agent_collect' as BillingPartyType,
+            transit_point: transitPoint,
+            rate_per_kg: ratePerKg,
+            total_revenue: agentCargoAmount,
+          })
+          .select()
+          .single();
+
+        if (agentShipmentError) {
+          console.error('Failed to create agent cargo shipment:', agentShipmentError);
+        } else {
+          // Create invoice FROM agent for their cargo (they collected from their customers)
+          const { error: agentInvoiceError } = await supabase
+            .from('invoices')
+            .insert({
+              shipment_id: agentShipment.id,
+              customer_id: null,
+              agent_id: user?.id,
+              invoice_number: '',
+              invoice_type: 'shipping',
+              amount: agentCargoAmount,
+              currency: currency,
+              status: 'pending',
+              created_by: user?.id,
+              invoice_direction: 'from_agent',
+              rate_per_kg: ratePerKg,
+              notes: `Agent consolidated cargo from ${currentRegionInfo?.region_name || selectedRegion}. Weight: ${agentCargoWeight}kg @ ${currencySymbol}${ratePerKg}/kg`,
+            });
+
+          if (agentInvoiceError) {
+            console.error('Failed to create agent cargo invoice:', agentInvoiceError);
+          }
+        }
+      }
+
       setCompletedShipments(createdShipments);
-      toast.success(`${createdShipments.length} shipment(s) and invoice(s) created successfully`);
+      const agentCargoMsg = agentCargoWeight > 0 ? ` + agent cargo (${agentCargoWeight}kg)` : '';
+      toast.success(`${createdShipments.length} shipment(s)${agentCargoMsg} created successfully`);
     } catch (error: any) {
       toast.error(`Failed to create shipments: ${error.message}`);
     } finally {
@@ -789,6 +848,45 @@ export function ShipmentUploadForm() {
         </CardContent>
       </Card>
 
+      {/* Agent's Consolidated Cargo Section */}
+      <Card className="shadow-lg border-0 bg-muted/30">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-900/30">
+                <Package className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+              </div>
+              <div>
+                <h3 className="font-medium">Agent's Cargo (Consolidated)</h3>
+                <p className="text-sm text-muted-foreground">
+                  Not tracked individually - for billing purposes only
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Label htmlFor="agent-cargo-weight" className="text-sm text-muted-foreground">
+                Weight (kg):
+              </Label>
+              <Input
+                id="agent-cargo-weight"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                value={agentCargoWeight || ''}
+                onChange={(e) => setAgentCargoWeight(parseFloat(e.target.value) || 0)}
+                className="w-32 h-10 text-right"
+              />
+              {agentCargoWeight > 0 && ratePerKg > 0 && (
+                <Badge variant="secondary" className="text-base px-3 py-1">
+                  {currencySymbol}{(agentCargoWeight * ratePerKg + transitAdditionalCost).toFixed(2)}
+                </Badge>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Submit Section */}
       <Card className="shadow-lg border-0">
         <CardContent className="p-4">
@@ -811,7 +909,7 @@ export function ShipmentUploadForm() {
               type="button"
               size="lg"
               className="h-12 px-8 text-lg font-semibold"
-              disabled={isSubmitting || totals.validLines === 0 || !ratePerKg || ratePerKg <= 0}
+              disabled={isSubmitting || (totals.validLines === 0 && agentCargoWeight <= 0) || !ratePerKg || ratePerKg <= 0}
               onClick={onSubmit}
             >
               {isSubmitting ? (
@@ -822,7 +920,9 @@ export function ShipmentUploadForm() {
               ) : (
                 <>
                   <CheckCircle className="w-5 h-5 mr-2" />
-                  Create {totals.validLines} Shipment{totals.validLines !== 1 ? 's' : ''}
+                  Create Shipment{totals.validLines + (agentCargoWeight > 0 ? 1 : 0) !== 1 ? 's' : ''}
+                  {agentCargoWeight > 0 && totals.validLines > 0 && ` (${totals.validLines} + Agent)`}
+                  {agentCargoWeight > 0 && totals.validLines === 0 && ' (Agent Cargo)'}
                 </>
               )}
             </Button>

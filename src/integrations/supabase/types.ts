@@ -1781,6 +1781,7 @@ export type Database = {
       }
       shipments: {
         Row: {
+          agent_cargo_weight_kg: number | null
           agent_id: string | null
           arrived_at: string | null
           batch_id: string | null
@@ -1815,6 +1816,7 @@ export type Database = {
           warehouse_location: string | null
         }
         Insert: {
+          agent_cargo_weight_kg?: number | null
           agent_id?: string | null
           arrived_at?: string | null
           batch_id?: string | null
@@ -1849,6 +1851,7 @@ export type Database = {
           warehouse_location?: string | null
         }
         Update: {
+          agent_cargo_weight_kg?: number | null
           agent_id?: string | null
           arrived_at?: string | null
           batch_id?: string | null
