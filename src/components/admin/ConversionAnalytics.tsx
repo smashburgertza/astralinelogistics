@@ -2,10 +2,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { useConversionAnalytics } from '@/hooks/useConversionAnalytics';
 import { TrendingUp, Eye, UserPlus, Percent } from 'lucide-react';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { Area, AreaChart, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { format, parseISO } from 'date-fns';
 
 const SOURCE_LABELS: Record<string, string> = {
   shipping_calculator: 'Shipping Calculator',
   shop_for_me: 'Shop For Me',
+};
+
+const chartConfig = {
+  views: {
+    label: 'Views',
+    color: 'hsl(var(--chart-1))',
+  },
+  signups: {
+    label: 'Signups',
+    color: 'hsl(var(--chart-2))',
+  },
 };
 
 export function ConversionAnalytics() {
@@ -24,6 +38,7 @@ export function ConversionAnalytics() {
         <CardContent>
           <div className="space-y-4">
             <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-[200px] w-full" />
             <Skeleton className="h-20 w-full" />
           </div>
         </CardContent>
@@ -31,7 +46,15 @@ export function ConversionAnalytics() {
     );
   }
 
-  const { stats, totals } = data || { stats: [], totals: { views: 0, signups: 0, conversionRate: 0 } };
+  const { stats, dailyStats, totals } = data || { stats: [], dailyStats: [], totals: { views: 0, signups: 0, conversionRate: 0 } };
+
+  // Format daily stats for the chart
+  const chartData = dailyStats.map((day) => ({
+    date: day.date,
+    views: day.views,
+    signups: day.signups,
+    formattedDate: format(parseISO(day.date), 'MMM d'),
+  }));
 
   return (
     <Card>
@@ -73,6 +96,53 @@ export function ConversionAnalytics() {
             </div>
           </div>
         </div>
+
+        {/* Daily Trend Chart */}
+        {chartData.length > 0 ? (
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium text-muted-foreground">Daily Trends</h4>
+            <ChartContainer config={chartConfig} className="h-[250px] w-full">
+              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="fillViews" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0.1} />
+                  </linearGradient>
+                  <linearGradient id="fillSignups" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--chart-2))" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="hsl(var(--chart-2))" stopOpacity={0.1} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis
+                  dataKey="formattedDate"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  className="text-xs"
+                />
+                <YAxis tickLine={false} axisLine={false} tickMargin={8} className="text-xs" />
+                <ChartTooltip
+                  content={<ChartTooltipContent indicator="dot" />}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="views"
+                  stroke="hsl(var(--chart-1))"
+                  fill="url(#fillViews)"
+                  strokeWidth={2}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="signups"
+                  stroke="hsl(var(--chart-2))"
+                  fill="url(#fillSignups)"
+                  strokeWidth={2}
+                />
+              </AreaChart>
+            </ChartContainer>
+          </div>
+        ) : null}
 
         {/* By Source */}
         <div className="space-y-3">
