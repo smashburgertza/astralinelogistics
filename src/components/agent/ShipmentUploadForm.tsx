@@ -73,6 +73,16 @@ const generateInvoiceNumber = () => {
   return `AGT-${year}${month}-${random}`;
 };
 
+// Generate tracking number (same format as database function)
+const generateTrackingNumber = () => {
+  const date = new Date();
+  const year = date.getFullYear().toString().slice(-2);
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+  return `AST${year}${month}${day}${random}`;
+};
+
 interface ShipmentLine {
   id: string;
   customer_id: string;
@@ -390,6 +400,7 @@ export function ShipmentUploadForm() {
       // Create each draft shipment
       for (const line of validLines) {
         const parcelBarcode = generateBarcode();
+        const trackingNumber = generateTrackingNumber();
         const customer = customers?.find(c => c.id === line.customer_id);
         const lineAmount = calculateLineAmount(line.weight_kg);
 
@@ -404,7 +415,7 @@ export function ShipmentUploadForm() {
             warehouse_location: null,
             created_by: user?.id,
             agent_id: user?.id,
-            tracking_number: '',
+            tracking_number: trackingNumber,
             batch_id: batchId,
             billing_party: 'customer_direct' as BillingPartyType,
             transit_point: transitPoint,
@@ -432,6 +443,7 @@ export function ShipmentUploadForm() {
       if (canHaveConsolidatedCargo && agentCargoWeight > 0) {
         const agentCargoAmount = (agentCargoWeight * (ratePerKg || 0)) + transitAdditionalCost;
         const parcelBarcode = generateBarcode();
+        const trackingNumber = generateTrackingNumber();
 
         const { data: agentShipment, error: agentError } = await supabase
           .from('shipments')
@@ -444,7 +456,7 @@ export function ShipmentUploadForm() {
             agent_cargo_weight_kg: agentCargoWeight,
             created_by: user?.id,
             agent_id: user?.id,
-            tracking_number: '',
+            tracking_number: trackingNumber,
             batch_id: batchId,
             billing_party: 'agent_collect' as BillingPartyType,
             transit_point: transitPoint,
@@ -514,6 +526,7 @@ export function ShipmentUploadForm() {
       // Create each shipment and its invoice
       for (const line of validLines) {
         const parcelBarcode = generateBarcode();
+        const trackingNumber = generateTrackingNumber();
         const customer = customers?.find(c => c.id === line.customer_id);
         const lineAmount = calculateLineAmount(line.weight_kg);
 
@@ -528,7 +541,7 @@ export function ShipmentUploadForm() {
             warehouse_location: null,
             created_by: user?.id,
             agent_id: user?.id,
-            tracking_number: '',
+            tracking_number: trackingNumber,
             batch_id: batchId,
             billing_party: 'customer_direct' as BillingPartyType, // Customer shipments always billed directly
             transit_point: transitPoint,
@@ -625,6 +638,7 @@ export function ShipmentUploadForm() {
       // Create a separate shipment for agent's consolidated cargo if any
       if (agentCargoWeight > 0) {
         const agentCargoAmount = agentCargoWeight * ratePerKg + transitAdditionalCost;
+        const agentTrackingNumber = generateTrackingNumber();
         
         const { data: agentShipment, error: agentShipmentError } = await supabase
           .from('shipments')
@@ -638,7 +652,7 @@ export function ShipmentUploadForm() {
             warehouse_location: null,
             created_by: user?.id,
             agent_id: user?.id,
-            tracking_number: '',
+            tracking_number: agentTrackingNumber,
             batch_id: batchId,
             billing_party: 'agent_collect' as BillingPartyType,
             transit_point: transitPoint,
