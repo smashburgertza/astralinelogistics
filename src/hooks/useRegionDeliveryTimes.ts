@@ -4,7 +4,8 @@ import { toast } from 'sonner';
 
 export type ServiceType = 
   | 'sea_cargo' 
-  | 'air_cargo' 
+  | 'air_cargo_door_to_door'
+  | 'air_cargo_airport_to_airport'
   | 'vehicle_roro' 
   | 'vehicle_container' 
   | 'shop_for_me' 
@@ -21,7 +22,8 @@ export interface RegionDeliveryTime {
 
 export const SERVICE_TYPE_LABELS: Record<ServiceType, { label: string; description: string }> = {
   sea_cargo: { label: 'Sea Cargo (Loose)', description: 'LCL shipments by sea' },
-  air_cargo: { label: 'Air Cargo', description: 'Air freight shipments' },
+  air_cargo_door_to_door: { label: 'Air Cargo (Door to Door)', description: 'Door-to-door air freight' },
+  air_cargo_airport_to_airport: { label: 'Air Cargo (Airport to Airport)', description: 'Airport-to-airport air freight' },
   vehicle_roro: { label: 'Vehicle (RoRo)', description: 'Roll-on/Roll-off shipping' },
   vehicle_container: { label: 'Vehicle (Container)', description: 'Containerized vehicle shipping' },
   shop_for_me: { label: 'Shop For Me', description: 'Personal shopping service' },
@@ -30,7 +32,8 @@ export const SERVICE_TYPE_LABELS: Record<ServiceType, { label: string; descripti
 
 export const DEFAULT_DELIVERY_TIMES: Record<ServiceType, string> = {
   sea_cargo: '4-6 weeks',
-  air_cargo: '7-10 working days',
+  air_cargo_door_to_door: '7-10 working days',
+  air_cargo_airport_to_airport: '5-7 working days',
   vehicle_roro: '4-6 weeks',
   vehicle_container: '6-8 weeks',
   shop_for_me: '7-10 working days',
@@ -76,7 +79,8 @@ export function useRegionDeliveryTimesByRegion(regionId: string | undefined) {
       // Return with defaults for missing service types
       return {
         sea_cargo: timesMap.sea_cargo || DEFAULT_DELIVERY_TIMES.sea_cargo,
-        air_cargo: timesMap.air_cargo || DEFAULT_DELIVERY_TIMES.air_cargo,
+        air_cargo_door_to_door: timesMap.air_cargo_door_to_door || DEFAULT_DELIVERY_TIMES.air_cargo_door_to_door,
+        air_cargo_airport_to_airport: timesMap.air_cargo_airport_to_airport || DEFAULT_DELIVERY_TIMES.air_cargo_airport_to_airport,
         vehicle_roro: timesMap.vehicle_roro || DEFAULT_DELIVERY_TIMES.vehicle_roro,
         vehicle_container: timesMap.vehicle_container || DEFAULT_DELIVERY_TIMES.vehicle_container,
         shop_for_me: timesMap.shop_for_me || DEFAULT_DELIVERY_TIMES.shop_for_me,
