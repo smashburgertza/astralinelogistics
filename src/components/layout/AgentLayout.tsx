@@ -41,7 +41,6 @@ interface AgentLayoutProps {
 
 const navItems = [
   { label: 'Dashboard', href: '/agent', icon: LayoutDashboard },
-  { label: 'Upload Shipment', href: '/agent/upload', icon: CloudUpload },
   { label: 'My Shipments', href: '/agent/shipments', icon: PackageSearch },
   { label: 'My Invoices', href: '/agent/invoices', icon: FileText },
 ];
