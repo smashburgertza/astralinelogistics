@@ -60,6 +60,7 @@ export interface DeliveryTimes {
   full_container?: string;
   vehicle_roro?: string;
   vehicle_container?: string;
-  air_cargo?: string;
+  air_cargo_door_to_door?: string;
+  air_cargo_airport_to_airport?: string;
   shop_for_me?: string;
 }

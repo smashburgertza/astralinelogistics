@@ -36,6 +36,12 @@ export function AirCargoCalculator({
   const total = shippingCost + handlingFee;
   const currency = pricingItem?.currency || 'USD';
   const symbol = CURRENCY_SYMBOLS[currency] || '$';
+  
+  // Get the appropriate delivery time based on service type
+  const deliveryTimeKey = serviceType === 'door-to-door' 
+    ? 'air_cargo_door_to_door' 
+    : 'air_cargo_airport_to_airport';
+  const estimatedDelivery = deliveryTimes?.[deliveryTimeKey] || DEFAULT_DELIVERY_TIMES[deliveryTimeKey];
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -102,7 +108,7 @@ export function AirCargoCalculator({
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Clock className="h-4 w-4" />
-                <span>Est. Delivery: {deliveryTimes?.air_cargo || DEFAULT_DELIVERY_TIMES.air_cargo}</span>
+                <span>Est. Delivery: {estimatedDelivery}</span>
               </div>
             </div>
           }
@@ -124,7 +130,7 @@ export function AirCargoCalculator({
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Clock className="h-4 w-4" />
-                <span>Est. Delivery: {deliveryTimes?.air_cargo || DEFAULT_DELIVERY_TIMES.air_cargo}</span>
+                <span>Est. Delivery: {estimatedDelivery}</span>
               </div>
               <Button className="w-full h-12 text-base btn-gold group" asChild>
                 <a href="/customer">

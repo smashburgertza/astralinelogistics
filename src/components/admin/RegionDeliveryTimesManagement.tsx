@@ -17,7 +17,8 @@ import {
 
 const SERVICE_TYPES: ServiceType[] = [
   'sea_cargo',
-  'air_cargo',
+  'air_cargo_door_to_door',
+  'air_cargo_airport_to_airport',
   'full_container',
   'vehicle_roro',
   'vehicle_container',
