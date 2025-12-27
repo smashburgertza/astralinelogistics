@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,6 +7,9 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import { PublicLayout } from "@/components/layout/PublicLayout";
+import { Loader2 } from "lucide-react";
+
+// Public pages - loaded eagerly for fast initial render
 import Index from "./pages/Index";
 import AuthPage from "./pages/Auth";
 import SystemAuthPage from "./pages/SystemAuth";
@@ -14,38 +18,53 @@ import ShopForMe from "./pages/ShopForMe";
 import OrderTracking from "./pages/OrderTracking";
 import AboutPage from "./pages/About";
 import ContactPage from "./pages/Contact";
-import CustomerDashboard from "./pages/customer/Dashboard";
-import CustomerShipmentsPage from "./pages/customer/Shipments";
-import CustomerInvoicesPage from "./pages/customer/Invoices";
-import CustomerTrackPage from "./pages/customer/Track";
-import CustomerOrdersPage from "./pages/customer/Orders";
-import CustomerSettingsPage from "./pages/customer/Settings";
-import CustomerPaymentsPage from "./pages/customer/Payments";
-import AgentDashboard from "./pages/agent/Dashboard";
-import AgentUploadPage from "./pages/agent/Upload";
-import AgentShipmentsPage from "./pages/agent/Shipments";
-import AdminDashboard from "./pages/admin/Dashboard";
-import AdminShipmentsPage from "./pages/admin/Shipments";
-import AdminInvoicesPage from "./pages/admin/Invoices";
-import AdminCustomersPage from "./pages/admin/Customers";
-import AdminExpensesPage from "./pages/admin/Expenses";
-import AdminOrderRequestsPage from "./pages/admin/OrderRequests";
-import AdminPageContentPage from "./pages/admin/PageContent";
-import AdminAgentsPage from "./pages/admin/Agents";
-import AdminEmployeesPage from "./pages/admin/Employees";
-import AdminSettingsPage from "./pages/admin/Settings";
-import AdminReportsPage from "./pages/admin/Reports";
-import AdminCommissionsPage from "./pages/admin/Commissions";
-import AdminEstimatesPage from "./pages/admin/Estimates";
-import AdminEmployeeDashboard from "./pages/admin/EmployeeDashboard";
-import AdminAccountingPage from "./pages/admin/Accounting";
-import AdminAnalyticsPage from "./pages/admin/Analytics";
-import AdminFinancialSummaryPage from "./pages/admin/FinancialSummary";
-import AdminProfilePage from "./pages/admin/Profile";
-import AdminNotificationsPage from "./pages/admin/Notifications";
 import NotFound from "./pages/NotFound";
 
+// Customer Portal - lazy loaded
+const CustomerDashboard = lazy(() => import("./pages/customer/Dashboard"));
+const CustomerShipmentsPage = lazy(() => import("./pages/customer/Shipments"));
+const CustomerInvoicesPage = lazy(() => import("./pages/customer/Invoices"));
+const CustomerTrackPage = lazy(() => import("./pages/customer/Track"));
+const CustomerOrdersPage = lazy(() => import("./pages/customer/Orders"));
+const CustomerSettingsPage = lazy(() => import("./pages/customer/Settings"));
+const CustomerPaymentsPage = lazy(() => import("./pages/customer/Payments"));
+
+// Agent Portal - lazy loaded
+const AgentDashboard = lazy(() => import("./pages/agent/Dashboard"));
+const AgentUploadPage = lazy(() => import("./pages/agent/Upload"));
+const AgentShipmentsPage = lazy(() => import("./pages/agent/Shipments"));
+
+// Admin Portal - lazy loaded
+const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
+const AdminShipmentsPage = lazy(() => import("./pages/admin/Shipments"));
+const AdminInvoicesPage = lazy(() => import("./pages/admin/Invoices"));
+const AdminCustomersPage = lazy(() => import("./pages/admin/Customers"));
+const AdminExpensesPage = lazy(() => import("./pages/admin/Expenses"));
+const AdminOrderRequestsPage = lazy(() => import("./pages/admin/OrderRequests"));
+const AdminPageContentPage = lazy(() => import("./pages/admin/PageContent"));
+const AdminAgentsPage = lazy(() => import("./pages/admin/Agents"));
+const AdminEmployeesPage = lazy(() => import("./pages/admin/Employees"));
+const AdminSettingsPage = lazy(() => import("./pages/admin/Settings"));
+const AdminReportsPage = lazy(() => import("./pages/admin/Reports"));
+const AdminCommissionsPage = lazy(() => import("./pages/admin/Commissions"));
+const AdminEstimatesPage = lazy(() => import("./pages/admin/Estimates"));
+const AdminEmployeeDashboard = lazy(() => import("./pages/admin/EmployeeDashboard"));
+const AdminAccountingPage = lazy(() => import("./pages/admin/Accounting"));
+const AdminAnalyticsPage = lazy(() => import("./pages/admin/Analytics"));
+const AdminFinancialSummaryPage = lazy(() => import("./pages/admin/FinancialSummary"));
+const AdminProfilePage = lazy(() => import("./pages/admin/Profile"));
+const AdminNotificationsPage = lazy(() => import("./pages/admin/Notifications"));
+
 const queryClient = new QueryClient();
+
+// Loading fallback component
+function PageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  );
+}
 
 // Component that enables real-time sync across all pages
 function RealtimeSyncProvider({ children }: { children: React.ReactNode }) {
@@ -76,40 +95,40 @@ const App = () => (
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/system" element={<SystemAuthPage />} />
             
-            {/* Customer Portal */}
-            <Route path="/customer" element={<CustomerDashboard />} />
-            <Route path="/customer/shipments" element={<CustomerShipmentsPage />} />
-            <Route path="/customer/invoices" element={<CustomerInvoicesPage />} />
-            <Route path="/customer/track" element={<CustomerTrackPage />} />
-            <Route path="/customer/orders" element={<CustomerOrdersPage />} />
-            <Route path="/customer/settings" element={<CustomerSettingsPage />} />
-            <Route path="/customer/payments" element={<CustomerPaymentsPage />} />
+            {/* Customer Portal - Lazy Loaded */}
+            <Route path="/customer" element={<Suspense fallback={<PageLoader />}><CustomerDashboard /></Suspense>} />
+            <Route path="/customer/shipments" element={<Suspense fallback={<PageLoader />}><CustomerShipmentsPage /></Suspense>} />
+            <Route path="/customer/invoices" element={<Suspense fallback={<PageLoader />}><CustomerInvoicesPage /></Suspense>} />
+            <Route path="/customer/track" element={<Suspense fallback={<PageLoader />}><CustomerTrackPage /></Suspense>} />
+            <Route path="/customer/orders" element={<Suspense fallback={<PageLoader />}><CustomerOrdersPage /></Suspense>} />
+            <Route path="/customer/settings" element={<Suspense fallback={<PageLoader />}><CustomerSettingsPage /></Suspense>} />
+            <Route path="/customer/payments" element={<Suspense fallback={<PageLoader />}><CustomerPaymentsPage /></Suspense>} />
             
-            {/* Agent Portal */}
-            <Route path="/agent" element={<AgentDashboard />} />
-            <Route path="/agent/upload" element={<AgentUploadPage />} />
-            <Route path="/agent/shipments" element={<AgentShipmentsPage />} />
+            {/* Agent Portal - Lazy Loaded */}
+            <Route path="/agent" element={<Suspense fallback={<PageLoader />}><AgentDashboard /></Suspense>} />
+            <Route path="/agent/upload" element={<Suspense fallback={<PageLoader />}><AgentUploadPage /></Suspense>} />
+            <Route path="/agent/shipments" element={<Suspense fallback={<PageLoader />}><AgentShipmentsPage /></Suspense>} />
             
-            {/* Admin Portal */}
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/shipments" element={<AdminShipmentsPage />} />
-            <Route path="/admin/invoices" element={<AdminInvoicesPage />} />
-            <Route path="/admin/customers" element={<AdminCustomersPage />} />
-            <Route path="/admin/expenses" element={<AdminExpensesPage />} />
-            <Route path="/admin/orders" element={<AdminOrderRequestsPage />} />
-            <Route path="/admin/content" element={<AdminPageContentPage />} />
-            <Route path="/admin/agents" element={<AdminAgentsPage />} />
-            <Route path="/admin/employees" element={<AdminEmployeesPage />} />
-            <Route path="/admin/settings" element={<AdminSettingsPage />} />
-            <Route path="/admin/reports" element={<AdminReportsPage />} />
-            <Route path="/admin/commissions" element={<AdminCommissionsPage />} />
-            <Route path="/admin/estimates" element={<AdminEstimatesPage />} />
-            <Route path="/admin/my-dashboard" element={<AdminEmployeeDashboard />} />
-            <Route path="/admin/accounting" element={<AdminAccountingPage />} />
-            <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
-            <Route path="/admin/financial-summary" element={<AdminFinancialSummaryPage />} />
-            <Route path="/admin/profile" element={<AdminProfilePage />} />
-            <Route path="/admin/notifications" element={<AdminNotificationsPage />} />
+            {/* Admin Portal - Lazy Loaded */}
+            <Route path="/admin" element={<Suspense fallback={<PageLoader />}><AdminDashboard /></Suspense>} />
+            <Route path="/admin/shipments" element={<Suspense fallback={<PageLoader />}><AdminShipmentsPage /></Suspense>} />
+            <Route path="/admin/invoices" element={<Suspense fallback={<PageLoader />}><AdminInvoicesPage /></Suspense>} />
+            <Route path="/admin/customers" element={<Suspense fallback={<PageLoader />}><AdminCustomersPage /></Suspense>} />
+            <Route path="/admin/expenses" element={<Suspense fallback={<PageLoader />}><AdminExpensesPage /></Suspense>} />
+            <Route path="/admin/orders" element={<Suspense fallback={<PageLoader />}><AdminOrderRequestsPage /></Suspense>} />
+            <Route path="/admin/content" element={<Suspense fallback={<PageLoader />}><AdminPageContentPage /></Suspense>} />
+            <Route path="/admin/agents" element={<Suspense fallback={<PageLoader />}><AdminAgentsPage /></Suspense>} />
+            <Route path="/admin/employees" element={<Suspense fallback={<PageLoader />}><AdminEmployeesPage /></Suspense>} />
+            <Route path="/admin/settings" element={<Suspense fallback={<PageLoader />}><AdminSettingsPage /></Suspense>} />
+            <Route path="/admin/reports" element={<Suspense fallback={<PageLoader />}><AdminReportsPage /></Suspense>} />
+            <Route path="/admin/commissions" element={<Suspense fallback={<PageLoader />}><AdminCommissionsPage /></Suspense>} />
+            <Route path="/admin/estimates" element={<Suspense fallback={<PageLoader />}><AdminEstimatesPage /></Suspense>} />
+            <Route path="/admin/my-dashboard" element={<Suspense fallback={<PageLoader />}><AdminEmployeeDashboard /></Suspense>} />
+            <Route path="/admin/accounting" element={<Suspense fallback={<PageLoader />}><AdminAccountingPage /></Suspense>} />
+            <Route path="/admin/analytics" element={<Suspense fallback={<PageLoader />}><AdminAnalyticsPage /></Suspense>} />
+            <Route path="/admin/financial-summary" element={<Suspense fallback={<PageLoader />}><AdminFinancialSummaryPage /></Suspense>} />
+            <Route path="/admin/profile" element={<Suspense fallback={<PageLoader />}><AdminProfilePage /></Suspense>} />
+            <Route path="/admin/notifications" element={<Suspense fallback={<PageLoader />}><AdminNotificationsPage /></Suspense>} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>
