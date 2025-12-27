@@ -35,6 +35,7 @@ interface AuthContextType {
   isAgent: () => boolean;
   isCustomer: () => boolean;
   getRegion: () => AgentRegion | undefined;
+  refetchProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -136,6 +137,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAgent = () => hasRole('agent');
   const isCustomer = () => hasRole('customer');
   const getRegion = () => roles.find(r => r.region)?.region;
+  
+  const refetchProfile = async () => {
+    if (user?.id) {
+      await fetchUserData(user.id);
+    }
+  };
 
   return (
     <AuthContext.Provider value={{
@@ -152,6 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAgent,
       isCustomer,
       getRegion,
+      refetchProfile,
     }}>
       {children}
     </AuthContext.Provider>

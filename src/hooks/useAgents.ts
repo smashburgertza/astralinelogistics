@@ -356,6 +356,7 @@ export function useUpdateAgentSettings() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['agents'] });
       queryClient.invalidateQueries({ queryKey: ['agent-settings'] });
+      queryClient.invalidateQueries({ queryKey: ['agent-full-config'] });
       toast.success('Agent settings updated');
     },
     onError: (error: any) => {
