@@ -10,8 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAgentShipments, useAgentShipmentStats, useAgentDraftShipments, useFinalizeDraftShipment, useDeleteDraftShipment } from '@/hooks/useAgentShipments';
 import { useAgentAssignedRegions } from '@/hooks/useAgentRegions';
 import { useDebounce } from '@/hooks/useDebounce';
-import { Package, Plane, MapPin, CheckCircle, Upload, Scale, FileEdit, Trash2, Check, Loader2 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Package, Plane, MapPin, CheckCircle, Upload, Scale, FileEdit, Trash2, Check, Loader2, Edit } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export default function AgentShipmentsPage() {
+  const navigate = useNavigate();
   // Get assigned regions first - this is the single source of truth for agent's regions
   const { data: assignedRegions = [] } = useAgentAssignedRegions();
   const regionCodes = useMemo(
@@ -188,6 +189,14 @@ export default function AgentShipmentsPage() {
                         )}
                       </div>
                       <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate(`/agent/upload?draft=${draft.id}`)}
+                        >
+                          <Edit className="w-4 h-4 mr-1" />
+                          Continue Editing
+                        </Button>
                         <Button
                           variant="default"
                           size="sm"
