@@ -91,6 +91,7 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
     region: '' as 'europe' | 'dubai' | 'china' | 'india' | 'usa' | 'uk' | '',
     cargo_type: 'air' as 'sea' | 'air',
     service_type: '' as 'door_to_door' | 'airport_to_airport' | '',
+    transit_point: 'direct' as 'direct' | 'nairobi' | 'zanzibar',
     agent_rate_per_kg: 0,
     customer_rate_per_kg: 0,
     handling_fee: 0,
@@ -148,6 +149,7 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
       region: newPricing.region as 'europe' | 'dubai' | 'china' | 'india' | 'usa' | 'uk',
       cargo_type: newPricing.cargo_type,
       service_type: newPricing.service_type || null,
+      transit_point: newPricing.transit_point,
       agent_rate_per_kg: newPricing.agent_rate_per_kg,
       customer_rate_per_kg: newPricing.customer_rate_per_kg,
       handling_fee: newPricing.handling_fee,
@@ -158,6 +160,7 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
       region: '',
       cargo_type: 'air',
       service_type: '',
+      transit_point: 'direct',
       agent_rate_per_kg: 0,
       customer_rate_per_kg: 0,
       handling_fee: 0,
@@ -262,6 +265,7 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
                           <TableRow>
                             <TableHead>Region</TableHead>
                             <TableHead>Cargo</TableHead>
+                            <TableHead>Route</TableHead>
                             <TableHead>Service</TableHead>
                             <TableHead>Agent Rate/kg</TableHead>
                             <TableHead></TableHead>
@@ -286,6 +290,11 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
                                 <TableCell>
                                   <Badge variant="outline" className="text-xs capitalize">
                                     {pricing.cargo_type}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="secondary" className="text-xs">
+                                    {TRANSIT_POINT_LABELS[pricing.transit_point || 'direct']}
                                   </Badge>
                                 </TableCell>
                                 <TableCell>
@@ -385,17 +394,31 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
                       </Select>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-3 gap-3">
                       <Select
                         value={newPricing.service_type}
                         onValueChange={(value) => setNewPricing({ ...newPricing, service_type: value as any })}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Service type (optional)" />
+                          <SelectValue placeholder="Service type" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="door_to_door">Door to Door</SelectItem>
                           <SelectItem value="airport_to_airport">Airport to Airport</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      <Select
+                        value={newPricing.transit_point}
+                        onValueChange={(value) => setNewPricing({ ...newPricing, transit_point: value as any })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="direct">Direct</SelectItem>
+                          <SelectItem value="nairobi">Via Nairobi</SelectItem>
+                          <SelectItem value="zanzibar">Via Zanzibar</SelectItem>
                         </SelectContent>
                       </Select>
 

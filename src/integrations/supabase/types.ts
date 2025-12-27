@@ -1466,6 +1466,9 @@ export type Database = {
           region: Database["public"]["Enums"]["agent_region"]
           region_id: string | null
           service_type: string | null
+          transit_point:
+            | Database["public"]["Enums"]["transit_point_type"]
+            | null
           updated_at: string | null
         }
         Insert: {
@@ -1479,6 +1482,9 @@ export type Database = {
           region: Database["public"]["Enums"]["agent_region"]
           region_id?: string | null
           service_type?: string | null
+          transit_point?:
+            | Database["public"]["Enums"]["transit_point_type"]
+            | null
           updated_at?: string | null
         }
         Update: {
@@ -1492,6 +1498,9 @@ export type Database = {
           region?: Database["public"]["Enums"]["agent_region"]
           region_id?: string | null
           service_type?: string | null
+          transit_point?:
+            | Database["public"]["Enums"]["transit_point_type"]
+            | null
           updated_at?: string | null
         }
         Relationships: [

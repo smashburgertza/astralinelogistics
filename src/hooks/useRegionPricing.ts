@@ -103,6 +103,7 @@ export function useCreateRegionPricing() {
       currency: string;
       cargo_type?: 'sea' | 'air';
       service_type?: 'door_to_door' | 'airport_to_airport' | null;
+      transit_point?: 'direct' | 'nairobi' | 'zanzibar';
     }) => {
       const { data, error } = await supabase
         .from('region_pricing')
