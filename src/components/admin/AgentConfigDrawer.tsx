@@ -45,7 +45,7 @@ import { Agent } from '@/hooks/useAgents';
 import { useTransitRoutes, TRANSIT_POINT_LABELS, TRANSIT_POINT_OPTIONS, TransitPointType, useCreateTransitRoute, useUpdateTransitRoute, useDeleteTransitRoute } from '@/hooks/useTransitRoutes';
 import { useAllAgentBalances } from '@/hooks/useAgentBalance';
 import { useRegions } from '@/hooks/useRegions';
-import { useRegionPricing, useUpdateRegionPricing } from '@/hooks/useRegionPricing';
+import { useRegionPricing, useUpdateRegionPricing, useCreateRegionPricing } from '@/hooks/useRegionPricing';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 
 interface AgentConfigDrawerProps {
@@ -63,6 +63,7 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
   const updateRoute = useUpdateTransitRoute();
   const deleteRoute = useDeleteTransitRoute();
   const updatePricing = useUpdateRegionPricing();
+  const createPricing = useCreateRegionPricing();
 
   const [newRoute, setNewRoute] = useState({
     region_id: '',
@@ -74,6 +75,15 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
 
   const [editingPricing, setEditingPricing] = useState<Record<string, { agent_rate_per_kg: number }>>({});
 
+  const [newPricing, setNewPricing] = useState({
+    region: '' as 'europe' | 'dubai' | 'china' | 'india' | 'usa' | 'uk' | '',
+    cargo_type: 'air' as 'sea' | 'air',
+    service_type: '' as 'door_to_door' | 'airport_to_airport' | '',
+    agent_rate_per_kg: 0,
+    customer_rate_per_kg: 0,
+    handling_fee: 0,
+    currency: 'USD',
+  });
   if (!agent) return null;
 
   // Get agent's assigned regions
@@ -116,6 +126,30 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
       const newState = { ...prev };
       delete newState[pricingId];
       return newState;
+    });
+  };
+
+  const handleAddPricing = async () => {
+    if (!newPricing.region) return;
+    
+    await createPricing.mutateAsync({
+      region: newPricing.region as 'europe' | 'dubai' | 'china' | 'india' | 'usa' | 'uk',
+      cargo_type: newPricing.cargo_type,
+      service_type: newPricing.service_type || null,
+      agent_rate_per_kg: newPricing.agent_rate_per_kg,
+      customer_rate_per_kg: newPricing.customer_rate_per_kg,
+      handling_fee: newPricing.handling_fee,
+      currency: newPricing.currency,
+    });
+    
+    setNewPricing({
+      region: '',
+      cargo_type: 'air',
+      service_type: '',
+      agent_rate_per_kg: 0,
+      customer_rate_per_kg: 0,
+      handling_fee: 0,
+      currency: 'USD',
     });
   };
 
@@ -278,6 +312,118 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
                       <span className="text-xs">Configure region pricing in Settings → Pricing first.</span>
                     </div>
                   )}
+
+                  <Separator />
+
+                  {/* Add New Pricing */}
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">Add New Pricing</Label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Select
+                        value={newPricing.region}
+                        onValueChange={(value) => setNewPricing({ ...newPricing, region: value as any })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select region" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {agentRegions.map((region) => (
+                            <SelectItem key={region.code} value={region.code}>
+                              {region.flag_emoji} {region.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      <Select
+                        value={newPricing.cargo_type}
+                        onValueChange={(value) => setNewPricing({ ...newPricing, cargo_type: value as 'sea' | 'air' })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="air">Air Cargo</SelectItem>
+                          <SelectItem value="sea">Sea Cargo</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <Select
+                        value={newPricing.service_type}
+                        onValueChange={(value) => setNewPricing({ ...newPricing, service_type: value as any })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Service type (optional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="door_to_door">Door to Door</SelectItem>
+                          <SelectItem value="airport_to_airport">Airport to Airport</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      <Select
+                        value={newPricing.currency}
+                        onValueChange={(value) => setNewPricing({ ...newPricing, currency: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="USD">USD</SelectItem>
+                          <SelectItem value="EUR">EUR</SelectItem>
+                          <SelectItem value="GBP">GBP</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Agent Rate/kg</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={newPricing.agent_rate_per_kg}
+                          onChange={(e) => setNewPricing({ ...newPricing, agent_rate_per_kg: parseFloat(e.target.value) || 0 })}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Customer Rate/kg</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={newPricing.customer_rate_per_kg}
+                          onChange={(e) => setNewPricing({ ...newPricing, customer_rate_per_kg: parseFloat(e.target.value) || 0 })}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Handling Fee</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={newPricing.handling_fee}
+                          onChange={(e) => setNewPricing({ ...newPricing, handling_fee: parseFloat(e.target.value) || 0 })}
+                        />
+                      </div>
+                    </div>
+
+                    <Button
+                      onClick={handleAddPricing}
+                      disabled={!newPricing.region || createPricing.isPending}
+                      className="w-full"
+                    >
+                      {createPricing.isPending ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Plus className="w-4 h-4 mr-2" />
+                      )}
+                      Add Pricing
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
