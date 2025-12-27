@@ -45,7 +45,7 @@ import { Agent } from '@/hooks/useAgents';
 import { useTransitRoutes, TRANSIT_POINT_LABELS, TRANSIT_POINT_OPTIONS, TransitPointType, useCreateTransitRoute, useUpdateTransitRoute, useDeleteTransitRoute } from '@/hooks/useTransitRoutes';
 import { useAllAgentBalances } from '@/hooks/useAgentBalance';
 import { useRegions } from '@/hooks/useRegions';
-import { useRegionPricing, useUpdateRegionPricing, useCreateRegionPricing } from '@/hooks/useRegionPricing';
+import { useRegionPricing, useUpdateRegionPricing, useCreateRegionPricing, useDeleteRegionPricing } from '@/hooks/useRegionPricing';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 
 interface AgentConfigDrawerProps {
@@ -64,6 +64,7 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
   const deleteRoute = useDeleteTransitRoute();
   const updatePricing = useUpdateRegionPricing();
   const createPricing = useCreateRegionPricing();
+  const deletePricing = useDeleteRegionPricing();
 
   const [newRoute, setNewRoute] = useState({
     region_id: '',
@@ -285,19 +286,34 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
                                   </div>
                                 </TableCell>
                                 <TableCell>
-                                  {isEditing && (
+                                  <div className="flex items-center gap-1">
+                                    {isEditing && (
+                                      <Button
+                                        size="sm"
+                                        onClick={() => handleSavePricing(pricing.id)}
+                                        disabled={updatePricing.isPending}
+                                      >
+                                        {updatePricing.isPending ? (
+                                          <Loader2 className="w-4 h-4 animate-spin" />
+                                        ) : (
+                                          <Save className="w-4 h-4" />
+                                        )}
+                                      </Button>
+                                    )}
                                     <Button
-                                      size="sm"
-                                      onClick={() => handleSavePricing(pricing.id)}
-                                      disabled={updatePricing.isPending}
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8"
+                                      onClick={() => {
+                                        if (confirm('Delete this pricing entry?')) {
+                                          deletePricing.mutate(pricing.id);
+                                        }
+                                      }}
+                                      disabled={deletePricing.isPending}
                                     >
-                                      {updatePricing.isPending ? (
-                                        <Loader2 className="w-4 h-4 animate-spin" />
-                                      ) : (
-                                        <Save className="w-4 h-4" />
-                                      )}
+                                      <Trash2 className="w-4 h-4 text-destructive" />
                                     </Button>
-                                  )}
+                                  </div>
                                 </TableCell>
                               </TableRow>
                             );
