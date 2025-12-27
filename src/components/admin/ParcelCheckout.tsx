@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
-import { ScanLine, Package, User, Phone, Mail, CheckCircle2, AlertCircle, Clock, X } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { ScanLine, Package, User, Phone, Mail, CheckCircle2, AlertCircle, Clock, X, Volume2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,40 +7,63 @@ import { Badge } from '@/components/ui/badge';
 import { useParcelCheckout } from '@/hooks/useParcelCheckout';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { playSuccessBeep, playErrorBeep } from '@/lib/audioFeedback';
 
 export function ParcelCheckout() {
   const [barcode, setBarcode] = useState('');
+  const [lastScanTime, setLastScanTime] = useState<Date | null>(null);
+  const [scanAnimation, setScanAnimation] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const { isLoading, scannedParcel, recentCheckouts, lookupParcel, releaseParcel, clearScannedParcel } = useParcelCheckout();
   const [error, setError] = useState<string | null>(null);
 
-  // Auto-focus input on mount
+  // Auto-focus input on mount and after any action
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
-  const handleScan = async (e: React.FormEvent) => {
+  // Re-focus input when clicking anywhere on the page (for scanner convenience)
+  useEffect(() => {
+    const handleClick = () => {
+      inputRef.current?.focus();
+    };
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, []);
+
+  const handleScan = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!barcode.trim()) return;
 
     setError(null);
+    setScanAnimation(true);
+    setLastScanTime(new Date());
+    
     const result = await lookupParcel(barcode.trim());
     
     if (!result.success) {
       setError(result.error || 'Failed to lookup parcel');
+      playErrorBeep();
+    } else {
+      playSuccessBeep();
     }
+    
+    setTimeout(() => setScanAnimation(false), 500);
     setBarcode('');
     inputRef.current?.focus();
-  };
+  }, [barcode, lookupParcel]);
 
-  const handleRelease = async () => {
+  const handleRelease = useCallback(async () => {
     if (!scannedParcel) return;
     
     const result = await releaseParcel(scannedParcel.id);
     if (result.success) {
+      playSuccessBeep();
       inputRef.current?.focus();
+    } else {
+      playErrorBeep();
     }
-  };
+  }, [scannedParcel, releaseParcel]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -55,37 +78,64 @@ export function ParcelCheckout() {
   return (
     <div className="space-y-6">
       {/* Scanner Input */}
-      <Card className="border-2 border-dashed border-accent/50 bg-gradient-to-br from-accent/5 to-transparent">
+      <Card className={cn(
+        "border-2 border-dashed transition-all duration-300",
+        scanAnimation 
+          ? "border-emerald-500 bg-emerald-500/10 shadow-lg shadow-emerald-500/20" 
+          : "border-accent/50 bg-gradient-to-br from-accent/5 to-transparent"
+      )}>
         <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <div className="p-2 rounded-lg bg-accent/10">
-              <ScanLine className="h-5 w-5 text-accent" />
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <div className={cn(
+                "p-2 rounded-lg transition-colors duration-300",
+                scanAnimation ? "bg-emerald-500/20" : "bg-accent/10"
+              )}>
+                <ScanLine className={cn(
+                  "h-5 w-5 transition-colors duration-300",
+                  scanAnimation ? "text-emerald-500" : "text-accent"
+                )} />
+              </div>
+              Scan Parcel Barcode
+            </CardTitle>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Volume2 className="h-3 w-3" />
+              Audio feedback enabled
             </div>
-            Scan Parcel Barcode
-          </CardTitle>
+          </div>
           <CardDescription>
-            Scan or enter the parcel barcode to look up and release to customer
+            Use your handheld scanner or type the barcode manually. Scanner auto-submits on Enter.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleScan} className="flex gap-3">
-            <Input
-              ref={inputRef}
-              type="text"
-              placeholder="Enter or scan barcode..."
-              value={barcode}
-              onChange={(e) => setBarcode(e.target.value)}
-              className="text-lg h-12 font-mono"
-              autoComplete="off"
-              autoFocus
-            />
-            <Button type="submit" size="lg" disabled={isLoading || !barcode.trim()}>
-              {isLoading ? 'Scanning...' : 'Lookup'}
+            <div className="relative flex-1">
+              <Input
+                ref={inputRef}
+                type="text"
+                placeholder="Waiting for scan..."
+                value={barcode}
+                onChange={(e) => setBarcode(e.target.value)}
+                className={cn(
+                  "text-lg h-14 font-mono pr-24 transition-all duration-300",
+                  scanAnimation && "ring-2 ring-emerald-500"
+                )}
+                autoComplete="off"
+                autoFocus
+              />
+              {lastScanTime && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                  Last: {format(lastScanTime, 'HH:mm:ss')}
+                </div>
+              )}
+            </div>
+            <Button type="submit" size="lg" className="h-14 px-6" disabled={isLoading || !barcode.trim()}>
+              {isLoading ? 'Looking up...' : 'Lookup'}
             </Button>
           </form>
           
           {error && (
-            <div className="mt-4 p-4 rounded-lg bg-destructive/10 border border-destructive/20 flex items-center gap-3">
+            <div className="mt-4 p-4 rounded-lg bg-destructive/10 border border-destructive/20 flex items-center gap-3 animate-in slide-in-from-top-2">
               <AlertCircle className="h-5 w-5 text-destructive shrink-0" />
               <p className="text-sm text-destructive">{error}</p>
             </div>
