@@ -506,86 +506,71 @@ export function ShipmentUploadForm() {
         console.error('Failed to create batch:', batchError);
       }
 
-      // Create each draft shipment
-      for (const line of validLines) {
-        const parcelBarcode = generateBarcode();
-        const trackingNumber = generateTrackingNumber();
-        const customer = customers?.find(c => c.id === line.customer_id);
-        const lineAmount = calculateLineAmount(line.weight_kg);
+      // Create ONE draft shipment with all parcels
+      const trackingNumber = generateTrackingNumber();
+      const totalWeight = validLines.reduce((sum, l) => sum + l.weight_kg, 0) + agentCargoWeight;
+      const totalAmount = validLines.reduce((sum, l) => sum + calculateLineAmount(l.weight_kg), 0) +
+        (canHaveConsolidatedCargo && agentCargoWeight > 0 ? (agentCargoWeight * (ratePerKg || 0)) + transitAdditionalCost : 0);
+      
+      // Use first customer info for the draft shipment header
+      const firstLine = validLines[0];
+      const firstCustomer = firstLine ? customers?.find(c => c.id === firstLine.customer_id) : null;
+      
+      // Build description from all lines
+      const descriptions = validLines
+        .map(l => l.description || l.customer_name)
+        .filter(Boolean)
+        .join(', ');
 
-        const { data: shipment, error: shipmentError } = await supabase
-          .from('shipments')
-          .insert({
-            customer_id: line.customer_id || null,
-            customer_name: line.customer_name || customer?.name || null,
-            origin_region: selectedRegion,
-            total_weight_kg: line.weight_kg,
-            description: line.description || null,
-            warehouse_location: null,
-            created_by: user?.id,
-            agent_id: user?.id,
-            tracking_number: trackingNumber,
-            batch_id: batchId,
-            billing_party: 'customer_direct' as BillingPartyType,
-            transit_point: transitPoint,
-            rate_per_kg: ratePerKg || 0,
-            total_revenue: lineAmount,
-            is_draft: true, // Mark as draft
-          })
-          .select()
-          .single();
+      const { data: shipment, error: shipmentError } = await supabase
+        .from('shipments')
+        .insert({
+          customer_id: firstLine?.customer_id || null,
+          customer_name: firstLine?.customer_name || firstCustomer?.name || null,
+          origin_region: selectedRegion,
+          total_weight_kg: totalWeight,
+          description: descriptions || null,
+          warehouse_location: null,
+          created_by: user?.id,
+          agent_id: user?.id,
+          tracking_number: trackingNumber,
+          batch_id: batchId,
+          billing_party: agentCargoWeight > 0 ? 'agent_collect' as BillingPartyType : 'customer_direct' as BillingPartyType,
+          transit_point: transitPoint,
+          rate_per_kg: ratePerKg || 0,
+          total_revenue: totalAmount,
+          agent_cargo_weight_kg: agentCargoWeight > 0 ? agentCargoWeight : null,
+          is_draft: true,
+        })
+        .select()
+        .single();
 
-        if (shipmentError) throw shipmentError;
+      if (shipmentError) throw shipmentError;
 
-        // Create parcel for draft
-        await supabase
-          .from('parcels')
-          .insert({
-            shipment_id: shipment.id,
-            barcode: parcelBarcode,
-            weight_kg: line.weight_kg,
-            description: line.description || null,
-          });
+      // Create parcels for each line
+      const parcelsToInsert = validLines.map(line => ({
+        shipment_id: shipment.id,
+        barcode: generateBarcode(),
+        weight_kg: line.weight_kg,
+        description: line.description || line.customer_name || null,
+      }));
+
+      // Add agent cargo parcel if present
+      if (canHaveConsolidatedCargo && agentCargoWeight > 0) {
+        parcelsToInsert.push({
+          shipment_id: shipment.id,
+          barcode: generateBarcode(),
+          weight_kg: agentCargoWeight,
+          description: "Agent's Consolidated Cargo",
+        });
       }
 
-      // Handle agent cargo if present
-      if (canHaveConsolidatedCargo && agentCargoWeight > 0) {
-        const agentCargoAmount = (agentCargoWeight * (ratePerKg || 0)) + transitAdditionalCost;
-        const parcelBarcode = generateBarcode();
-        const trackingNumber = generateTrackingNumber();
+      if (parcelsToInsert.length > 0) {
+        const { error: parcelsError } = await supabase
+          .from('parcels')
+          .insert(parcelsToInsert);
 
-        const { data: agentShipment, error: agentError } = await supabase
-          .from('shipments')
-          .insert({
-            customer_id: null,
-            customer_name: null,
-            origin_region: selectedRegion,
-            total_weight_kg: agentCargoWeight,
-            description: "Agent's Consolidated Cargo",
-            agent_cargo_weight_kg: agentCargoWeight,
-            created_by: user?.id,
-            agent_id: user?.id,
-            tracking_number: trackingNumber,
-            batch_id: batchId,
-            billing_party: 'agent_collect' as BillingPartyType,
-            transit_point: transitPoint,
-            rate_per_kg: ratePerKg || 0,
-            total_revenue: agentCargoAmount,
-            is_draft: true,
-          })
-          .select()
-          .single();
-
-        if (!agentError && agentShipment) {
-          await supabase
-            .from('parcels')
-            .insert({
-              shipment_id: agentShipment.id,
-              barcode: parcelBarcode,
-              weight_kg: agentCargoWeight,
-              description: "Agent's Consolidated Cargo",
-            });
-        }
+        if (parcelsError) throw parcelsError;
       }
 
       toast.success('Draft saved successfully! You can continue editing from My Shipments.');
