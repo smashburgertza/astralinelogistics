@@ -10,7 +10,8 @@ import {
   ArrowUpRight, Sparkles, ScanBarcode, Clock
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { REGIONS, SHIPMENT_STATUSES, type Region, type ShipmentStatus } from '@/lib/constants';
+import { SHIPMENT_STATUSES, type ShipmentStatus } from '@/lib/constants';
+import { useRegions } from '@/hooks/useRegions';
 import { format, subMonths, startOfMonth, endOfMonth, startOfDay, endOfDay } from 'date-fns';
 import { EmployeePerformanceInsights } from '@/components/admin/EmployeePerformanceInsights';
 import { EmployeeLeaderboard } from '@/components/admin/EmployeeLeaderboard';
@@ -78,6 +79,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export default function AdminDashboard() {
+  const { data: regions = [] } = useRegions();
   const [stats, setStats] = useState<DashboardStats>({
     totalShipments: 0,
     thisMonthShipments: 0,
@@ -255,10 +257,13 @@ export default function AdminDashboard() {
       value,
     }));
 
-  const regionChartData = Object.entries(stats.shipmentsByRegion).map(([key, value]) => ({
-    name: REGIONS[key as Region]?.label || key,
-    shipments: value,
-  }));
+  const regionChartData = Object.entries(stats.shipmentsByRegion).map(([key, value]) => {
+    const regionInfo = regions.find(r => r.code === key);
+    return {
+      name: regionInfo?.name || key,
+      shipments: value,
+    };
+  });
 
   return (
     <AdminLayout title="Dashboard" subtitle="Welcome back! Here's what's happening with your logistics.">
@@ -678,7 +683,7 @@ export default function AdminDashboard() {
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold truncate">{shipment.tracking_number}</p>
                       <p className="text-sm text-muted-foreground flex items-center gap-2">
-                        <span className="text-base">{REGIONS[shipment.origin_region as Region]?.flag}</span>
+                        <span className="text-base">{regions.find(r => r.code === shipment.origin_region)?.flag_emoji}</span>
                         <span>{shipment.total_weight_kg}kg</span>
                         <span className="text-muted-foreground/50">•</span>
                         <span>{format(new Date(shipment.created_at), 'MMM d')}</span>

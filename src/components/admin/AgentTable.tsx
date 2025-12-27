@@ -38,7 +38,7 @@ import {
 import { MoreHorizontal, UserX, MapPin, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { Agent, useDeleteAgent, useUpdateAgentRegion } from '@/hooks/useAgents';
-import { REGIONS } from '@/lib/constants';
+import { useRegions } from '@/hooks/useRegions';
 
 interface AgentTableProps {
   agents: Agent[] | undefined;
@@ -50,6 +50,7 @@ export function AgentTable({ agents, isLoading }: AgentTableProps) {
   const [agentToDelete, setAgentToDelete] = useState<Agent | null>(null);
   const deleteAgent = useDeleteAgent();
   const updateRegion = useUpdateAgentRegion();
+  const { data: regions = [] } = useRegions();
 
   const handleDelete = async () => {
     if (agentToDelete) {
@@ -121,8 +122,8 @@ export function AgentTable({ agents, isLoading }: AgentTableProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {agents.map((agent) => {
-              const region = agent.region ? REGIONS[agent.region] : null;
+          {agents.map((agent) => {
+              const regionInfo = regions.find(r => r.code === agent.region);
               return (
                 <TableRow key={agent.id}>
                   <TableCell>
@@ -154,10 +155,10 @@ export function AgentTable({ agents, isLoading }: AgentTableProps) {
                     >
                       <SelectTrigger className="w-[140px] h-8">
                         <SelectValue>
-                          {region ? (
+                          {regionInfo ? (
                             <span className="flex items-center gap-2">
-                              <span>{region.flag}</span>
-                              <span>{region.label}</span>
+                              <span>{regionInfo.flag_emoji}</span>
+                              <span>{regionInfo.name}</span>
                             </span>
                           ) : (
                             <span className="text-muted-foreground">Not assigned</span>
@@ -165,11 +166,11 @@ export function AgentTable({ agents, isLoading }: AgentTableProps) {
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        {Object.entries(REGIONS).map(([key, r]) => (
-                          <SelectItem key={key} value={key}>
+                        {regions.map((r) => (
+                          <SelectItem key={r.code} value={r.code}>
                             <span className="flex items-center gap-2">
-                              <span>{r.flag}</span>
-                              <span>{r.label}</span>
+                              <span>{r.flag_emoji}</span>
+                              <span>{r.name}</span>
                             </span>
                           </SelectItem>
                         ))}

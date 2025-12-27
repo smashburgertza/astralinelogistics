@@ -5,7 +5,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { Customer, useCustomerShipments, useCustomerInvoices } from '@/hooks/useCustomers';
 import { CustomerDialog } from './CustomerDialog';
-import { SHIPMENT_STATUSES, CURRENCY_SYMBOLS, REGIONS } from '@/lib/constants';
+import { SHIPMENT_STATUSES, CURRENCY_SYMBOLS } from '@/lib/constants';
+import { useRegions } from '@/hooks/useRegions';
 import { format } from 'date-fns';
 import { Mail, Phone, Building2, MapPin, FileText, Package, Pencil, Calendar } from 'lucide-react';
 
@@ -18,6 +19,7 @@ interface CustomerDetailsDrawerProps {
 export function CustomerDetailsDrawer({ customer, open, onOpenChange }: CustomerDetailsDrawerProps) {
   const { data: shipments, isLoading: shipmentsLoading } = useCustomerShipments(customer?.id || '');
   const { data: invoices, isLoading: invoicesLoading } = useCustomerInvoices(customer?.id || '');
+  const { data: regions = [] } = useRegions();
 
   if (!customer) return null;
 
@@ -109,12 +111,12 @@ export function CustomerDetailsDrawer({ customer, open, onOpenChange }: Customer
               <div className="space-y-2">
                 {shipments.map((shipment) => {
                   const statusConfig = SHIPMENT_STATUSES[shipment.status as keyof typeof SHIPMENT_STATUSES];
-                  const regionInfo = REGIONS[shipment.origin_region as keyof typeof REGIONS];
+                  const regionInfo = regions.find(r => r.code === shipment.origin_region);
                   return (
                     <div key={shipment.id} className="flex items-center justify-between p-3 rounded-lg border bg-card">
                       <div>
                         <div className="flex items-center gap-2">
-                          {regionInfo && <span>{regionInfo.flag}</span>}
+                          {regionInfo && <span>{regionInfo.flag_emoji}</span>}
                           <span className="font-mono text-sm">{shipment.tracking_number}</span>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">
