@@ -607,31 +607,40 @@ export function ShipmentUploadForm() {
               </div>
             </div>
             <div className="flex items-center gap-4 flex-wrap">
-              {/* Region Selector for multi-region agents */}
-              {hasMultipleRegions ? (
+              {/* Region Selector */}
+              {regionsLoading ? (
+                <Badge variant="outline" className="gap-1.5">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Loading...
+                </Badge>
+              ) : assignedRegions.length > 1 ? (
                 <div className="flex items-center gap-2">
                   <Globe className="w-4 h-4 text-muted-foreground" />
                   <Select
                     value={selectedRegion}
                     onValueChange={(value) => setSelectedRegion(value as AgentRegion)}
                   >
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-[200px] bg-background">
                       <SelectValue placeholder="Select region" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-popover z-[100]">
                       {assignedRegions.map((r) => (
                         <SelectItem key={r.region_code} value={r.region_code}>
-                          {r.flag_emoji} {r.region_name}
+                          <span className="flex items-center gap-2">
+                            <span>{r.flag_emoji}</span>
+                            <span>{r.region_name}</span>
+                          </span>
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-              ) : (
-                <Badge variant="outline" className="gap-1.5">
-                  {currentRegionInfo?.flag_emoji} {currentRegionInfo?.region_name}
+              ) : currentRegionInfo ? (
+                <Badge variant="outline" className="gap-1.5 px-3 py-1.5">
+                  <Globe className="w-3.5 h-3.5" />
+                  {currentRegionInfo.flag_emoji} {currentRegionInfo.region_name}
                 </Badge>
-              )}
+              ) : null}
             </div>
           </div>
         </CardHeader>
