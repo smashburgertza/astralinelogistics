@@ -31,7 +31,7 @@ import {
   SidebarInset,
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
-import { REGIONS } from '@/lib/constants';
+import { useRegions } from '@/hooks/useRegions';
 import { cn } from '@/lib/utils';
 
 interface AgentLayoutProps {
@@ -55,7 +55,8 @@ export function AgentLayout({ children, title, subtitle }: AgentLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const region = getRegion();
-  const regionInfo = region ? REGIONS[region] : null;
+  const { data: regions = [] } = useRegions();
+  const regionInfo = region ? regions.find(r => r.code === region) : null;
 
   const handleSignOut = async () => {
     await signOut();
@@ -89,10 +90,10 @@ export function AgentLayout({ children, title, subtitle }: AgentLayoutProps) {
             <div className="px-4 py-3 border-b border-sidebar-border group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:py-2">
               <div className="flex items-center gap-2 text-sm group-data-[collapsible=icon]:justify-center">
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400/20 to-teal-500/20 flex items-center justify-center shrink-0">
-                  <span className="text-lg">{regionInfo.flag}</span>
+                  <span className="text-lg">{regionInfo.flag_emoji}</span>
                 </div>
                 <span className="text-muted-foreground font-medium transition-all duration-300 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:overflow-hidden">
-                  {regionInfo.label}
+                  {regionInfo.name}
                 </span>
               </div>
             </div>

@@ -18,7 +18,7 @@ import { ShipmentStatusBadge } from '@/components/admin/ShipmentStatusBadge';
 import { ShipmentDetailDrawer } from '@/components/admin/ShipmentDetailDrawer';
 import { EditShipmentDialog } from './EditShipmentDialog';
 import { Shipment } from '@/hooks/useShipments';
-import { REGIONS } from '@/lib/constants';
+import { useRegions } from '@/hooks/useRegions';
 import { toast } from 'sonner';
 
 interface AgentShipmentTableProps {
@@ -32,6 +32,7 @@ export function AgentShipmentTable({ shipments, isLoading }: AgentShipmentTableP
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingShipment, setEditingShipment] = useState<Shipment | null>(null);
   const updateStatus = useUpdateShipmentStatus();
+  const { data: regions = [] } = useRegions();
 
   const copyTrackingNumber = (trackingNumber: string) => {
     navigator.clipboard.writeText(trackingNumber);
@@ -96,7 +97,7 @@ export function AgentShipmentTable({ shipments, isLoading }: AgentShipmentTableP
         </TableHeader>
         <TableBody>
           {shipments.map((shipment) => {
-            const region = REGIONS[shipment.origin_region as keyof typeof REGIONS];
+            const regionInfo = regions.find(r => r.code === shipment.origin_region);
             return (
               <TableRow key={shipment.id} className="group">
                 <TableCell>

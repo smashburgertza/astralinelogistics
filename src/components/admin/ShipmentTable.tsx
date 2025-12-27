@@ -16,7 +16,8 @@ import { format } from 'date-fns';
 import { ShipmentStatusBadge } from './ShipmentStatusBadge';
 import { ShipmentDetailDrawer } from './ShipmentDetailDrawer';
 import { Shipment, useUpdateShipmentStatus } from '@/hooks/useShipments';
-import { REGIONS, SHIPMENT_STATUSES } from '@/lib/constants';
+import { SHIPMENT_STATUSES } from '@/lib/constants';
+import { useRegions } from '@/hooks/useRegions';
 import { toast } from 'sonner';
 
 interface ShipmentTableProps {
@@ -35,6 +36,7 @@ export function ShipmentTable({
   const updateStatus = useUpdateShipmentStatus();
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const { data: regions = [] } = useRegions();
 
   const copyTrackingNumber = (trackingNumber: string) => {
     navigator.clipboard.writeText(trackingNumber);
@@ -135,7 +137,7 @@ export function ShipmentTable({
         </TableHeader>
         <TableBody>
           {shipments.map((shipment) => {
-            const region = REGIONS[shipment.origin_region as keyof typeof REGIONS];
+            const regionInfo = regions.find(r => r.code === shipment.origin_region);
             const isSelected = selectedIds.includes(shipment.id);
             
             return (
@@ -177,8 +179,8 @@ export function ShipmentTable({
                 </TableCell>
                 <TableCell>
                   <span className="inline-flex items-center gap-1.5">
-                    <span>{region?.flag}</span>
-                    <span>{region?.label}</span>
+                    <span>{regionInfo?.flag_emoji}</span>
+                    <span>{regionInfo?.name}</span>
                   </span>
                 </TableCell>
                 <TableCell>

@@ -7,13 +7,15 @@ import { Search, Package } from 'lucide-react';
 import { useTrackShipment } from '@/hooks/useTrackShipment';
 import { ShipmentTimeline } from '@/components/tracking/ShipmentTimeline';
 import { ParcelList } from '@/components/tracking/ParcelList';
-import { SHIPMENT_STATUSES, REGIONS } from '@/lib/constants';
+import { SHIPMENT_STATUSES } from '@/lib/constants';
+import { useRegions } from '@/hooks/useRegions';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function CustomerTrackPage() {
   const [trackingNumber, setTrackingNumber] = useState('');
   const [searchedNumber, setSearchedNumber] = useState('');
+  const { data: regions = [] } = useRegions();
   
   const { data: shipment, isLoading, error } = useTrackShipment(searchedNumber);
 
@@ -28,7 +30,7 @@ export default function CustomerTrackPage() {
     : null;
 
   const region = shipment?.origin_region
-    ? REGIONS[shipment.origin_region as keyof typeof REGIONS]
+    ? regions.find(r => r.code === shipment.origin_region)
     : null;
 
   return (
@@ -95,7 +97,7 @@ export default function CustomerTrackPage() {
                       {shipment.tracking_number}
                     </CardTitle>
                     <CardDescription className="flex items-center gap-2 mt-1">
-                      {region?.flag} From {region?.label}
+                      {region?.flag_emoji} From {region?.name}
                       <span>•</span>
                       {shipment.total_weight_kg} kg
                     </CardDescription>

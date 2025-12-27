@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
-import { REGIONS, type Region } from '@/lib/constants';
+import { useRegions } from '@/hooks/useRegions';
 
 type ActivityType = 'shipment' | 'invoice' | 'estimate' | 'customer' | 'expense';
 
@@ -46,6 +46,7 @@ export function LiveActivityFeed() {
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<ActivityType | 'all'>('all');
   const navigate = useNavigate();
+  const { data: regions = [] } = useRegions();
 
   const filteredActivities = activeFilter === 'all' 
     ? activities 
@@ -137,7 +138,7 @@ export function LiveActivityFeed() {
       shipments?.forEach(s => {
         const customerName = (s.customers as any)?.name;
         const employeeName = profileMap.get(s.created_by || '') || undefined;
-        const region = REGIONS[s.origin_region as Region];
+        const regionInfo = regions.find(r => r.code === s.origin_region);
         
         activities.push({
           id: `shipment-${s.id}`,
@@ -150,7 +151,7 @@ export function LiveActivityFeed() {
           status: s.status || undefined,
           employeeName,
           customerName,
-          region: region ? `${region.flag} ${region.label}` : undefined,
+          region: regionInfo ? `${regionInfo.flag_emoji} ${regionInfo.name}` : undefined,
           link: '/admin/shipments',
         });
       });
@@ -204,7 +205,7 @@ export function LiveActivityFeed() {
       estimates?.forEach(e => {
         const customerName = (e.customers as any)?.name;
         const employeeName = profileMap.get(e.created_by || '') || undefined;
-        const region = REGIONS[e.origin_region as Region];
+        const regionInfo = regions.find(r => r.code === e.origin_region);
         
         activities.push({
           id: `estimate-${e.id}`,
@@ -219,7 +220,7 @@ export function LiveActivityFeed() {
           status: e.status || undefined,
           employeeName,
           customerName,
-          region: region ? `${region.flag} ${region.label}` : undefined,
+          region: regionInfo ? `${regionInfo.flag_emoji} ${regionInfo.name}` : undefined,
           link: '/admin/estimates',
         });
       });

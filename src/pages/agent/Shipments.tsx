@@ -7,14 +7,15 @@ import { Button } from '@/components/ui/button';
 import { useAgentShipments, useAgentShipmentStats } from '@/hooks/useAgentShipments';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useAuth } from '@/hooks/useAuth';
-import { REGIONS } from '@/lib/constants';
+import { useRegions } from '@/hooks/useRegions';
 import { Package, Plane, MapPin, CheckCircle, Upload, Scale } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function AgentShipmentsPage() {
   const { getRegion } = useAuth();
   const region = getRegion();
-  const regionInfo = region ? REGIONS[region] : null;
+  const { data: regions = [] } = useRegions();
+  const regionInfo = region ? regions.find(r => r.code === region) : null;
 
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
@@ -37,7 +38,7 @@ export default function AgentShipmentsPage() {
   return (
     <AgentLayout 
       title="My Shipments" 
-      subtitle={regionInfo ? `Shipments from ${regionInfo.label}` : 'View all your uploaded shipments'}
+      subtitle={regionInfo ? `Shipments from ${regionInfo.name}` : 'View all your uploaded shipments'}
     >
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">

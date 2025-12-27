@@ -26,7 +26,7 @@ import { DollarSign, MoreHorizontal, Check, X, MessageSquare, Loader2, AlertCirc
 import { EXPENSE_CATEGORIES, useApproveExpense } from '@/hooks/useExpenses';
 import { ExpenseStatusBadge } from './ExpenseStatusBadge';
 import { ExpenseApprovalDialog } from './ExpenseApprovalDialog';
-import { REGIONS } from '@/lib/constants';
+import { useRegions } from '@/hooks/useRegions';
 
 interface ExpenseWithShipment {
   id: string;
@@ -77,6 +77,7 @@ export function ExpenseTable({ expenses, isLoading, showActions = true }: Expens
   }>({ open: false, expenseId: '', mode: 'deny' });
 
   const approveExpense = useApproveExpense();
+  const { data: regions = [] } = useRegions();
 
   const handleApprove = (expenseId: string) => {
     approveExpense.mutate(expenseId);
@@ -155,7 +156,7 @@ export function ExpenseTable({ expenses, isLoading, showActions = true }: Expens
           </TableHeader>
           <TableBody>
             {expenses.map((expense) => {
-              const regionInfo = expense.region ? REGIONS[expense.region as keyof typeof REGIONS] : null;
+              const regionInfo = expense.region ? regions.find(r => r.code === expense.region) : null;
               const isPending = expense.status === 'pending';
               const needsClarification = expense.status === 'needs_clarification';
               const canTakeAction = isPending || needsClarification;
@@ -209,8 +210,8 @@ export function ExpenseTable({ expenses, isLoading, showActions = true }: Expens
                   <TableCell>
                     {regionInfo ? (
                       <div className="flex items-center gap-2">
-                        <span>{regionInfo.flag}</span>
-                        <span>{regionInfo.label}</span>
+                        <span>{regionInfo.flag_emoji}</span>
+                        <span>{regionInfo.name}</span>
                       </div>
                     ) : (
                       <span className="text-muted-foreground">—</span>

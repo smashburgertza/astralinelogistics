@@ -8,7 +8,8 @@ import { MoreHorizontal, FileText, Download, Eye, CheckCircle, XCircle, Clock, A
 import { Invoice, useUpdateInvoiceStatus, INVOICE_STATUSES } from '@/hooks/useInvoices';
 import { InvoiceStatusBadge } from './InvoiceStatusBadge';
 import { InvoicePDFPreview } from './InvoicePDFPreview';
-import { CURRENCY_SYMBOLS, REGIONS } from '@/lib/constants';
+import { CURRENCY_SYMBOLS } from '@/lib/constants';
+import { useRegions } from '@/hooks/useRegions';
 import { format } from 'date-fns';
 import { useReactToPrint } from 'react-to-print';
 
@@ -22,6 +23,7 @@ export function InvoiceTable({ invoices, isLoading }: InvoiceTableProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const updateStatus = useUpdateInvoiceStatus();
   const printRef = useRef<HTMLDivElement>(null);
+  const { data: regions = [] } = useRegions();
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
@@ -102,7 +104,7 @@ export function InvoiceTable({ invoices, isLoading }: InvoiceTableProps) {
             {invoices.map((invoice) => {
               const currencySymbol = CURRENCY_SYMBOLS[invoice.currency || 'USD'] || '$';
               const regionInfo = invoice.shipments?.origin_region
-                ? REGIONS[invoice.shipments.origin_region as keyof typeof REGIONS]
+                ? regions.find(r => r.code === invoice.shipments?.origin_region)
                 : null;
 
               return (
@@ -121,7 +123,7 @@ export function InvoiceTable({ invoices, isLoading }: InvoiceTableProps) {
                   <TableCell>
                     {invoice.shipments ? (
                       <div className="flex items-center gap-2">
-                        {regionInfo && <span>{regionInfo.flag}</span>}
+                        {regionInfo && <span>{regionInfo.flag_emoji}</span>}
                         <span className="font-mono text-sm">{invoice.shipments.tracking_number}</span>
                       </div>
                     ) : (

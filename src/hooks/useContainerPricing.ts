@@ -1,12 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import type { Region } from '@/lib/constants';
 
 export interface ContainerPricing {
   id: string;
   container_size: '20ft' | '40ft';
-  region: Region;
+  region: string;
   price: number;
   currency: string;
   created_at: string;

@@ -39,7 +39,8 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { useCustomers, useCreateShipment } from '@/hooks/useShipments';
 import { useRegionPricingByRegion, calculateShipmentCost } from '@/hooks/useRegionPricing';
-import { REGIONS, CURRENCY_SYMBOLS } from '@/lib/constants';
+import { CURRENCY_SYMBOLS } from '@/lib/constants';
+import { useRegions } from '@/hooks/useRegions';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -92,7 +93,8 @@ interface CompletedShipment {
 export function ShipmentUploadForm() {
   const { user, getRegion } = useAuth();
   const region = getRegion();
-  const regionInfo = region ? REGIONS[region] : null;
+  const { data: regions = [] } = useRegions();
+  const regionInfo = region ? regions.find(r => r.code === region) : null;
   
   const { data: customers, isLoading: customersLoading } = useCustomers();
   const { data: pricing, isLoading: pricingLoading } = useRegionPricingByRegion(region);
@@ -596,7 +598,7 @@ export function ShipmentUploadForm() {
               <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                 <span className="text-sm text-muted-foreground">Origin Region</span>
                 <Badge variant="outline" className="gap-1.5">
-                  {regionInfo?.flag} {regionInfo?.label}
+                  {regionInfo?.flag_emoji} {regionInfo?.name}
                 </Badge>
               </div>
 

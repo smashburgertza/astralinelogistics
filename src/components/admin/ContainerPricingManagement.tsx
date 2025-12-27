@@ -5,13 +5,14 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useContainerPricing } from '@/hooks/useContainerPricing';
-import { REGIONS } from '@/lib/constants';
+import { useRegions } from '@/hooks/useRegions';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const CURRENCIES = ['USD', 'GBP', 'EUR', 'TZS'];
 
 export function ContainerPricingManagement() {
   const { containerPricing, isLoading, updatePricing } = useContainerPricing();
+  const { data: regions = [] } = useRegions();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<{ price: string; currency: string }>({ price: '', currency: '' });
 
@@ -72,12 +73,14 @@ export function ContainerPricingManagement() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {grouped20ft.map((pricing) => (
+                {grouped20ft.map((pricing) => {
+                  const regionInfo = regions.find(r => r.code === pricing.region);
+                  return (
                   <TableRow key={pricing.id}>
                     <TableCell>
                       <span className="flex items-center gap-2">
-                        <span>{REGIONS[pricing.region]?.flag}</span>
-                        {REGIONS[pricing.region]?.label}
+                        <span>{regionInfo?.flag_emoji}</span>
+                        {regionInfo?.name}
                       </span>
                     </TableCell>
                     <TableCell>
@@ -128,7 +131,8 @@ export function ContainerPricingManagement() {
                       )}
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
@@ -148,12 +152,14 @@ export function ContainerPricingManagement() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {grouped40ft.map((pricing) => (
+                {grouped40ft.map((pricing) => {
+                  const regionInfo = regions.find(r => r.code === pricing.region);
+                  return (
                   <TableRow key={pricing.id}>
                     <TableCell>
                       <span className="flex items-center gap-2">
-                        <span>{REGIONS[pricing.region]?.flag}</span>
-                        {REGIONS[pricing.region]?.label}
+                        <span>{regionInfo?.flag_emoji}</span>
+                        {regionInfo?.name}
                       </span>
                     </TableCell>
                     <TableCell>
@@ -204,7 +210,8 @@ export function ContainerPricingManagement() {
                       )}
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
