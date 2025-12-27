@@ -91,8 +91,6 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
     service_type: 'door_to_door' | 'airport_to_airport' | null;
     transit_point: 'direct' | 'nairobi' | 'zanzibar';
     agent_rate_per_kg: number;
-    customer_rate_per_kg: number;
-    handling_fee: number;
   }>>({});
 
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'pricing' | 'route'; id: string } | null>(null);
@@ -102,8 +100,6 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
     service_type: '' as 'door_to_door' | 'airport_to_airport' | '',
     transit_point: 'direct' as 'direct' | 'nairobi' | 'zanzibar',
     agent_rate_per_kg: 0,
-    customer_rate_per_kg: 0,
-    handling_fee: 0,
     currency: 'USD',
   });
   if (!agent) return null;
@@ -136,8 +132,6 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
         service_type: pricing.service_type as 'door_to_door' | 'airport_to_airport' | null,
         transit_point: (pricing.transit_point || 'direct') as 'direct' | 'nairobi' | 'zanzibar',
         agent_rate_per_kg: pricing.agent_rate_per_kg,
-        customer_rate_per_kg: pricing.customer_rate_per_kg,
-        handling_fee: pricing.handling_fee || 0,
       }
     }));
   };
@@ -171,8 +165,6 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
       service_type: editedValue.service_type,
       transit_point: editedValue.transit_point,
       agent_rate_per_kg: editedValue.agent_rate_per_kg,
-      customer_rate_per_kg: editedValue.customer_rate_per_kg,
-      handling_fee: editedValue.handling_fee,
     });
     
     setEditingPricing(prev => {
@@ -191,8 +183,8 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
       service_type: newPricing.service_type || null,
       transit_point: newPricing.transit_point,
       agent_rate_per_kg: newPricing.agent_rate_per_kg,
-      customer_rate_per_kg: newPricing.customer_rate_per_kg,
-      handling_fee: newPricing.handling_fee,
+      customer_rate_per_kg: 0, // Will be configured separately in customer pricing
+      handling_fee: 0, // Will be configured separately in customer pricing
       currency: newPricing.currency,
     });
     
@@ -202,8 +194,6 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
       service_type: '',
       transit_point: 'direct',
       agent_rate_per_kg: 0,
-      customer_rate_per_kg: 0,
-      handling_fee: 0,
       currency: 'USD',
     });
   };
@@ -554,26 +544,6 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
                           min="0"
                           value={newPricing.agent_rate_per_kg}
                           onChange={(e) => setNewPricing({ ...newPricing, agent_rate_per_kg: parseFloat(e.target.value) || 0 })}
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Customer Rate/kg</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={newPricing.customer_rate_per_kg}
-                          onChange={(e) => setNewPricing({ ...newPricing, customer_rate_per_kg: parseFloat(e.target.value) || 0 })}
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Handling Fee</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={newPricing.handling_fee}
-                          onChange={(e) => setNewPricing({ ...newPricing, handling_fee: parseFloat(e.target.value) || 0 })}
                         />
                       </div>
                     </div>
