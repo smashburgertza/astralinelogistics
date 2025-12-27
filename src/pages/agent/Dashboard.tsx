@@ -9,12 +9,13 @@ import { format } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
 import { useAgentShipments, useAgentShipmentStats } from '@/hooks/useAgentShipments';
 import { ShipmentStatusBadge } from '@/components/admin/ShipmentStatusBadge';
-import { REGIONS } from '@/lib/constants';
+import { useRegions } from '@/hooks/useRegions';
 
 export default function AgentDashboard() {
   const { getRegion } = useAuth();
-  const region = getRegion();
-  const regionInfo = region ? REGIONS[region] : null;
+  const regionCode = getRegion();
+  const { data: regions } = useRegions();
+  const regionInfo = regions?.find(r => r.code === regionCode);
 
   const { data: stats, isLoading: statsLoading } = useAgentShipmentStats();
   const { data: shipments, isLoading: shipmentsLoading } = useAgentShipments();
@@ -24,7 +25,7 @@ export default function AgentDashboard() {
   return (
     <AgentLayout 
       title="Agent Dashboard" 
-      subtitle={regionInfo ? `Managing shipments from ${regionInfo.label}` : 'Upload and manage shipments'}
+      subtitle={regionInfo ? `Managing shipments from ${regionInfo.name}` : 'Upload and manage shipments'}
     >
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">

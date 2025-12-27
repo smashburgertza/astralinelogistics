@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import type { Region } from '@/lib/constants';
 
 export type VehicleType = 'motorcycle' | 'sedan' | 'suv' | 'truck';
 export type ShippingMethod = 'roro' | 'container';
@@ -10,7 +9,8 @@ export interface VehiclePricing {
   id: string;
   vehicle_type: VehicleType;
   shipping_method: ShippingMethod;
-  region: Region;
+  region: string;
+  region_id: string | null;
   price: number;
   currency: string;
   created_at: string;

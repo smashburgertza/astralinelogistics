@@ -8,7 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Package, FileText, CreditCard, MapPin, ArrowRight, Plane, Clock, CheckCircle, Search, ShoppingCart, Sparkles } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCustomerStats, useCustomerShipments, useCustomerInvoices } from '@/hooks/useCustomerPortal';
-import { SHIPMENT_STATUSES, REGIONS } from '@/lib/constants';
+import { SHIPMENT_STATUSES } from '@/lib/constants';
+import { useRegions } from '@/hooks/useRegions';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { NotificationsList } from '@/components/customer/NotificationsList';
@@ -19,6 +20,7 @@ export default function CustomerDashboard() {
   const { data: stats, isLoading: statsLoading } = useCustomerStats();
   const { data: shipments, isLoading: shipmentsLoading } = useCustomerShipments();
   const { data: invoices, isLoading: invoicesLoading } = useCustomerInvoices();
+  const { data: regions } = useRegions();
 
   const recentShipments = shipments?.slice(0, 5) || [];
   const pendingInvoices = invoices?.filter(i => i.status === 'pending').slice(0, 3) || [];
@@ -37,6 +39,10 @@ export default function CustomerDashboard() {
       delivered: CheckCircle,
     };
     return icons[status as keyof typeof icons] || Package;
+  };
+
+  const getRegionInfo = (regionCode: string) => {
+    return regions?.find(r => r.code === regionCode);
   };
 
   return (
@@ -115,7 +121,7 @@ export default function CustomerDashboard() {
                 {recentShipments.map((shipment) => {
                   const StatusIcon = getStatusIcon(shipment.status || 'collected');
                   const statusConfig = SHIPMENT_STATUSES[shipment.status as keyof typeof SHIPMENT_STATUSES];
-                  const region = REGIONS[shipment.origin_region as keyof typeof REGIONS];
+                  const region = getRegionInfo(shipment.origin_region);
 
                   return (
                     <div
@@ -133,7 +139,7 @@ export default function CustomerDashboard() {
                           </code>
                           <span className="text-muted-foreground/50">•</span>
                           <span className="text-sm text-muted-foreground">
-                            <span className="text-base">{region?.flag}</span> {region?.label}
+                            <span className="text-base">{region?.flag_emoji}</span> {region?.name}
                           </span>
                         </div>
                         <p className="text-sm text-muted-foreground flex items-center gap-2 mt-1">

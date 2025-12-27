@@ -5,11 +5,12 @@ import { CreateAgentDialog } from '@/components/admin/CreateAgentDialog';
 import { AgentTable } from '@/components/admin/AgentTable';
 import { RegionManagement } from '@/components/admin/RegionManagement';
 import { useAgents } from '@/hooks/useAgents';
-import { REGIONS } from '@/lib/constants';
+import { useActiveRegions } from '@/hooks/useRegions';
 import { Users, Globe } from 'lucide-react';
 
 export default function AgentsPage() {
   const { data: agents, isLoading } = useAgents();
+  const { data: regions } = useActiveRegions();
 
   // Calculate stats
   const totalAgents = agents?.length || 0;
@@ -52,17 +53,17 @@ export default function AgentsPage() {
               </CardContent>
             </Card>
 
-            {Object.entries(REGIONS).map(([key, region]) => (
-              <Card key={key} className="border-0 shadow-md">
+            {regions?.slice(0, 4).map((region) => (
+              <Card key={region.id} className="border-0 shadow-md">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <span>{region.flag}</span>
-                    {region.label}
+                    <span>{region.flag_emoji}</span>
+                    {region.name}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-3xl font-bold">
-                    {agentsByRegion[key] || 0}
+                    {agentsByRegion[region.code] || 0}
                   </p>
                 </CardContent>
               </Card>
