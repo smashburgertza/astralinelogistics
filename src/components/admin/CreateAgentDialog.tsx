@@ -22,9 +22,10 @@ import {
   FormMessage,
   FormDescription,
 } from '@/components/ui/form';
-import { Plus, Loader2, User, Mail, Phone, MapPin, Lock } from 'lucide-react';
+import { Plus, Loader2, User, Mail, Phone, MapPin, Lock, Package } from 'lucide-react';
 import { useCreateAgent } from '@/hooks/useAgents';
 import { useActiveRegions } from '@/hooks/useRegions';
+import { Switch } from '@/components/ui/switch';
 
 const formSchema = z.object({
   email: z.string().email('Please enter a valid email'),
@@ -32,6 +33,7 @@ const formSchema = z.object({
   fullName: z.string().min(2, 'Name must be at least 2 characters').max(100),
   phone: z.string().max(20).optional(),
   regions: z.array(z.string()).min(1, 'Please select at least one region'),
+  canHaveConsolidatedCargo: z.boolean().default(false),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -49,6 +51,7 @@ export function CreateAgentDialog() {
       fullName: '',
       phone: '',
       regions: [],
+      canHaveConsolidatedCargo: false,
     },
   });
 
@@ -59,6 +62,7 @@ export function CreateAgentDialog() {
       fullName: values.fullName,
       phone: values.phone,
       regions: values.regions,
+      canHaveConsolidatedCargo: values.canHaveConsolidatedCargo,
     });
     setOpen(false);
     form.reset();
@@ -200,6 +204,31 @@ export function CreateAgentDialog() {
                     )}
                   </div>
                   <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Consolidated Cargo Permission */}
+            <FormField
+              control={form.control}
+              name="canHaveConsolidatedCargo"
+              render={({ field }) => (
+                <FormItem className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
+                  <div className="space-y-0.5">
+                    <FormLabel className="flex items-center gap-2">
+                      <Package className="w-4 h-4" />
+                      Agent's Cargo (Consolidated)
+                    </FormLabel>
+                    <FormDescription>
+                      Allow this agent to log consolidated cargo that is not tracked individually.
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
                 </FormItem>
               )}
             />

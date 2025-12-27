@@ -51,7 +51,8 @@ import { toast } from 'sonner';
 import { PrintableLabels } from './PrintableLabels';
 import { useGetOrCreateBatch } from '@/hooks/useCargoBatches';
 import { Database } from '@/integrations/supabase/types';
-import { BillingPartyType, BILLING_PARTIES } from '@/lib/billingParty';
+import { BillingPartyType } from '@/lib/billingParty';
+import { useAgentSettings } from '@/hooks/useAgents';
 
 type AgentRegion = Database['public']['Enums']['agent_region'];
 
@@ -264,7 +265,11 @@ export function ShipmentUploadForm() {
   
   const { data: customers, isLoading: customersLoading } = useCustomers();
   const { data: transitRoutes = [] } = useTransitRoutesByRegion(selectedRegion);
+  const { data: agentSettings } = useAgentSettings();
   const getOrCreateBatch = useGetOrCreateBatch();
+  
+  // Check if agent can have consolidated cargo
+  const canHaveConsolidatedCargo = agentSettings?.can_have_consolidated_cargo ?? false;
   
   // Filter available transit options based on configured routes
   const availableTransitPoints = useMemo(() => {
@@ -356,9 +361,9 @@ export function ShipmentUploadForm() {
     // Allow lines with either customer_id OR customer_name, and valid weight
     const validLines = lines.filter(l => (l.customer_id || l.customer_name) && l.weight_kg > 0);
     
-    // Must have at least one customer shipment OR agent cargo
-    if (validLines.length === 0 && agentCargoWeight <= 0) {
-      toast.error('Please add at least one shipment or agent cargo weight');
+    // Must have at least one customer shipment OR agent cargo (if permitted)
+    if (validLines.length === 0 && (!canHaveConsolidatedCargo || agentCargoWeight <= 0)) {
+      toast.error('Please add at least one shipment with customer and weight');
       return;
     }
 
@@ -805,44 +810,46 @@ export function ShipmentUploadForm() {
         </CardContent>
       </Card>
 
-      {/* Agent's Consolidated Cargo Section */}
-      <Card className="shadow-lg border-0 bg-muted/30">
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-900/30">
-                <Package className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+      {/* Agent's Consolidated Cargo Section - Only shown if agent has permission */}
+      {canHaveConsolidatedCargo && (
+        <Card className="shadow-lg border-0 bg-muted/30">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-900/30">
+                  <Package className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                </div>
+                <div>
+                  <h3 className="font-medium">Agent's Cargo (Consolidated)</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Not tracked individually - for billing purposes only
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-medium">Agent's Cargo (Consolidated)</h3>
-                <p className="text-sm text-muted-foreground">
-                  Not tracked individually - for billing purposes only
-                </p>
+              <div className="flex items-center gap-3">
+                <Label htmlFor="agent-cargo-weight" className="text-sm text-muted-foreground">
+                  Weight (kg):
+                </Label>
+                <Input
+                  id="agent-cargo-weight"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={agentCargoWeight || ''}
+                  onChange={(e) => setAgentCargoWeight(parseFloat(e.target.value) || 0)}
+                  className="w-32 h-10 text-right"
+                />
+                {agentCargoWeight > 0 && ratePerKg > 0 && (
+                  <Badge variant="secondary" className="text-base px-3 py-1">
+                    {currencySymbol}{(agentCargoWeight * ratePerKg + transitAdditionalCost).toFixed(2)}
+                  </Badge>
+                )}
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <Label htmlFor="agent-cargo-weight" className="text-sm text-muted-foreground">
-                Weight (kg):
-              </Label>
-              <Input
-                id="agent-cargo-weight"
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="0.00"
-                value={agentCargoWeight || ''}
-                onChange={(e) => setAgentCargoWeight(parseFloat(e.target.value) || 0)}
-                className="w-32 h-10 text-right"
-              />
-              {agentCargoWeight > 0 && ratePerKg > 0 && (
-                <Badge variant="secondary" className="text-base px-3 py-1">
-                  {currencySymbol}{(agentCargoWeight * ratePerKg + transitAdditionalCost).toFixed(2)}
-                </Badge>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Submit Section */}
       <Card className="shadow-lg border-0">
@@ -866,7 +873,7 @@ export function ShipmentUploadForm() {
               type="button"
               size="lg"
               className="h-12 px-8 text-lg font-semibold"
-              disabled={isSubmitting || (totals.validLines === 0 && agentCargoWeight <= 0) || !ratePerKg || ratePerKg <= 0}
+              disabled={isSubmitting || (totals.validLines === 0 && (!canHaveConsolidatedCargo || agentCargoWeight <= 0)) || !ratePerKg || ratePerKg <= 0}
               onClick={onSubmit}
             >
               {isSubmitting ? (
@@ -877,9 +884,9 @@ export function ShipmentUploadForm() {
               ) : (
                 <>
                   <CheckCircle className="w-5 h-5 mr-2" />
-                  Create Shipment{totals.validLines + (agentCargoWeight > 0 ? 1 : 0) !== 1 ? 's' : ''}
-                  {agentCargoWeight > 0 && totals.validLines > 0 && ` (${totals.validLines} + Agent)`}
-                  {agentCargoWeight > 0 && totals.validLines === 0 && ' (Agent Cargo)'}
+                  Create Shipment{totals.validLines + (canHaveConsolidatedCargo && agentCargoWeight > 0 ? 1 : 0) !== 1 ? 's' : ''}
+                  {canHaveConsolidatedCargo && agentCargoWeight > 0 && totals.validLines > 0 && ` (${totals.validLines} + Agent)`}
+                  {canHaveConsolidatedCargo && agentCargoWeight > 0 && totals.validLines === 0 && ' (Agent Cargo)'}
                 </>
               )}
             </Button>

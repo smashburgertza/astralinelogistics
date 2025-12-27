@@ -8,12 +8,17 @@ export interface AgentRegion {
   region_id: string | null;
 }
 
+export interface AgentSettings {
+  can_have_consolidated_cargo: boolean;
+}
+
 export interface Agent {
   id: string;
   user_id: string;
   role: 'agent';
   region: string | null; // Legacy single region (for backward compatibility)
   regions: AgentRegion[]; // New: multiple regions
+  settings: AgentSettings | null;
   created_at: string;
   profile: {
     id: string;
@@ -39,34 +44,43 @@ export function useAgents() {
 
       const userIds = agentRoles.map(r => r.user_id);
 
-      // Get profiles and agent_regions in parallel
-      const [profilesResult, regionsResult] = await Promise.all([
+      // Get profiles, agent_regions, and agent_settings in parallel
+      const [profilesResult, regionsResult, settingsResult] = await Promise.all([
         supabase.from('profiles').select('*').in('id', userIds),
         supabase.from('agent_regions').select('*').in('user_id', userIds),
+        supabase.from('agent_settings').select('*').in('user_id', userIds),
       ]);
 
       if (profilesResult.error) throw profilesResult.error;
       if (regionsResult.error) throw regionsResult.error;
+      // Settings error is non-fatal - some agents may not have settings yet
 
       const profiles = profilesResult.data || [];
       const agentRegions = regionsResult.data || [];
+      const agentSettings = settingsResult.data || [];
 
       // Combine the data
-      const agents: Agent[] = agentRoles.map(role => ({
-        id: role.id,
-        user_id: role.user_id,
-        role: 'agent' as const,
-        region: role.region, // Legacy
-        regions: agentRegions
-          .filter(ar => ar.user_id === role.user_id)
-          .map(ar => ({
-            id: ar.id,
-            region_code: ar.region_code,
-            region_id: ar.region_id,
-          })),
-        created_at: role.created_at || '',
-        profile: profiles.find(p => p.id === role.user_id) || null,
-      }));
+      const agents: Agent[] = agentRoles.map(role => {
+        const settings = agentSettings.find(s => s.user_id === role.user_id);
+        return {
+          id: role.id,
+          user_id: role.user_id,
+          role: 'agent' as const,
+          region: role.region, // Legacy
+          regions: agentRegions
+            .filter(ar => ar.user_id === role.user_id)
+            .map(ar => ({
+              id: ar.id,
+              region_code: ar.region_code,
+              region_id: ar.region_id,
+            })),
+          settings: settings ? {
+            can_have_consolidated_cargo: settings.can_have_consolidated_cargo,
+          } : null,
+          created_at: role.created_at || '',
+          profile: profiles.find(p => p.id === role.user_id) || null,
+        };
+      });
 
       return agents;
     },
@@ -82,13 +96,15 @@ export function useCreateAgent() {
       password, 
       fullName, 
       phone,
-      regions 
+      regions,
+      canHaveConsolidatedCargo = false,
     }: { 
       email: string; 
       password: string; 
       fullName: string;
       phone?: string;
       regions: string[]; // Array of region codes
+      canHaveConsolidatedCargo?: boolean;
     }) => {
       // Store current admin session before creating new user
       const { data: currentSession } = await supabase.auth.getSession();
@@ -168,6 +184,19 @@ export function useCreateAgent() {
           console.error('Failed to insert regions:', regionsError);
           throw regionsError;
         }
+      }
+
+      // Create agent settings
+      const { error: settingsError } = await supabase
+        .from('agent_settings')
+        .insert({
+          user_id: userId,
+          can_have_consolidated_cargo: canHaveConsolidatedCargo,
+        });
+
+      if (settingsError) {
+        console.error('Failed to create agent settings:', settingsError);
+        // Don't throw - settings can be added later
       }
 
       return { userId };
@@ -271,6 +300,66 @@ export function useDeleteAgent() {
     },
     onError: (error: any) => {
       toast.error(`Failed to remove agent: ${error.message}`);
+    },
+  });
+}
+
+// Hook for agents to check their own settings
+export function useAgentSettings() {
+  return useQuery({
+    queryKey: ['agent-settings'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+
+      const { data, error } = await supabase
+        .from('agent_settings')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Failed to fetch agent settings:', error);
+        return null;
+      }
+
+      return data;
+    },
+  });
+}
+
+// Hook to update agent settings (admin only)
+export function useUpdateAgentSettings() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      userId,
+      canHaveConsolidatedCargo,
+    }: {
+      userId: string;
+      canHaveConsolidatedCargo: boolean;
+    }) => {
+      // Upsert the settings
+      const { error } = await supabase
+        .from('agent_settings')
+        .upsert({
+          user_id: userId,
+          can_have_consolidated_cargo: canHaveConsolidatedCargo,
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'user_id',
+        });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+      queryClient.invalidateQueries({ queryKey: ['agent-settings'] });
+      toast.success('Agent settings updated');
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to update settings: ${error.message}`);
     },
   });
 }

@@ -150,6 +150,30 @@ export type Database = {
           },
         ]
       }
+      agent_settings: {
+        Row: {
+          can_have_consolidated_cargo: boolean
+          created_at: string | null
+          id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          can_have_consolidated_cargo?: boolean
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          can_have_consolidated_cargo?: boolean
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string
