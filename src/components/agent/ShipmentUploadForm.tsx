@@ -982,11 +982,6 @@ export function ShipmentUploadForm() {
                   onChange={(e) => setAgentCargoWeight(parseFloat(e.target.value) || 0)}
                   className="w-32 h-10 text-right"
                 />
-                {agentCargoWeight > 0 && ratePerKg > 0 && (
-                  <Badge variant="secondary" className="text-base px-3 py-1">
-                    {currencySymbol}{(agentCargoWeight * ratePerKg + transitAdditionalCost).toFixed(2)}
-                  </Badge>
-                )}
               </div>
             </div>
           </CardContent>
