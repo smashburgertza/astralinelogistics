@@ -72,6 +72,10 @@ export function useCreateEmployee() {
       isSuperAdmin: boolean;
       permissions: Record<string, boolean>;
     }) => {
+      // Store current admin session before creating new user
+      const { data: currentSession } = await supabase.auth.getSession();
+      const adminSession = currentSession.session;
+
       // Create user via auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: data.email,
@@ -82,8 +86,24 @@ export function useCreateEmployee() {
         },
       });
 
-      if (authError) throw authError;
-      if (!authData.user) throw new Error('Failed to create user');
+      if (authError) {
+        // Restore admin session if signup failed
+        if (adminSession) {
+          await supabase.auth.setSession(adminSession);
+        }
+        throw authError;
+      }
+      if (!authData.user) {
+        if (adminSession) {
+          await supabase.auth.setSession(adminSession);
+        }
+        throw new Error('Failed to create user');
+      }
+
+      // Restore admin session immediately after user creation
+      if (adminSession) {
+        await supabase.auth.setSession(adminSession);
+      }
 
       // Update profile
       const { error: profileError } = await supabase
