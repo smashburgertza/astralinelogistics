@@ -2,6 +2,7 @@ import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { PublicNavbar } from './PublicNavbar';
 import { Mail, Phone, MapPin, Facebook, Twitter, Instagram, Linkedin } from 'lucide-react';
 import astralineLogoWhite from '@/assets/astraline-logo-white.svg';
+import { useActiveRegions } from '@/hooks/useRegions';
 
 const scrollToSection = (sectionId: string, navigate: ReturnType<typeof useNavigate>, location: ReturnType<typeof useLocation>) => {
   if (location.pathname !== '/') {
@@ -23,6 +24,7 @@ const scrollToSection = (sectionId: string, navigate: ReturnType<typeof useNavig
 export function PublicLayout() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { data: regions } = useActiveRegions();
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -79,24 +81,11 @@ export function PublicLayout() {
             <div>
               <h4 className="font-heading font-semibold text-base sm:text-lg mb-4 sm:mb-6">We Ship From</h4>
               <ul className="space-y-2 sm:space-y-3 text-sm text-white/70">
-                <li className="flex items-center gap-2">
-                  <span className="text-base sm:text-lg">🇬🇧</span> United Kingdom
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-base sm:text-lg">🇩🇪</span> Germany
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-base sm:text-lg">🇫🇷</span> France
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-base sm:text-lg">🇦🇪</span> Dubai, UAE
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-base sm:text-lg">🇨🇳</span> China
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-base sm:text-lg">🇮🇳</span> India
-                </li>
+                {regions?.map((region) => (
+                  <li key={region.id} className="flex items-center gap-2">
+                    <span className="text-base sm:text-lg">{region.flag_emoji || '🌍'}</span> {region.name}
+                  </li>
+                ))}
               </ul>
             </div>
 
