@@ -100,9 +100,11 @@ export function useCreateEmployee() {
         throw new Error('Failed to create user');
       }
 
-      // Restore admin session immediately after user creation
+      // Restore admin session and wait for it to be ready
       if (adminSession) {
         await supabase.auth.setSession(adminSession);
+        // Small delay to ensure session is propagated
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
 
       // Update profile
