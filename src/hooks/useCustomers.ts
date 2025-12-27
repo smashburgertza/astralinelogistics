@@ -113,6 +113,10 @@ export function useCreateCustomerWithAuth() {
       address?: string | null;
       notes?: string | null;
     }) => {
+      // Store current admin session before creating new user
+      const { data: currentSession } = await supabase.auth.getSession();
+      const adminSession = currentSession.session;
+
       // Create user via auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: data.email,
@@ -123,8 +127,24 @@ export function useCreateCustomerWithAuth() {
         },
       });
 
-      if (authError) throw authError;
-      if (!authData.user) throw new Error('Failed to create user');
+      if (authError) {
+        if (adminSession) {
+          await supabase.auth.setSession(adminSession);
+        }
+        throw authError;
+      }
+      if (!authData.user) {
+        if (adminSession) {
+          await supabase.auth.setSession(adminSession);
+        }
+        throw new Error('Failed to create user');
+      }
+
+      // Restore admin session and wait for it to be ready
+      if (adminSession) {
+        await supabase.auth.setSession(adminSession);
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
 
       // Update the profile that was auto-created
       const { error: profileError } = await supabase
