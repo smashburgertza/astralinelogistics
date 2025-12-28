@@ -44,7 +44,7 @@ type FormValues = z.infer<typeof formSchema>;
 interface ExpenseDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  shipmentId: string;
+  shipmentId?: string | null;
   expense?: Expense | null;
 }
 
@@ -105,7 +105,7 @@ export function ExpenseDialog({
     } else {
       createExpense.mutate(
         {
-          shipment_id: shipmentId,
+          shipment_id: shipmentId || null,
           category: data.category,
           amount: data.amount,
           currency: data.currency,

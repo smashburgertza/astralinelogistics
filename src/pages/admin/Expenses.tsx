@@ -3,13 +3,15 @@ import { AdminLayout } from '@/components/layout/AdminLayout';
 import { StatCard } from '@/components/admin/StatCard';
 import { ExpenseFilters } from '@/components/admin/ExpenseFilters';
 import { ExpenseTable } from '@/components/admin/ExpenseTable';
+import { ExpenseDialog } from '@/components/admin/ExpenseDialog';
 import { useAllExpenses, useExpenseStats, usePendingExpenses } from '@/hooks/useExpenses';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useExchangeRates, convertToTZS } from '@/hooks/useExchangeRates';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, TrendingUp, Clock, CheckCircle, AlertCircle, Coins } from 'lucide-react';
+import { DollarSign, TrendingUp, Clock, CheckCircle, AlertCircle, Coins, Plus } from 'lucide-react';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
@@ -41,6 +43,7 @@ export default function AdminExpensesPage() {
   const [category, setCategory] = useState('all');
   const [region, setRegion] = useState('all');
   const [status, setStatus] = useState('all');
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const debouncedSearch = useDebounce(search, 300);
 
@@ -92,6 +95,16 @@ export default function AdminExpensesPage() {
       title="Expenses" 
       subtitle="Track and manage all operational expenses across shipments"
     >
+      <ExpenseDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+
+      {/* Add Expense Button */}
+      <div className="flex justify-end mb-4">
+        <Button onClick={() => setDialogOpen(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add Expense
+        </Button>
+      </div>
+
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <StatCard
