@@ -58,6 +58,7 @@ const AdminProfilePage = lazy(() => import("./pages/admin/Profile"));
 const AdminNotificationsPage = lazy(() => import("./pages/admin/Notifications"));
 const AdminBatchProfitabilityPage = lazy(() => import("./pages/admin/BatchProfitability"));
 const AdminSettlementsPage = lazy(() => import("./pages/admin/Settlements"));
+const AdminManifestsPage = lazy(() => import("./pages/admin/Manifests"));
 
 const queryClient = new QueryClient();
 
@@ -137,6 +138,7 @@ const App = () => (
             <Route path="/admin/notifications" element={<Suspense fallback={<PageLoader />}><AdminNotificationsPage /></Suspense>} />
             <Route path="/admin/batches" element={<Suspense fallback={<PageLoader />}><AdminBatchProfitabilityPage /></Suspense>} />
             <Route path="/admin/settlements" element={<Suspense fallback={<PageLoader />}><AdminSettlementsPage /></Suspense>} />
+            <Route path="/admin/manifests" element={<Suspense fallback={<PageLoader />}><AdminManifestsPage /></Suspense>} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>
