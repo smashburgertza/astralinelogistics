@@ -45,6 +45,7 @@ interface AdminLayoutProps {
 const mainNavItems = [
   { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
   { label: 'My Dashboard', href: '/admin/my-dashboard', icon: User },
+  { label: 'Manifests', href: '/admin/manifests', icon: PackageSearch },
   { label: 'Shipments', href: '/admin/shipments', icon: PackageSearch },
   { label: 'Customers', href: '/admin/customers', icon: UsersRound },
   { label: 'Estimates', href: '/admin/estimates', icon: ReceiptText },
