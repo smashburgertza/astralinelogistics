@@ -358,18 +358,18 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
                         <p className="text-sm text-muted-foreground mb-1">Net Balance</p>
                         <p className={`text-3xl font-bold ${
                           agentBalance.net_balance > 0 
-                            ? 'text-green-600' 
+                            ? 'text-red-600' 
                             : agentBalance.net_balance < 0 
-                              ? 'text-red-600' 
+                              ? 'text-green-600' 
                               : ''
                         }`}>
                           ${Math.abs(agentBalance.net_balance).toFixed(2)}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
                           {agentBalance.net_balance > 0 
-                            ? 'Agent owes Astraline' 
+                            ? 'Astraline owes Agent' 
                             : agentBalance.net_balance < 0 
-                              ? 'Astraline owes Agent'
+                              ? 'Agent owes Astraline'
                               : 'Balanced'}
                         </p>
                       </div>
@@ -379,21 +379,7 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
                       {/* Breakdown */}
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <p className="text-sm font-medium text-muted-foreground">From Agent (Agent Owes)</p>
-                          <div className="space-y-1">
-                            <div className="flex justify-between text-sm">
-                              <span>Paid</span>
-                              <span className="font-medium">${agentBalance.paid_from_agent.toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                              <span>Pending</span>
-                              <span className="font-medium text-amber-600">${agentBalance.pending_from_agent.toFixed(2)}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <p className="text-sm font-medium text-muted-foreground">To Agent (Astraline Owes)</p>
+                          <p className="text-sm font-medium text-muted-foreground">Agent Owes Astraline (To Agent)</p>
                           <div className="space-y-1">
                             <div className="flex justify-between text-sm">
                               <span>Paid</span>
@@ -402,6 +388,20 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
                             <div className="flex justify-between text-sm">
                               <span>Pending</span>
                               <span className="font-medium text-amber-600">${agentBalance.pending_to_agent.toFixed(2)}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <p className="text-sm font-medium text-muted-foreground">Astraline Owes Agent (From Agent)</p>
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-sm">
+                              <span>Paid</span>
+                              <span className="font-medium">${agentBalance.paid_from_agent.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span>Pending</span>
+                              <span className="font-medium text-amber-600">${agentBalance.pending_from_agent.toFixed(2)}</span>
                             </div>
                           </div>
                         </div>
