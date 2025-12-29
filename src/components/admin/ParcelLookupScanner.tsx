@@ -62,7 +62,6 @@ export function ParcelLookupScanner() {
   const [shipmentDetails, setShipmentDetails] = useState<ShipmentDetails | null>(null);
   const [scannedParcel, setScannedParcel] = useState<ParcelDetails | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const scannerBufferRef = useRef('');
   const scannerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Keep input focused for scanner mode
@@ -72,56 +71,29 @@ export function ParcelLookupScanner() {
     }
   }, [scanMode]);
 
-  // Global keydown listener for handheld scanner input
+  // Handle scanner input via the input field
+  // Handheld scanners type rapidly and usually send Enter at the end
   useEffect(() => {
     if (scanMode !== 'scanner') return;
 
-    const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      // Ignore if typing in another input field
-      const target = e.target as HTMLElement;
-      if (target !== inputRef.current && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
-        return;
+    // Auto-search after rapid input stops (for scanners that don't send Enter)
+    if (barcode.length >= 3) {
+      if (scannerTimeoutRef.current) {
+        clearTimeout(scannerTimeoutRef.current);
       }
-
-      // If Enter is pressed and we have buffered input, trigger search
-      if (e.key === 'Enter' && scannerBufferRef.current.length > 0) {
-        e.preventDefault();
-        const scannedValue = scannerBufferRef.current;
-        scannerBufferRef.current = '';
-        setBarcode(scannedValue);
-        handleSearch(scannedValue);
-        return;
-      }
-
-      // Buffer printable characters (handheld scanners type rapidly)
-      if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
-        scannerBufferRef.current += e.key;
-        setBarcode(scannerBufferRef.current);
-
-        // Clear any existing timeout
-        if (scannerTimeoutRef.current) {
-          clearTimeout(scannerTimeoutRef.current);
+      scannerTimeoutRef.current = setTimeout(() => {
+        if (barcode.length >= 3 && !isSearching) {
+          handleSearch(barcode);
         }
+      }, 150); // Wait 150ms after last input
+    }
 
-        // Auto-search after 100ms of no input (scanner finished)
-        scannerTimeoutRef.current = setTimeout(() => {
-          if (scannerBufferRef.current.length >= 3) {
-            const scannedValue = scannerBufferRef.current;
-            scannerBufferRef.current = '';
-            handleSearch(scannedValue);
-          }
-        }, 100);
-      }
-    };
-
-    document.addEventListener('keydown', handleGlobalKeyDown);
     return () => {
-      document.removeEventListener('keydown', handleGlobalKeyDown);
       if (scannerTimeoutRef.current) {
         clearTimeout(scannerTimeoutRef.current);
       }
     };
-  }, [scanMode]);
+  }, [barcode, scanMode, isSearching]);
 
   const handleSearch = async (searchBarcode?: string) => {
     const barcodeToSearch = (searchBarcode || barcode).trim().toUpperCase();
@@ -222,7 +194,6 @@ export function ParcelLookupScanner() {
     } finally {
       setIsSearching(false);
       setBarcode('');
-      scannerBufferRef.current = '';
       if (scanMode === 'scanner') {
         inputRef.current?.focus();
       }
@@ -244,7 +215,6 @@ export function ParcelLookupScanner() {
     setShipmentDetails(null);
     setScannedParcel(null);
     setBarcode('');
-    scannerBufferRef.current = '';
     if (scanMode === 'scanner') {
       inputRef.current?.focus();
     }
@@ -294,10 +264,7 @@ export function ParcelLookupScanner() {
                   ref={inputRef}
                   placeholder="Scan barcode or type here..."
                   value={barcode}
-                  onChange={(e) => {
-                    setBarcode(e.target.value);
-                    scannerBufferRef.current = e.target.value;
-                  }}
+                  onChange={(e) => setBarcode(e.target.value)}
                   onKeyDown={handleKeyDown}
                   className="pl-10 font-mono text-lg"
                   disabled={isSearching}
