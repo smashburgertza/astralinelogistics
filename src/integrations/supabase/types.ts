@@ -1551,6 +1551,59 @@ export type Database = {
           },
         ]
       }
+      products_services: {
+        Row: {
+          account_id: string | null
+          category: string
+          created_at: string | null
+          currency: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          service_type: string | null
+          unit: string | null
+          unit_price: number
+          updated_at: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          category?: string
+          created_at?: string | null
+          currency?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          service_type?: string | null
+          unit?: string | null
+          unit_price?: number
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          category?: string
+          created_at?: string | null
+          currency?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          service_type?: string | null
+          unit?: string | null
+          unit_price?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_services_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           address: string | null

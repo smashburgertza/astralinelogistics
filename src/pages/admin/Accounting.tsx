@@ -6,7 +6,8 @@ import { TransactionsTab } from '@/components/admin/accounting/TransactionsTab';
 import { ChartOfAccountsTab } from '@/components/admin/accounting/ChartOfAccountsTab';
 import { FinancialReportsTab } from '@/components/admin/accounting/FinancialReportsTab';
 import { BankAccountsTab } from '@/components/admin/accounting/BankAccountsTab';
-import { LayoutDashboard, Receipt, List, FileText, Landmark } from 'lucide-react';
+import { ProductsServicesTab } from '@/components/admin/accounting/ProductsServicesTab';
+import { LayoutDashboard, Receipt, List, FileText, Landmark, Package } from 'lucide-react';
 
 export default function AccountingPage() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -22,10 +23,14 @@ export default function AccountingPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-flex">
+          <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-flex">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
               <LayoutDashboard className="h-4 w-4" />
               <span className="hidden sm:inline">Dashboard</span>
+            </TabsTrigger>
+            <TabsTrigger value="products" className="flex items-center gap-2">
+              <Package className="h-4 w-4" />
+              <span className="hidden sm:inline">Products & Services</span>
             </TabsTrigger>
             <TabsTrigger value="transactions" className="flex items-center gap-2">
               <Receipt className="h-4 w-4" />
@@ -47,6 +52,10 @@ export default function AccountingPage() {
 
           <TabsContent value="dashboard">
             <AccountingDashboard />
+          </TabsContent>
+
+          <TabsContent value="products">
+            <ProductsServicesTab />
           </TabsContent>
 
           <TabsContent value="transactions">

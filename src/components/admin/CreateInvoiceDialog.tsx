@@ -11,15 +11,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGr
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Trash2, FileText } from 'lucide-react';
+import { Plus, Trash2, FileText, Package } from 'lucide-react';
 import { useCreateInvoice } from '@/hooks/useInvoices';
 import { useCustomers, useShipments } from '@/hooks/useShipments';
 import { useExchangeRates, convertToTZS } from '@/hooks/useExchangeRates';
 import { useChartOfAccounts } from '@/hooks/useAccounting';
+import { useProductsServices, SERVICE_TYPES } from '@/hooks/useProductsServices';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 import { supabase } from '@/integrations/supabase/client';
 
 const lineItemSchema = z.object({
+  product_service_id: z.string().optional(),
   account_id: z.string().optional(),
   description: z.string().min(1, 'Description is required'),
   quantity: z.coerce.number().min(0.01, 'Quantity must be greater than 0'),
@@ -61,6 +63,18 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
   const { data: shipments } = useShipments();
   const { data: exchangeRates } = useExchangeRates();
   const { data: accounts } = useChartOfAccounts({ active: true });
+  const { data: productsServices } = useProductsServices({ active: true });
+
+  // Group products/services by type
+  const groupedProducts = useMemo(() => {
+    if (!productsServices) return {};
+    return productsServices.reduce((acc, item) => {
+      const type = item.service_type || 'other';
+      if (!acc[type]) acc[type] = [];
+      acc[type].push(item);
+      return acc;
+    }, {} as Record<string, typeof productsServices>);
+  }, [productsServices]);
 
   // Group accounts by type for the dropdown
   const groupedAccounts = useMemo(() => {
@@ -82,7 +96,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
       tax_rate: 0,
       notes: '',
       line_items: [
-        { account_id: '', description: '', quantity: 1, unit_price: 0, shipment_id: '', weight_kg: 0, tracking_number: '' },
+        { product_service_id: '', account_id: '', description: '', quantity: 1, unit_price: 0, shipment_id: '', weight_kg: 0, tracking_number: '' },
       ],
     },
   });
@@ -99,7 +113,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
         tax_rate: 0,
         notes: '',
         line_items: [
-          { account_id: '', description: '', quantity: 1, unit_price: 0, shipment_id: '', weight_kg: 0, tracking_number: '' },
+          { product_service_id: '', account_id: '', description: '', quantity: 1, unit_price: 0, shipment_id: '', weight_kg: 0, tracking_number: '' },
         ],
       });
     }
@@ -146,6 +160,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
       if (!shipment) return null;
       
       return {
+        product_service_id: '',
         account_id: '',
         description: shipment.description || 'Cargo shipment',
         quantity: shipment.total_weight_kg,
@@ -164,6 +179,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
     const validNonShipmentItems = nonShipmentItems.filter(
       item => item.description && item.description.trim() !== ''
     ).map(item => ({
+      product_service_id: item.product_service_id || '',
       account_id: item.account_id || '',
       description: item.description || '',
       quantity: item.quantity || 1,
@@ -179,7 +195,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
     
     // If we still have no items, add an empty one
     if (newLineItems.length === 0) {
-      newLineItems.push({ account_id: '', description: '', quantity: 1, unit_price: 0, shipment_id: '', weight_kg: 0, tracking_number: '' });
+      newLineItems.push({ product_service_id: '', account_id: '', description: '', quantity: 1, unit_price: 0, shipment_id: '', weight_kg: 0, tracking_number: '' });
     }
     
     form.setValue('line_items', newLineItems);
@@ -269,7 +285,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
   };
 
   const handleAddLineItem = () => {
-    append({ account_id: '', description: '', quantity: 1, unit_price: 0, shipment_id: '', weight_kg: 0, tracking_number: '' });
+    append({ product_service_id: '', account_id: '', description: '', quantity: 1, unit_price: 0, shipment_id: '', weight_kg: 0, tracking_number: '' });
   };
 
   return (
@@ -425,11 +441,11 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
               
               {/* Line Items Header */}
               <div className="grid grid-cols-12 gap-2 text-xs text-muted-foreground px-2">
-                <div className="col-span-2">Service</div>
-                <div className="col-span-3">Item Description</div>
+                <div className="col-span-2">Product/Service</div>
+                <div className="col-span-2">Description</div>
                 <div className="col-span-2">Tracking #</div>
-                <div className="col-span-1 text-center">Weight</div>
-                <div className="col-span-1 text-right">Rate/kg</div>
+                <div className="col-span-1 text-center">Qty</div>
+                <div className="col-span-2 text-right">Unit Price</div>
                 <div className="col-span-2 text-right">Total</div>
                 <div className="col-span-1"></div>
               </div>
@@ -446,40 +462,50 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
                       <div className="col-span-2">
                         <FormField
                           control={form.control}
-                          name={`line_items.${index}.account_id`}
-                          render={({ field }) => (
+                          name={`line_items.${index}.product_service_id`}
+                          render={({ field: psField }) => (
                             <FormItem>
                               <Select 
-                                onValueChange={(val) => field.onChange(val === "none" ? "" : val)} 
-                                value={field.value || "none"}
+                                onValueChange={(val) => {
+                                  psField.onChange(val === "none" ? "" : val);
+                                  // Auto-fill description, unit_price, and account_id from selected product/service
+                                  if (val && val !== "none") {
+                                    const selectedProduct = productsServices?.find(p => p.id === val);
+                                    if (selectedProduct) {
+                                      form.setValue(`line_items.${index}.description`, selectedProduct.name);
+                                      form.setValue(`line_items.${index}.unit_price`, selectedProduct.unit_price);
+                                      if (selectedProduct.account_id) {
+                                        form.setValue(`line_items.${index}.account_id`, selectedProduct.account_id);
+                                      }
+                                    }
+                                  }
+                                }} 
+                                value={psField.value || "none"}
                               >
                                 <FormControl>
                                   <SelectTrigger className="text-xs">
-                                    <SelectValue placeholder="Select service" />
+                                    <SelectValue placeholder="Select item" />
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                  <SelectItem value="none">No account</SelectItem>
-                                  {groupedAccounts.revenue.length > 0 && (
-                                    <SelectGroup>
-                                      <SelectLabel className="text-xs font-semibold text-primary">Revenue</SelectLabel>
-                                      {groupedAccounts.revenue.map((account) => (
-                                        <SelectItem key={account.id} value={account.id} className="text-xs">
-                                          {account.account_code} - {account.account_name}
+                                  <SelectItem value="none">
+                                    <span className="flex items-center gap-2">
+                                      <Package className="h-3 w-3" />
+                                      Custom item
+                                    </span>
+                                  </SelectItem>
+                                  {Object.entries(groupedProducts).map(([type, items]) => (
+                                    <SelectGroup key={type}>
+                                      <SelectLabel className="text-xs font-semibold">
+                                        {SERVICE_TYPES[type as keyof typeof SERVICE_TYPES]?.label || type}
+                                      </SelectLabel>
+                                      {items.map((item) => (
+                                        <SelectItem key={item.id} value={item.id} className="text-xs">
+                                          {item.name} - {CURRENCY_SYMBOLS[item.currency] || '$'}{item.unit_price}/{item.unit}
                                         </SelectItem>
                                       ))}
                                     </SelectGroup>
-                                  )}
-                                  {groupedAccounts.expense.length > 0 && (
-                                    <SelectGroup>
-                                      <SelectLabel className="text-xs font-semibold text-destructive">Costs/Expenses</SelectLabel>
-                                      {groupedAccounts.expense.map((account) => (
-                                        <SelectItem key={account.id} value={account.id} className="text-xs">
-                                          {account.account_code} - {account.account_name}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectGroup>
-                                  )}
+                                  ))}
                                 </SelectContent>
                               </Select>
                               <FormMessage />
@@ -487,7 +513,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
                           )}
                         />
                       </div>
-                      <div className="col-span-3">
+                      <div className="col-span-2">
                         <FormField
                           control={form.control}
                           name={`line_items.${index}.description`}
@@ -550,7 +576,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
                           )}
                         />
                       </div>
-                      <div className="col-span-1">
+                      <div className="col-span-2">
                         <FormField
                           control={form.control}
                           name={`line_items.${index}.unit_price`}
