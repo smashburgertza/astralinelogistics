@@ -529,61 +529,8 @@ export function ShipmentUploadForm() {
 
         if (parcelError) throw parcelError;
 
-        // Customer shipments: Agent invoices Astraline (from_agent = Astraline owes agent)
-        const invoiceDirection = 'from_agent';
-        
-        // Create invoice
-        const invoiceNumber = generateInvoiceNumber();
-        const transitLabel = transitPoint !== 'direct' ? ` (${TRANSIT_POINT_LABELS[transitPoint]})` : '';
-        
-        const { data: invoice, error: invoiceError } = await supabase
-          .from('invoices')
-          .insert({
-            invoice_number: invoiceNumber,
-            customer_id: line.customer_id || null,
-            shipment_id: shipment.id,
-            amount: lineAmount,
-            currency: currency,
-            invoice_type: 'shipping',
-            status: 'pending',
-            created_by: user?.id,
-            agent_id: user?.id,
-            invoice_direction: invoiceDirection,
-            rate_per_kg: ratePerKg,
-            notes: `Agent invoice for customer shipment from ${currentRegionInfo?.region_name || selectedRegion}${transitLabel}. Weight: ${line.weight_kg}kg @ ${currencySymbol}${ratePerKg}/kg`,
-          })
-          .select()
-          .single();
-
-        // Create invoice line items for itemized charges
-        if (invoice) {
-          await supabase.from('invoice_items').insert([
-            {
-              invoice_id: invoice.id,
-              item_type: 'shipping',
-              description: `Shipping ${line.weight_kg}kg @ ${currencySymbol}${ratePerKg}/kg`,
-              quantity: line.weight_kg,
-              unit_price: ratePerKg,
-              weight_kg: line.weight_kg,
-              amount: line.weight_kg * ratePerKg,
-              currency: currency,
-            },
-            ...(transitAdditionalCost > 0 ? [{
-              invoice_id: invoice.id,
-              item_type: 'transit_fee',
-              description: `Transit via ${TRANSIT_POINT_LABELS[transitPoint]}`,
-              quantity: 1,
-              unit_price: transitAdditionalCost,
-              amount: transitAdditionalCost,
-              currency: currency,
-            }] : []),
-          ]);
-        }
-
-        if (invoiceError) {
-          console.error('Failed to create invoice:', invoiceError);
-          // Don't fail the shipment if invoice creation fails
-        }
+        // NOTE: Invoice creation is now handled manually by admin
+        // Agent just uploads shipments, admin creates invoices with additional charges later
 
         createdShipments.push({
           tracking_number: shipment.tracking_number,
