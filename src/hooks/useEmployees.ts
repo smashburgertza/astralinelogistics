@@ -28,9 +28,44 @@ export const PERMISSIONS = [
   { key: 'manage_customers', label: 'Manage Customers' },
   { key: 'manage_agents', label: 'Manage Agents' },
   { key: 'manage_expenses', label: 'Manage Expenses' },
+  { key: 'approve_expenses', label: 'Approve Expenses' },
   { key: 'view_reports', label: 'View Reports' },
   { key: 'manage_settings', label: 'Manage Settings' },
 ] as const;
+
+// Hook to fetch employees who can approve expenses
+export function useExpenseApprovers() {
+  return useQuery({
+    queryKey: ['expense-approvers'],
+    queryFn: async () => {
+      // Get all employees and super_admins
+      const { data: userRoles, error } = await supabase
+        .from('user_roles')
+        .select('user_id, role, permissions')
+        .in('role', ['employee', 'super_admin']);
+
+      if (error) throw error;
+
+      // Filter to only those with approve_expenses permission or super_admin
+      const approverIds = userRoles
+        .filter(r => 
+          r.role === 'super_admin' || 
+          (r.permissions && (r.permissions as Record<string, boolean>)['approve_expenses'])
+        )
+        .map(r => r.user_id);
+
+      if (approverIds.length === 0) return [];
+
+      // Get profiles for approvers
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, email, full_name')
+        .in('id', approverIds);
+
+      return profiles || [];
+    },
+  });
+}
 
 export function useEmployees() {
   return useQuery({
