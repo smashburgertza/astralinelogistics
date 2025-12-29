@@ -254,7 +254,7 @@ export function InvoiceTable({ invoices, isLoading }: InvoiceTableProps) {
             invoiceId: details.invoiceId,
             amount: details.amount,
             paymentMethod: details.paymentMethod,
-            bankAccountId: details.bankAccountId,
+            depositAccountId: details.depositAccountId,
             paymentCurrency: details.paymentCurrency,
             paymentDate: details.paymentDate,
             reference: details.reference,
