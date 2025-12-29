@@ -131,6 +131,10 @@ export function useCreateCustomerWithAuth() {
         if (adminSession) {
           await supabase.auth.setSession(adminSession);
         }
+        // Provide clearer error message for existing users
+        if (authError.message?.includes('already registered')) {
+          throw new Error('A user with this email already exists. Try creating the customer without login credentials, or use a different email.');
+        }
         throw authError;
       }
       if (!authData.user) {
