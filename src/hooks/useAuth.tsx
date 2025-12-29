@@ -21,6 +21,17 @@ interface Profile {
   address?: string;
 }
 
+// Permission keys that can be assigned to employees
+export type PermissionKey = 
+  | 'manage_shipments'
+  | 'manage_invoices'
+  | 'manage_customers'
+  | 'manage_agents'
+  | 'manage_expenses'
+  | 'approve_expenses'
+  | 'view_reports'
+  | 'manage_settings';
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -31,6 +42,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, fullName?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   hasRole: (role: AppRole) => boolean;
+  hasPermission: (permission: PermissionKey) => boolean;
   isAdmin: () => boolean;
   isAgent: () => boolean;
   isCustomer: () => boolean;
@@ -133,6 +145,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const hasRole = (role: AppRole) => roles.some(r => r.role === role);
+  
+  // Check if user has a specific permission
+  // Super admins automatically have all permissions
+  const hasPermission = (permission: PermissionKey): boolean => {
+    // Super admins bypass all permission checks
+    if (hasRole('super_admin')) return true;
+    
+    // Check if any role has this permission
+    return roles.some(r => {
+      if (r.permissions && typeof r.permissions === 'object') {
+        return (r.permissions as Record<string, boolean>)[permission] === true;
+      }
+      return false;
+    });
+  };
+  
   const isAdmin = () => hasRole('super_admin') || hasRole('employee');
   const isAgent = () => hasRole('agent');
   const isCustomer = () => hasRole('customer');
@@ -155,6 +183,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signUp,
       signOut,
       hasRole,
+      hasPermission,
       isAdmin,
       isAgent,
       isCustomer,

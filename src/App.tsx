@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import { PublicLayout } from "@/components/layout/PublicLayout";
+import { PermissionGate } from "@/components/auth/PermissionGate";
 import { Loader2 } from "lucide-react";
 
 // Public pages - loaded eagerly for fast initial render
@@ -116,27 +117,41 @@ const App = () => (
             <Route path="/agent/invoices" element={<Suspense fallback={<PageLoader />}><AgentInvoicesPage /></Suspense>} />
             <Route path="/agent/settings" element={<Suspense fallback={<PageLoader />}><AgentSettingsPage /></Suspense>} />
             
-            {/* Admin Portal - Lazy Loaded */}
+            {/* Admin Portal - Lazy Loaded with Permission Gates */}
             <Route path="/admin" element={<Suspense fallback={<PageLoader />}><AdminDashboard /></Suspense>} />
-            <Route path="/admin/shipments" element={<Suspense fallback={<PageLoader />}><AdminShipmentsPage /></Suspense>} />
-            <Route path="/admin/billing" element={<Suspense fallback={<PageLoader />}><AdminBillingPage /></Suspense>} />
-            <Route path="/admin/customers" element={<Suspense fallback={<PageLoader />}><AdminCustomersPage /></Suspense>} />
-            <Route path="/admin/expenses" element={<Suspense fallback={<PageLoader />}><AdminExpensesPage /></Suspense>} />
-            <Route path="/admin/orders" element={<Suspense fallback={<PageLoader />}><AdminOrderRequestsPage /></Suspense>} />
-            <Route path="/admin/content" element={<Suspense fallback={<PageLoader />}><AdminPageContentPage /></Suspense>} />
-            <Route path="/admin/agents" element={<Suspense fallback={<PageLoader />}><AdminAgentsPage /></Suspense>} />
-            <Route path="/admin/employees" element={<Suspense fallback={<PageLoader />}><AdminEmployeesPage /></Suspense>} />
-            <Route path="/admin/settings" element={<Suspense fallback={<PageLoader />}><AdminSettingsPage /></Suspense>} />
-            <Route path="/admin/reports" element={<Suspense fallback={<PageLoader />}><AdminReportsPage /></Suspense>} />
-            <Route path="/admin/commissions" element={<Suspense fallback={<PageLoader />}><AdminCommissionsPage /></Suspense>} />
             <Route path="/admin/my-dashboard" element={<Suspense fallback={<PageLoader />}><AdminEmployeeDashboard /></Suspense>} />
-            <Route path="/admin/accounting" element={<Suspense fallback={<PageLoader />}><AdminAccountingPage /></Suspense>} />
-            <Route path="/admin/analytics" element={<Suspense fallback={<PageLoader />}><AdminAnalyticsPage /></Suspense>} />
-            <Route path="/admin/financial-summary" element={<Suspense fallback={<PageLoader />}><AdminFinancialSummaryPage /></Suspense>} />
             <Route path="/admin/profile" element={<Suspense fallback={<PageLoader />}><AdminProfilePage /></Suspense>} />
             <Route path="/admin/notifications" element={<Suspense fallback={<PageLoader />}><AdminNotificationsPage /></Suspense>} />
-            <Route path="/admin/batches" element={<Suspense fallback={<PageLoader />}><AdminBatchProfitabilityPage /></Suspense>} />
-            <Route path="/admin/settlements" element={<Suspense fallback={<PageLoader />}><AdminSettlementsPage /></Suspense>} />
+            
+            {/* Shipments - requires manage_shipments */}
+            <Route path="/admin/shipments" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="manage_shipments"><AdminShipmentsPage /></PermissionGate></Suspense>} />
+            <Route path="/admin/orders" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="manage_shipments"><AdminOrderRequestsPage /></PermissionGate></Suspense>} />
+            
+            {/* Customers - requires manage_customers */}
+            <Route path="/admin/customers" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="manage_customers"><AdminCustomersPage /></PermissionGate></Suspense>} />
+            
+            {/* Billing - requires manage_invoices */}
+            <Route path="/admin/billing" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="manage_invoices"><AdminBillingPage /></PermissionGate></Suspense>} />
+            <Route path="/admin/settlements" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="manage_invoices"><AdminSettlementsPage /></PermissionGate></Suspense>} />
+            
+            {/* Expenses - requires manage_expenses */}
+            <Route path="/admin/expenses" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="manage_expenses"><AdminExpensesPage /></PermissionGate></Suspense>} />
+            
+            {/* Reports & Analytics - requires view_reports */}
+            <Route path="/admin/accounting" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="view_reports"><AdminAccountingPage /></PermissionGate></Suspense>} />
+            <Route path="/admin/financial-summary" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="view_reports"><AdminFinancialSummaryPage /></PermissionGate></Suspense>} />
+            <Route path="/admin/batches" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="view_reports"><AdminBatchProfitabilityPage /></PermissionGate></Suspense>} />
+            <Route path="/admin/reports" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="view_reports"><AdminReportsPage /></PermissionGate></Suspense>} />
+            <Route path="/admin/commissions" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="view_reports"><AdminCommissionsPage /></PermissionGate></Suspense>} />
+            <Route path="/admin/analytics" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="view_reports"><AdminAnalyticsPage /></PermissionGate></Suspense>} />
+            
+            {/* Agents - requires manage_agents */}
+            <Route path="/admin/agents" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="manage_agents"><AdminAgentsPage /></PermissionGate></Suspense>} />
+            
+            {/* Settings & Management - requires manage_settings */}
+            <Route path="/admin/content" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="manage_settings"><AdminPageContentPage /></PermissionGate></Suspense>} />
+            <Route path="/admin/employees" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="manage_settings"><AdminEmployeesPage /></PermissionGate></Suspense>} />
+            <Route path="/admin/settings" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="manage_settings"><AdminSettingsPage /></PermissionGate></Suspense>} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, PackageSearch, UsersRound, FileStack, Wallet,
@@ -31,10 +31,11 @@ import {
   SidebarTrigger,
   SidebarInset,
 } from '@/components/ui/sidebar';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth, PermissionKey } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { NotificationDropdown } from '@/components/admin/NotificationDropdown';
 import { GlobalSearch } from '@/components/admin/GlobalSearch';
+import { LucideIcon } from 'lucide-react';
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -42,37 +43,58 @@ interface AdminLayoutProps {
   subtitle?: string;
 }
 
-const mainNavItems = [
+interface NavItem {
+  label: string;
+  href: string;
+  icon: LucideIcon;
+  permission?: PermissionKey; // If undefined, accessible to all admin/employees
+}
+
+const mainNavItems: NavItem[] = [
   { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
   { label: 'My Dashboard', href: '/admin/my-dashboard', icon: User },
-  { label: 'Shipments', href: '/admin/shipments', icon: PackageSearch },
-  { label: 'Customers', href: '/admin/customers', icon: UsersRound },
-  { label: 'Billing', href: '/admin/billing', icon: FileStack },
-  { label: 'Shop Orders', href: '/admin/orders', icon: ShoppingCart },
+  { label: 'Shipments', href: '/admin/shipments', icon: PackageSearch, permission: 'manage_shipments' },
+  { label: 'Customers', href: '/admin/customers', icon: UsersRound, permission: 'manage_customers' },
+  { label: 'Billing', href: '/admin/billing', icon: FileStack, permission: 'manage_invoices' },
+  { label: 'Shop Orders', href: '/admin/orders', icon: ShoppingCart, permission: 'manage_shipments' },
 ];
 
-const financeNavItems = [
-  { label: 'Accounting', href: '/admin/accounting', icon: Calculator },
-  { label: 'Financial Summary', href: '/admin/financial-summary', icon: PiggyBank },
-  { label: 'Batch Profitability', href: '/admin/batches', icon: Container },
-  { label: 'Settlements', href: '/admin/settlements', icon: TrendingUp },
-  { label: 'Expenses', href: '/admin/expenses', icon: Wallet },
-  { label: 'Commissions', href: '/admin/commissions', icon: TrendingUp },
-  { label: 'Reports', href: '/admin/reports', icon: ChartSpline },
-  { label: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
+const financeNavItems: NavItem[] = [
+  { label: 'Accounting', href: '/admin/accounting', icon: Calculator, permission: 'view_reports' },
+  { label: 'Financial Summary', href: '/admin/financial-summary', icon: PiggyBank, permission: 'view_reports' },
+  { label: 'Batch Profitability', href: '/admin/batches', icon: Container, permission: 'view_reports' },
+  { label: 'Settlements', href: '/admin/settlements', icon: TrendingUp, permission: 'manage_invoices' },
+  { label: 'Expenses', href: '/admin/expenses', icon: Wallet, permission: 'manage_expenses' },
+  { label: 'Commissions', href: '/admin/commissions', icon: TrendingUp, permission: 'view_reports' },
+  { label: 'Reports', href: '/admin/reports', icon: ChartSpline, permission: 'view_reports' },
+  { label: 'Analytics', href: '/admin/analytics', icon: BarChart3, permission: 'view_reports' },
 ];
 
-const managementNavItems = [
-  { label: 'Page Content', href: '/admin/content', icon: FileText },
-  { label: 'Employees', href: '/admin/employees', icon: UserCog },
-  { label: 'Agents', href: '/admin/agents', icon: Container },
-  { label: 'Settings', href: '/admin/settings', icon: Settings2 },
+const managementNavItems: NavItem[] = [
+  { label: 'Page Content', href: '/admin/content', icon: FileText, permission: 'manage_settings' },
+  { label: 'Employees', href: '/admin/employees', icon: UserCog, permission: 'manage_settings' },
+  { label: 'Agents', href: '/admin/agents', icon: Container, permission: 'manage_agents' },
+  { label: 'Settings', href: '/admin/settings', icon: Settings2, permission: 'manage_settings' },
 ];
 
 export function AdminLayout({ children, title, subtitle }: AdminLayoutProps) {
-  const { profile, signOut, hasRole } = useAuth();
+  const { profile, signOut, hasRole, hasPermission } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Filter navigation items based on user permissions
+  const filterNavItems = (items: NavItem[]) => {
+    return items.filter(item => {
+      // If no permission required, show to all admin/employees
+      if (!item.permission) return true;
+      // Otherwise check if user has the required permission
+      return hasPermission(item.permission);
+    });
+  };
+
+  const filteredMainNav = useMemo(() => filterNavItems(mainNavItems), [hasPermission]);
+  const filteredFinanceNav = useMemo(() => filterNavItems(financeNavItems), [hasPermission]);
+  const filteredManagementNav = useMemo(() => filterNavItems(managementNavItems), [hasPermission]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -109,7 +131,7 @@ export function AdminLayout({ children, title, subtitle }: AdminLayoutProps) {
               </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu className="space-y-1 group-data-[collapsible=icon]:space-y-2">
-                  {mainNavItems.map((item) => (
+                  {filteredMainNav.map((item) => (
                     <SidebarMenuItem key={item.href}>
                       <SidebarMenuButton
                         asChild
@@ -140,7 +162,7 @@ export function AdminLayout({ children, title, subtitle }: AdminLayoutProps) {
               </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu className="space-y-1 group-data-[collapsible=icon]:space-y-2">
-                  {financeNavItems.map((item) => (
+                  {filteredFinanceNav.map((item) => (
                     <SidebarMenuItem key={item.href}>
                       <SidebarMenuButton
                         asChild
@@ -164,36 +186,38 @@ export function AdminLayout({ children, title, subtitle }: AdminLayoutProps) {
               </SidebarGroupContent>
             </SidebarGroup>
 
-            {/* Management */}
-            <SidebarGroup>
-              <SidebarGroupLabel className="text-muted-foreground/70 uppercase text-[11px] font-semibold tracking-wider mb-2 transition-all duration-300">
-                Management
-              </SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu className="space-y-1 group-data-[collapsible=icon]:space-y-2">
-                  {managementNavItems.map((item) => (
-                    <SidebarMenuItem key={item.href}>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={isActive(item.href)}
-                        tooltip={item.label}
-                        className={cn(
-                          "transition-all duration-300 rounded-lg font-medium",
-                          isActive(item.href) 
-                            ? "bg-accent text-accent-foreground shadow-sm" 
-                            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                        )}
-                      >
-                        <Link to={item.href}>
-                          <item.icon className="w-5 h-5 shrink-0" />
-                          <span className="transition-all duration-300 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0">{item.label}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
+            {/* Management - only show if user has any management items */}
+            {filteredManagementNav.length > 0 && (
+              <SidebarGroup>
+                <SidebarGroupLabel className="text-muted-foreground/70 uppercase text-[11px] font-semibold tracking-wider mb-2 transition-all duration-300">
+                  Management
+                </SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu className="space-y-1 group-data-[collapsible=icon]:space-y-2">
+                    {filteredManagementNav.map((item) => (
+                      <SidebarMenuItem key={item.href}>
+                        <SidebarMenuButton
+                          asChild
+                          isActive={isActive(item.href)}
+                          tooltip={item.label}
+                          className={cn(
+                            "transition-all duration-300 rounded-lg font-medium",
+                            isActive(item.href) 
+                              ? "bg-accent text-accent-foreground shadow-sm" 
+                              : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                          )}
+                        >
+                          <Link to={item.href}>
+                            <item.icon className="w-5 h-5 shrink-0" />
+                            <span className="transition-all duration-300 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0">{item.label}</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            )}
           </SidebarContent>
 
           {/* User Section */}
