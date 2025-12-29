@@ -22,16 +22,24 @@ import {
   FormMessage,
   FormDescription,
 } from '@/components/ui/form';
-import { Plus, Loader2, User, Mail, Phone, MapPin, Lock, Package } from 'lucide-react';
+import { Plus, Loader2, User, Mail, Phone, MapPin, Lock, Package, Building2, UserCircle } from 'lucide-react';
 import { useCreateAgent } from '@/hooks/useAgents';
 import { useActiveRegions } from '@/hooks/useRegions';
 import { Switch } from '@/components/ui/switch';
+import { Separator } from '@/components/ui/separator';
 
 const formSchema = z.object({
+  // Company Information
+  companyName: z.string().min(2, 'Company name must be at least 2 characters').max(100),
+  companyAddress: z.string().max(255).optional(),
+  // Contact Person
+  contactPersonName: z.string().min(2, 'Contact person name is required').max(100),
+  contactPersonEmail: z.string().email('Please enter a valid email'),
+  contactPersonPhone: z.string().max(20).optional(),
+  // Login Credentials
   email: z.string().email('Please enter a valid email'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
-  fullName: z.string().min(2, 'Name must be at least 2 characters').max(100),
-  phone: z.string().max(20).optional(),
+  // Regions & Settings
   regions: z.array(z.string()).min(1, 'Please select at least one region'),
   canHaveConsolidatedCargo: z.boolean().default(false),
 });
@@ -46,10 +54,13 @@ export function CreateAgentDialog() {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      companyName: '',
+      companyAddress: '',
+      contactPersonName: '',
+      contactPersonEmail: '',
+      contactPersonPhone: '',
       email: '',
       password: '',
-      fullName: '',
-      phone: '',
       regions: [],
       canHaveConsolidatedCargo: false,
     },
@@ -59,8 +70,11 @@ export function CreateAgentDialog() {
     await createAgent.mutateAsync({
       email: values.email,
       password: values.password,
-      fullName: values.fullName,
-      phone: values.phone,
+      companyName: values.companyName,
+      companyAddress: values.companyAddress,
+      contactPersonName: values.contactPersonName,
+      contactPersonEmail: values.contactPersonEmail,
+      contactPersonPhone: values.contactPersonPhone,
       regions: values.regions,
       canHaveConsolidatedCargo: values.canHaveConsolidatedCargo,
     });
@@ -76,7 +90,7 @@ export function CreateAgentDialog() {
           Add Agent
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-heading">Create New Agent</DialogTitle>
           <DialogDescription>
@@ -85,77 +99,141 @@ export function CreateAgentDialog() {
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
-            <FormField
-              control={form.control}
-              name="fullName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="flex items-center gap-2">
-                    <User className="w-4 h-4" />
-                    Full Name
-                  </FormLabel>
-                  <FormControl>
-                    <Input placeholder="John Doe" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 mt-4">
+            {/* Company Information Section */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <Building2 className="w-4 h-4" />
+                Company Information
+              </div>
+              
+              <FormField
+                control={form.control}
+                name="companyName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Company Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="ABC Logistics Ltd." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="flex items-center gap-2">
-                    <Mail className="w-4 h-4" />
-                    Email
-                  </FormLabel>
-                  <FormControl>
-                    <Input type="email" placeholder="agent@example.com" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <FormField
+                control={form.control}
+                name="companyAddress"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Company Address (Optional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="123 Business Street, City, Country" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="flex items-center gap-2">
-                    <Lock className="w-4 h-4" />
-                    Password
-                  </FormLabel>
-                  <FormControl>
-                    <Input type="password" placeholder="••••••••" {...field} />
-                  </FormControl>
-                  <FormDescription>
-                    Minimum 8 characters. The agent will use this to log in.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <Separator />
 
-            <FormField
-              control={form.control}
-              name="phone"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="flex items-center gap-2">
-                    <Phone className="w-4 h-4" />
-                    Phone (Optional)
-                  </FormLabel>
-                  <FormControl>
-                    <Input placeholder="+1 234 567 8900" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Contact Person Section */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <UserCircle className="w-4 h-4" />
+                Contact Person
+              </div>
+              
+              <FormField
+                control={form.control}
+                name="contactPersonName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Full Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="John Doe" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="contactPersonEmail"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input type="email" placeholder="contact@company.com" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="contactPersonPhone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone (Optional)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="+1 234 567 8900" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Login Credentials Section */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <Lock className="w-4 h-4" />
+                Login Credentials
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Login Email</FormLabel>
+                      <FormControl>
+                        <Input type="email" placeholder="agent@example.com" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="••••••••" {...field} />
+                      </FormControl>
+                      <FormDescription className="text-xs">
+                        Minimum 8 characters
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+
+            <Separator />
 
             <FormField
               control={form.control}
