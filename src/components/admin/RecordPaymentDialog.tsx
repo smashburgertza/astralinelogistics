@@ -133,7 +133,7 @@ export function RecordPaymentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>{isOutgoingPayment ? 'Record Outgoing Payment' : 'Record Payment'}</DialogTitle>
           <DialogDescription>
