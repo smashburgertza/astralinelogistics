@@ -18,6 +18,10 @@ interface RecordPaymentDialogProps {
   onRecordPayment: (paymentDetails: PaymentDetails) => void;
   isLoading?: boolean;
   remainingBalance?: number;
+  /** If true, this is an outgoing payment (we pay someone) vs receiving payment */
+  isOutgoingPayment?: boolean;
+  /** Name to display instead of customer (e.g., "Agent") */
+  payeeName?: string;
 }
 
 export interface PaymentDetails {
@@ -44,7 +48,9 @@ export function RecordPaymentDialog({
   onOpenChange, 
   onRecordPayment,
   isLoading,
-  remainingBalance
+  remainingBalance,
+  isOutgoingPayment = false,
+  payeeName,
 }: RecordPaymentDialogProps) {
   const [paymentMethod, setPaymentMethod] = useState('bank_transfer');
   const [depositAccountId, setDepositAccountId] = useState('');
@@ -103,9 +109,11 @@ export function RecordPaymentDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Record Payment</DialogTitle>
+          <DialogTitle>{isOutgoingPayment ? 'Record Outgoing Payment' : 'Record Payment'}</DialogTitle>
           <DialogDescription>
-            Record payment for invoice {invoice?.invoice_number}
+            {isOutgoingPayment 
+              ? `Record payment to ${payeeName || 'agent'} for invoice ${invoice?.invoice_number}`
+              : `Record payment for invoice ${invoice?.invoice_number}`}
           </DialogDescription>
         </DialogHeader>
 
@@ -127,15 +135,19 @@ export function RecordPaymentDialog({
               </div>
             )}
             <div className="flex justify-between text-sm font-medium border-t pt-2">
-              <span className="text-muted-foreground">Balance Due:</span>
+              <span className="text-muted-foreground">
+                {isOutgoingPayment ? 'Amount to Pay:' : 'Balance Due:'}
+              </span>
               <span className={balance > 0 ? 'text-amber-600' : 'text-emerald-600'}>
                 {currencySymbol}{balance.toFixed(2)}
               </span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Customer:</span>
+              <span className="text-muted-foreground">
+                {isOutgoingPayment ? 'Pay To:' : 'Customer:'}
+              </span>
               <span className="font-medium">
-                {invoice?.customers?.name || invoice?.shipments?.customer_name || 'Unknown'}
+                {payeeName || invoice?.customers?.name || invoice?.shipments?.customer_name || 'Unknown'}
               </span>
             </div>
           </div>
@@ -164,7 +176,7 @@ export function RecordPaymentDialog({
 
           {/* Deposit Account Selection */}
           <div className="space-y-2">
-            <Label>Deposit To Account</Label>
+            <Label>{isOutgoingPayment ? 'Pay From Account' : 'Deposit To Account'}</Label>
             <Select value={depositAccountId} onValueChange={setDepositAccountId}>
               <SelectTrigger>
                 <SelectValue placeholder="Select bank account" />
@@ -187,7 +199,7 @@ export function RecordPaymentDialog({
           {/* Amount and Currency */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Amount Received</Label>
+              <Label>{isOutgoingPayment ? 'Amount to Pay' : 'Amount Received'}</Label>
               <Input
                 type="number"
                 min="0"
