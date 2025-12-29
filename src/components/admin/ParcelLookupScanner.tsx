@@ -96,8 +96,23 @@ export function ParcelLookupScanner() {
   }, [barcode, scanMode, isSearching]);
 
   const handleSearch = async (searchBarcode?: string) => {
-    const barcodeToSearch = (searchBarcode || barcode).trim().toUpperCase();
+    let barcodeToSearch = (searchBarcode || barcode).trim();
     if (!barcodeToSearch) return;
+
+    // Check if the scanned value is JSON (from a QR code with embedded data)
+    if (barcodeToSearch.startsWith('{') && barcodeToSearch.endsWith('}')) {
+      try {
+        const parsedData = JSON.parse(barcodeToSearch);
+        // Extract barcode from common field names
+        barcodeToSearch = parsedData.BARCODE || parsedData.barcode || 
+                          parsedData.TRACKING || parsedData.tracking ||
+                          parsedData.CODE || parsedData.code || barcodeToSearch;
+      } catch {
+        // Not valid JSON, use as-is
+      }
+    }
+
+    barcodeToSearch = barcodeToSearch.toUpperCase();
 
     setIsSearching(true);
     setShipmentDetails(null);
@@ -109,7 +124,7 @@ export function ParcelLookupScanner() {
         .from('parcels')
         .select('*')
         .ilike('barcode', barcodeToSearch)
-        .single();
+        .maybeSingle();
 
       if (parcelError || !parcel) {
         playErrorBeep();
