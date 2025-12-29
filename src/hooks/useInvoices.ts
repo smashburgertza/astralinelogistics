@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
-import { createInvoicePaymentJournalEntry, createInvoiceJournalEntry } from '@/lib/journalEntryUtils';
+import { createInvoicePaymentJournalEntry, createInvoiceJournalEntry, createAgentPaymentJournalEntry } from '@/lib/journalEntryUtils';
 
 export type InvoiceType = 'shipping' | 'purchase_shipping';
 
@@ -170,10 +170,10 @@ export function useRecordPayment() {
 
   return useMutation({
     mutationFn: async (params: RecordPaymentParams) => {
-      // First get the current invoice to check amount_paid
+      // First get the current invoice to check amount_paid and direction
       const { data: currentInvoice, error: fetchError } = await supabase
         .from('invoices')
-        .select('amount, amount_paid, invoice_number, currency')
+        .select('amount, amount_paid, invoice_number, currency, invoice_direction, agent_id')
         .eq('id', params.invoiceId)
         .single();
       
@@ -183,6 +183,7 @@ export function useRecordPayment() {
       const currentPaid = Number(currentInvoice.amount_paid || 0);
       const newTotalPaid = currentPaid + params.amount;
       const isFullyPaid = newTotalPaid >= totalAmount;
+      const isB2BAgentPayment = currentInvoice.invoice_direction === 'from_agent' && currentInvoice.agent_id;
 
       // Update invoice with new amount_paid and status
       const updates: TablesUpdate<'invoices'> = {
@@ -222,15 +223,29 @@ export function useRecordPayment() {
 
       // Create journal entry for the payment
       try {
-        await createInvoicePaymentJournalEntry({
-          invoiceId: data.id,
-          invoiceNumber: currentInvoice.invoice_number,
-          amount: params.amount,
-          currency: currentInvoice.currency || 'USD',
-          exchangeRate,
-          paymentCurrency: params.paymentCurrency,
-          depositAccountId: params.depositAccountId,
-        });
+        if (isB2BAgentPayment) {
+          // For B2B agent payments (we pay the agent): Debit Agent Payables, Credit Cash
+          await createAgentPaymentJournalEntry({
+            invoiceId: data.id,
+            invoiceNumber: currentInvoice.invoice_number,
+            amount: params.amount,
+            currency: currentInvoice.currency || 'USD',
+            exchangeRate,
+            paymentCurrency: params.paymentCurrency,
+            sourceAccountId: params.depositAccountId,
+          });
+        } else {
+          // For customer payments (we receive money): Debit Cash, Credit Accounts Receivable
+          await createInvoicePaymentJournalEntry({
+            invoiceId: data.id,
+            invoiceNumber: currentInvoice.invoice_number,
+            amount: params.amount,
+            currency: currentInvoice.currency || 'USD',
+            exchangeRate,
+            paymentCurrency: params.paymentCurrency,
+            depositAccountId: params.depositAccountId,
+          });
+        }
       } catch (journalError) {
         console.error('Failed to create payment journal entry:', journalError);
       }
@@ -249,9 +264,12 @@ export function useRecordPayment() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['b2b-invoices'] });
       queryClient.invalidateQueries({ queryKey: ['invoice-payments'] });
       queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
       queryClient.invalidateQueries({ queryKey: ['accounting-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['agent-balance'] });
+      queryClient.invalidateQueries({ queryKey: ['all-agent-balances'] });
       toast.success('Payment recorded successfully');
     },
     onError: (error) => {
