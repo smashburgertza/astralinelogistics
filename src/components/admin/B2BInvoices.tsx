@@ -32,6 +32,7 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { InvoiceStatusBadge } from "./InvoiceStatusBadge";
 import { CreateAgentCargoInvoiceDialog } from "./CreateAgentCargoInvoiceDialog";
+import { InvoiceDetailDialog } from "./InvoiceDetailDialog";
 
 interface B2BInvoice {
   id: string;
@@ -80,6 +81,8 @@ export function B2BInvoices() {
   const [activeTab, setActiveTab] = useState<"from_agents" | "to_agents">("from_agents");
   const [selectedShipment, setSelectedShipment] = useState<AgentCargoShipment | null>(null);
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<B2BInvoice | null>(null);
+  const [invoiceDetailOpen, setInvoiceDetailOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: invoices, isLoading } = useQuery({
@@ -323,7 +326,12 @@ export function B2BInvoices() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setSelectedInvoice(invoice);
+                        setInvoiceDetailOpen(true);
+                      }}
+                    >
                       <FileText className="h-4 w-4 mr-2" />
                       View Details
                     </DropdownMenuItem>
@@ -527,6 +535,13 @@ export function B2BInvoices() {
           shipment={selectedShipment}
         />
       )}
+
+      {/* Invoice Detail Dialog */}
+      <InvoiceDetailDialog
+        invoice={selectedInvoice as any}
+        open={invoiceDetailOpen}
+        onOpenChange={setInvoiceDetailOpen}
+      />
     </div>
   );
 }
