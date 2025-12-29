@@ -292,10 +292,22 @@ function FieldToggleSection({
   );
 }
 
+// Company settings interface
+interface CompanySettings {
+  company_name?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  website?: string;
+  tax_id?: string;
+  logo_url?: string;
+}
+
 export function InvoiceEstimateSettings() {
   const { data: allSettings, isLoading } = useAllSettings();
   const updateSettings = useUpdateSettings();
   const [settings, setSettings] = useState<InvoiceSettings>(defaultSettings);
+  const [companySettings, setCompanySettings] = useState<CompanySettings>({});
   const [previewOpen, setPreviewOpen] = useState(false);
 
   useEffect(() => {
@@ -304,6 +316,9 @@ export function InvoiceEstimateSettings() {
         ...defaultSettings, 
         ...allSettings.invoice_settings as unknown as InvoiceSettings 
       });
+    }
+    if (allSettings?.company) {
+      setCompanySettings(allSettings.company as unknown as CompanySettings);
     }
   }, [allSettings]);
 
@@ -366,6 +381,7 @@ export function InvoiceEstimateSettings() {
                     <InvoicePreviewContent 
                       template={selectedTemplate} 
                       settings={settings}
+                      companySettings={companySettings}
                     />
                   </div>
                 </DialogContent>
@@ -535,38 +551,63 @@ export function InvoiceEstimateSettings() {
 // Invoice Preview Content Component
 function InvoicePreviewContent({ 
   template, 
-  settings 
+  settings,
+  companySettings
 }: { 
   template: typeof TEMPLATES[0];
   settings: InvoiceSettings;
+  companySettings: CompanySettings;
 }) {
   const displayField = (key: string) => settings.displayFields[key] ?? true;
 
+  // Use real company data or fallback
+  const companyName = companySettings.company_name || 'Your Company Name';
+  const companyAddress = companySettings.address || 'Company Address';
+  const companyPhone = companySettings.phone || 'Phone Number';
+  const companyEmail = companySettings.email || 'email@company.com';
+  const companyWebsite = companySettings.website || '';
+  const companyTaxId = companySettings.tax_id || '';
+  const logoUrl = companySettings.logo_url || '';
+
   return (
-    <div className={cn("rounded-lg overflow-hidden", template.preview)}>
-      <div className="bg-white m-4 rounded-lg shadow-lg p-8 min-h-[600px]">
+    <div className={cn("rounded-lg overflow-hidden font-sans", template.preview)} style={{ fontFamily: "'Poppins', sans-serif" }}>
+      <div className="bg-white m-4 rounded-lg shadow-lg p-8 min-h-[600px]" style={{ fontFamily: "'Poppins', sans-serif" }}>
         {/* Header */}
         <div className="flex justify-between items-start mb-8">
           <div className="space-y-2">
             {displayField('logo') && (
-              <div 
-                className="w-32 h-12 rounded flex items-center justify-center text-white font-bold"
-                style={{ backgroundColor: template.accent }}
-              >
-                LOGO
-              </div>
+              logoUrl ? (
+                <img 
+                  src={logoUrl} 
+                  alt={companyName}
+                  className="h-16 max-w-[180px] object-contain"
+                />
+              ) : (
+                <div 
+                  className="w-32 h-12 rounded flex items-center justify-center text-white font-bold text-sm"
+                  style={{ backgroundColor: template.accent }}
+                >
+                  ADD LOGO
+                </div>
+              )
             )}
             {displayField('company_name') && (
-              <h2 className="text-xl font-bold">Astraline Cargo</h2>
+              <h2 className="text-xl font-bold">{companyName}</h2>
             )}
             {displayField('company_address') && (
-              <p className="text-sm text-muted-foreground">123 Business Street, Dubai, UAE</p>
+              <p className="text-sm text-muted-foreground">{companyAddress}</p>
             )}
-            {displayField('company_phone') && (
-              <p className="text-sm text-muted-foreground">+971 4 123 4567</p>
+            {displayField('company_phone') && companyPhone && (
+              <p className="text-sm text-muted-foreground">{companyPhone}</p>
             )}
             {displayField('company_email') && (
-              <p className="text-sm text-muted-foreground">info@astraline.com</p>
+              <p className="text-sm text-muted-foreground">{companyEmail}</p>
+            )}
+            {displayField('website') && companyWebsite && (
+              <p className="text-sm text-muted-foreground">{companyWebsite}</p>
+            )}
+            {displayField('tax_id') && companyTaxId && (
+              <p className="text-sm text-muted-foreground">Tax ID: {companyTaxId}</p>
             )}
           </div>
           
