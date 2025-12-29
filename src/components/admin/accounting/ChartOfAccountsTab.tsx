@@ -6,13 +6,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Search, Edit, ChevronRight, ChevronDown } from 'lucide-react';
-import { useChartOfAccounts, ACCOUNT_TYPES } from '@/hooks/useAccounting';
+import { useChartOfAccounts, ACCOUNT_TYPES, ChartAccount } from '@/hooks/useAccounting';
 import { CreateAccountDialog } from './CreateAccountDialog';
+import { EditAccountDialog } from './EditAccountDialog';
 
 export function ChartOfAccountsTab() {
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState<ChartAccount | null>(null);
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
 
   const { data: accounts = [], isLoading } = useChartOfAccounts({ 
@@ -88,7 +91,14 @@ export function ChartOfAccountsTab() {
             </Badge>
           </TableCell>
           <TableCell>
-            <Button variant="ghost" size="icon">
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => {
+                setSelectedAccount(account);
+                setShowEditDialog(true);
+              }}
+            >
               <Edit className="h-4 w-4" />
             </Button>
           </TableCell>
@@ -172,6 +182,13 @@ export function ChartOfAccountsTab() {
       <CreateAccountDialog 
         open={showCreateDialog} 
         onOpenChange={setShowCreateDialog}
+        accounts={accounts}
+      />
+
+      <EditAccountDialog
+        open={showEditDialog}
+        onOpenChange={setShowEditDialog}
+        account={selectedAccount}
         accounts={accounts}
       />
     </Card>
