@@ -27,12 +27,14 @@ import {
   FileText,
   Plus,
   Package,
+  Pencil,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { InvoiceStatusBadge } from "./InvoiceStatusBadge";
 import { CreateAgentCargoInvoiceDialog } from "./CreateAgentCargoInvoiceDialog";
 import { InvoiceDetailDialog } from "./InvoiceDetailDialog";
+import { EditB2BInvoiceDialog } from "./EditB2BInvoiceDialog";
 import { useExchangeRates } from "@/hooks/useExchangeRates";
 
 // Platform base currency
@@ -96,6 +98,8 @@ export function B2BInvoices() {
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<B2BInvoice | null>(null);
   const [invoiceDetailOpen, setInvoiceDetailOpen] = useState(false);
+  const [editInvoiceOpen, setEditInvoiceOpen] = useState(false);
+  const [invoiceToEdit, setInvoiceToEdit] = useState<B2BInvoice | null>(null);
   const queryClient = useQueryClient();
   const { data: exchangeRates } = useExchangeRates();
   
@@ -389,12 +393,23 @@ export function B2BInvoices() {
                       View Details
                     </DropdownMenuItem>
                     {invoice.status === "pending" && (
-                      <DropdownMenuItem
-                        onClick={() => markAsPaidMutation.mutate(invoice.id)}
-                      >
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Mark as Paid
-                      </DropdownMenuItem>
+                      <>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setInvoiceToEdit(invoice);
+                            setEditInvoiceOpen(true);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4 mr-2" />
+                          Edit Invoice
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => markAsPaidMutation.mutate(invoice.id)}
+                        >
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Mark as Paid
+                        </DropdownMenuItem>
+                      </>
                     )}
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -595,6 +610,18 @@ export function B2BInvoices() {
         open={invoiceDetailOpen}
         onOpenChange={setInvoiceDetailOpen}
       />
+
+      {/* Edit B2B Invoice Dialog */}
+      {invoiceToEdit && (
+        <EditB2BInvoiceDialog
+          invoice={invoiceToEdit}
+          open={editInvoiceOpen}
+          onOpenChange={(open) => {
+            setEditInvoiceOpen(open);
+            if (!open) setInvoiceToEdit(null);
+          }}
+        />
+      )}
     </div>
   );
 }

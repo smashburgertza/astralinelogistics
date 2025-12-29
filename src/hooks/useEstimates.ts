@@ -121,6 +121,44 @@ export function useCreateEstimate() {
   });
 }
 
+export function useUpdateEstimate() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, ...data }: {
+      id: string;
+      customer_id?: string;
+      shipment_id?: string | null;
+      origin_region?: 'china' | 'dubai' | 'europe' | 'india' | 'uk' | 'usa';
+      weight_kg?: number;
+      rate_per_kg?: number;
+      handling_fee?: number;
+      currency?: string;
+      notes?: string | null;
+      valid_until?: string | null;
+      estimate_type?: EstimateType;
+      product_cost?: number;
+      purchase_fee?: number;
+      subtotal?: number;
+      total?: number;
+    }) => {
+      const { error } = await supabase
+        .from('estimates')
+        .update(data)
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['estimates'] });
+      toast.success('Estimate updated');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to update estimate');
+    },
+  });
+}
+
 export function useUpdateEstimateStatus() {
   const queryClient = useQueryClient();
 
