@@ -227,39 +227,58 @@ export function ProductsServicesTab() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                {formData.unit === 'percent' ? (
                   <div className="space-y-2">
-                    <Label>Unit Price</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={formData.unit_price}
-                      onChange={(e) =>
-                        setFormData({ ...formData, unit_price: parseFloat(e.target.value) || 0 })
-                      }
-                    />
+                    <Label>Percentage (%)</Label>
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        value={formData.unit_price}
+                        onChange={(e) =>
+                          setFormData({ ...formData, unit_price: parseFloat(e.target.value) || 0 })
+                        }
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">%</span>
+                    </div>
                   </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Unit Price</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.unit_price}
+                        onChange={(e) =>
+                          setFormData({ ...formData, unit_price: parseFloat(e.target.value) || 0 })
+                        }
+                      />
+                    </div>
 
-                  <div className="space-y-2">
-                    <Label>Currency</Label>
-                    <Select
-                      value={formData.currency}
-                      onValueChange={(value) => setFormData({ ...formData, currency: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="USD">USD ($)</SelectItem>
-                        <SelectItem value="GBP">GBP (£)</SelectItem>
-                        <SelectItem value="EUR">EUR (€)</SelectItem>
-                        <SelectItem value="AED">AED (د.إ)</SelectItem>
-                        <SelectItem value="TZS">TZS (TSh)</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="space-y-2">
+                      <Label>Currency</Label>
+                      <Select
+                        value={formData.currency}
+                        onValueChange={(value) => setFormData({ ...formData, currency: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="USD">USD ($)</SelectItem>
+                          <SelectItem value="GBP">GBP (£)</SelectItem>
+                          <SelectItem value="EUR">EUR (€)</SelectItem>
+                          <SelectItem value="AED">AED (د.إ)</SelectItem>
+                          <SelectItem value="TZS">TZS (TSh)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="space-y-2">
                   <Label>Revenue Account (Optional)</Label>
@@ -336,8 +355,10 @@ export function ProductsServicesTab() {
                   </TableCell>
                   <TableCell>{getServiceTypeBadge(item.service_type)}</TableCell>
                   <TableCell className="font-medium">
-                    {CURRENCY_SYMBOLS[item.currency] || '$'}
-                    {item.unit_price.toFixed(2)}
+                    {item.unit === 'percent' 
+                      ? `${item.unit_price.toFixed(2)}%`
+                      : `${CURRENCY_SYMBOLS[item.currency] || '$'}${item.unit_price.toFixed(2)}`
+                    }
                   </TableCell>
                   <TableCell className="capitalize">{item.unit}</TableCell>
                   <TableCell>
