@@ -57,16 +57,70 @@ interface ShipmentDetails {
 
 export function ParcelLookupScanner() {
   const [barcode, setBarcode] = useState('');
-  const [scanMode, setScanMode] = useState<'manual' | 'camera'>('manual');
+  const [scanMode, setScanMode] = useState<'scanner' | 'camera'>('scanner');
   const [isSearching, setIsSearching] = useState(false);
   const [shipmentDetails, setShipmentDetails] = useState<ShipmentDetails | null>(null);
   const [scannedParcel, setScannedParcel] = useState<ParcelDetails | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const scannerBufferRef = useRef('');
+  const scannerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Keep input focused for scanner mode
   useEffect(() => {
-    if (scanMode === 'manual' && inputRef.current) {
+    if (scanMode === 'scanner' && inputRef.current) {
       inputRef.current.focus();
     }
+  }, [scanMode]);
+
+  // Global keydown listener for handheld scanner input
+  useEffect(() => {
+    if (scanMode !== 'scanner') return;
+
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in another input field
+      const target = e.target as HTMLElement;
+      if (target !== inputRef.current && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
+        return;
+      }
+
+      // If Enter is pressed and we have buffered input, trigger search
+      if (e.key === 'Enter' && scannerBufferRef.current.length > 0) {
+        e.preventDefault();
+        const scannedValue = scannerBufferRef.current;
+        scannerBufferRef.current = '';
+        setBarcode(scannedValue);
+        handleSearch(scannedValue);
+        return;
+      }
+
+      // Buffer printable characters (handheld scanners type rapidly)
+      if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        scannerBufferRef.current += e.key;
+        setBarcode(scannerBufferRef.current);
+
+        // Clear any existing timeout
+        if (scannerTimeoutRef.current) {
+          clearTimeout(scannerTimeoutRef.current);
+        }
+
+        // Auto-search after 100ms of no input (scanner finished)
+        scannerTimeoutRef.current = setTimeout(() => {
+          if (scannerBufferRef.current.length >= 3) {
+            const scannedValue = scannerBufferRef.current;
+            scannerBufferRef.current = '';
+            handleSearch(scannedValue);
+          }
+        }, 100);
+      }
+    };
+
+    document.addEventListener('keydown', handleGlobalKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleGlobalKeyDown);
+      if (scannerTimeoutRef.current) {
+        clearTimeout(scannerTimeoutRef.current);
+      }
+    };
   }, [scanMode]);
 
   const handleSearch = async (searchBarcode?: string) => {
@@ -168,7 +222,8 @@ export function ParcelLookupScanner() {
     } finally {
       setIsSearching(false);
       setBarcode('');
-      if (scanMode === 'manual') {
+      scannerBufferRef.current = '';
+      if (scanMode === 'scanner') {
         inputRef.current?.focus();
       }
     }
@@ -189,7 +244,8 @@ export function ParcelLookupScanner() {
     setShipmentDetails(null);
     setScannedParcel(null);
     setBarcode('');
-    if (scanMode === 'manual') {
+    scannerBufferRef.current = '';
+    if (scanMode === 'scanner') {
       inputRef.current?.focus();
     }
   };
@@ -206,16 +262,16 @@ export function ParcelLookupScanner() {
           Parcel Lookup
         </CardTitle>
         <CardDescription>
-          Scan a parcel barcode or QR code to view full shipment details
+          Use a handheld scanner, camera, or type manually to lookup parcel details
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Scanner Mode Tabs */}
-        <Tabs value={scanMode} onValueChange={(v) => setScanMode(v as 'manual' | 'camera')}>
+        <Tabs value={scanMode} onValueChange={(v) => setScanMode(v as 'scanner' | 'camera')}>
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="manual" className="gap-2">
-              <Keyboard className="h-4 w-4" />
-              Manual Entry
+            <TabsTrigger value="scanner" className="gap-2">
+              <Scan className="h-4 w-4" />
+              Barcode Scanner
             </TabsTrigger>
             <TabsTrigger value="camera" className="gap-2">
               <Camera className="h-4 w-4" />
@@ -223,18 +279,29 @@ export function ParcelLookupScanner() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="manual" className="mt-4">
+          <TabsContent value="scanner" className="mt-4 space-y-4">
+            <div className="p-4 rounded-lg border-2 border-dashed border-primary/30 bg-primary/5 text-center">
+              <Scan className="h-8 w-8 mx-auto mb-2 text-primary animate-pulse" />
+              <p className="text-sm font-medium">Ready for Scanner</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Use your handheld barcode scanner or type manually
+              </p>
+            </div>
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <Scan className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   ref={inputRef}
-                  placeholder="Scan or enter parcel barcode..."
+                  placeholder="Scan barcode or type here..."
                   value={barcode}
-                  onChange={(e) => setBarcode(e.target.value)}
+                  onChange={(e) => {
+                    setBarcode(e.target.value);
+                    scannerBufferRef.current = e.target.value;
+                  }}
                   onKeyDown={handleKeyDown}
-                  className="pl-10 font-mono"
+                  className="pl-10 font-mono text-lg"
                   disabled={isSearching}
+                  autoFocus
                 />
               </div>
               <Button onClick={() => handleSearch()} disabled={isSearching || !barcode.trim()}>
