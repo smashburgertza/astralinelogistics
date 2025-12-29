@@ -201,7 +201,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             {/* Header Info */}
             <div className="rounded-lg border bg-card p-4">
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-4 gap-4">
                 <div>
                   <FormField
                     control={form.control}
@@ -221,6 +221,32 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
                                 {customer.name}
                               </SelectItem>
                             ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div>
+                  <FormField
+                    control={form.control}
+                    name="currency"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs text-muted-foreground">Currency</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="font-medium">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="USD">USD ($)</SelectItem>
+                            <SelectItem value="GBP">GBP (£)</SelectItem>
+                            <SelectItem value="EUR">EUR (€)</SelectItem>
+                            <SelectItem value="AED">AED (د.إ)</SelectItem>
+                            <SelectItem value="TZS">TZS (TSh)</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -500,30 +526,6 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="currency"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Currency</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="USD">USD</SelectItem>
-                          <SelectItem value="GBP">GBP</SelectItem>
-                          <SelectItem value="EUR">EUR</SelectItem>
-                          <SelectItem value="AED">AED</SelectItem>
-                          <SelectItem value="TZS">TZS</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
               </div>
 
               {/* Right Column - Summary */}
