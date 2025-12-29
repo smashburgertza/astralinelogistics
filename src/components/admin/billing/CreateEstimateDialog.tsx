@@ -176,7 +176,7 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
           {trigger}
         </DialogTrigger>
       )}
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[calc(100vw-var(--sidebar-width,256px)-2rem)] sm:max-h-[calc(100vh-2rem)] h-[calc(100vh-2rem)] overflow-y-auto fixed right-4 left-auto top-4 translate-x-0 translate-y-0 data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-primary">
             Generate Estimate
