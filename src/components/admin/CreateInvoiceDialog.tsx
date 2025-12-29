@@ -298,6 +298,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
       due_date: dueDate.toISOString().split('T')[0],
       notes: data.notes || null,
       status: 'pending',
+      invoice_direction: null, // Customer invoice - not B2B agent invoice
     });
 
     form.reset();
