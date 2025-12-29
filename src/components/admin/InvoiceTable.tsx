@@ -5,9 +5,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MoreHorizontal, FileText, Download, Eye, CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react';
-import { Invoice, useUpdateInvoiceStatus, INVOICE_STATUSES } from '@/hooks/useInvoices';
+import { Invoice, useUpdateInvoiceStatus, useRecordPayment, RecordPaymentParams } from '@/hooks/useInvoices';
 import { InvoiceStatusBadge } from './InvoiceStatusBadge';
 import { InvoicePDFPreview } from './InvoicePDFPreview';
+import { RecordPaymentDialog, PaymentDetails } from './RecordPaymentDialog';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 import { useRegions } from '@/hooks/useRegions';
 import { format } from 'date-fns';
@@ -21,7 +22,10 @@ interface InvoiceTableProps {
 export function InvoiceTable({ invoices, isLoading }: InvoiceTableProps) {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [invoiceForPayment, setInvoiceForPayment] = useState<Invoice | null>(null);
   const updateStatus = useUpdateInvoiceStatus();
+  const recordPayment = useRecordPayment();
   const printRef = useRef<HTMLDivElement>(null);
   const { data: regions = [] } = useRegions();
 
@@ -179,9 +183,12 @@ export function InvoiceTable({ invoices, isLoading }: InvoiceTableProps) {
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         {invoice.status !== 'paid' && (
-                          <DropdownMenuItem onClick={() => updateStatus.mutate({ id: invoice.id, status: 'paid' })}>
+                          <DropdownMenuItem onClick={() => {
+                            setInvoiceForPayment(invoice);
+                            setPaymentDialogOpen(true);
+                          }}>
                             <CheckCircle className="h-4 w-4 mr-2" />
-                            Mark as Paid
+                            Record Payment
                           </DropdownMenuItem>
                         )}
                         {invoice.status !== 'pending' && invoice.status !== 'paid' && (
@@ -235,6 +242,31 @@ export function InvoiceTable({ invoices, isLoading }: InvoiceTableProps) {
       <div className="hidden">
         {selectedInvoice && <InvoicePDFPreview ref={printRef} invoice={selectedInvoice} />}
       </div>
+
+      {/* Record Payment Dialog */}
+      <RecordPaymentDialog
+        invoice={invoiceForPayment}
+        open={paymentDialogOpen}
+        onOpenChange={setPaymentDialogOpen}
+        isLoading={recordPayment.isPending}
+        onRecordPayment={(details: PaymentDetails) => {
+          recordPayment.mutate({
+            invoiceId: details.invoiceId,
+            amount: details.amount,
+            paymentMethod: details.paymentMethod,
+            bankAccountId: details.bankAccountId,
+            paymentCurrency: details.paymentCurrency,
+            paymentDate: details.paymentDate,
+            reference: details.reference,
+            notes: details.notes,
+          }, {
+            onSuccess: () => {
+              setPaymentDialogOpen(false);
+              setInvoiceForPayment(null);
+            },
+          });
+        }}
+      />
     </>
   );
 }

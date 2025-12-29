@@ -141,32 +141,93 @@ export function useUpdateInvoiceStatus() {
         .single();
       if (error) throw error;
 
-      // Auto-create journal entry when invoice is paid (Cash debit, AR credit)
-      if (status === 'paid') {
-        try {
-          await createInvoicePaymentJournalEntry({
-            invoiceId: data.id,
-            invoiceNumber: data.invoice_number,
-            amount: Number(data.amount),
-            currency: data.currency || 'USD',
-            exchangeRate: data.amount_in_tzs ? Number(data.amount_in_tzs) / Number(data.amount) : 1,
-            paymentCurrency: data.payment_currency || undefined,
-          });
-        } catch (journalError) {
-          console.error('Failed to create payment journal entry:', journalError);
-          // Don't fail the status update if journal entry fails
-        }
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      toast.success('Invoice status updated');
+    },
+    onError: (error) => {
+      toast.error(`Failed to update status: ${error.message}`);
+    },
+  });
+}
+
+export interface RecordPaymentParams {
+  invoiceId: string;
+  amount: number;
+  paymentMethod: string;
+  bankAccountId?: string;
+  paymentCurrency: string;
+  paymentDate: string;
+  reference?: string;
+  notes?: string;
+}
+
+export function useRecordPayment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: RecordPaymentParams) => {
+      // Update invoice status to paid
+      const { data, error } = await supabase
+        .from('invoices')
+        .update({ 
+          status: 'paid',
+          paid_at: params.paymentDate,
+          payment_method: params.paymentMethod,
+          payment_currency: params.paymentCurrency,
+        })
+        .eq('id', params.invoiceId)
+        .select()
+        .single();
+      
+      if (error) throw error;
+
+      // Get exchange rate if different currency
+      let exchangeRate = 1;
+      if (params.paymentCurrency !== 'TZS') {
+        const { data: rateData } = await supabase
+          .from('currency_exchange_rates')
+          .select('rate_to_tzs')
+          .eq('currency_code', params.paymentCurrency)
+          .maybeSingle();
+        exchangeRate = rateData?.rate_to_tzs || 1;
       }
+
+      // Create journal entry for the payment
+      try {
+        await createInvoicePaymentJournalEntry({
+          invoiceId: data.id,
+          invoiceNumber: data.invoice_number,
+          amount: params.amount,
+          currency: data.currency || 'USD',
+          exchangeRate,
+          paymentCurrency: params.paymentCurrency,
+        });
+      } catch (journalError) {
+        console.error('Failed to create payment journal entry:', journalError);
+      }
+
+      // Record in payments table as well
+      await supabase.from('payments').insert({
+        invoice_id: params.invoiceId,
+        amount: params.amount,
+        currency: params.paymentCurrency,
+        payment_method: params.paymentMethod,
+        paid_at: params.paymentDate,
+      });
 
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
-      toast.success('Invoice status updated');
+      queryClient.invalidateQueries({ queryKey: ['accounting-summary'] });
+      toast.success('Payment recorded successfully');
     },
     onError: (error) => {
-      toast.error(`Failed to update status: ${error.message}`);
+      toast.error(`Failed to record payment: ${error.message}`);
     },
   });
 }
