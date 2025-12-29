@@ -14,6 +14,7 @@ export interface InvoiceItem {
   amount: number;
   currency: string;
   weight_kg: number | null;
+  unit_type: 'fixed' | 'percent' | 'kg' | null;
   created_at: string;
 }
 
