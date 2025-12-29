@@ -49,11 +49,13 @@ export function InvoicesTabContent() {
   const { data: invoices, isLoading } = useInvoices(filters);
   const { data: exchangeRates } = useExchangeRates();
 
-  // Filter by invoice type locally
+  // Filter by invoice type locally - exclude B2B agent invoices (they show in B2B Agents tab)
   const filteredInvoices = useMemo(() => {
     if (!invoices) return [];
-    if (invoiceType === 'all') return invoices;
-    return invoices.filter(inv => inv.invoice_type === invoiceType);
+    // Only show customer invoices (invoice_direction is null or undefined)
+    const customerInvoices = invoices.filter(inv => !inv.invoice_direction || inv.invoice_direction === null);
+    if (invoiceType === 'all') return customerInvoices;
+    return customerInvoices.filter(inv => inv.invoice_type === invoiceType);
   }, [invoices, invoiceType]);
 
   // Calculate currency breakdown from paid invoices
