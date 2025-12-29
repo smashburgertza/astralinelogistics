@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +7,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { useCreateAccount, ACCOUNT_TYPES, ChartAccount } from '@/hooks/useAccounting';
+
+// Account code prefixes by type
+const ACCOUNT_CODE_PREFIXES: Record<string, string> = {
+  asset: '1',
+  liability: '2',
+  equity: '3',
+  revenue: '4',
+  expense: '5',
+};
 
 interface CreateAccountDialogProps {
   open: boolean;
@@ -25,6 +34,38 @@ export function CreateAccountDialog({ open, onOpenChange, accounts }: CreateAcco
   const [isActive, setIsActive] = useState(true);
 
   const createAccount = useCreateAccount();
+
+  // Generate next account code based on type
+  const generateNextCode = useMemo(() => {
+    if (!accountType) return '';
+    
+    const prefix = ACCOUNT_CODE_PREFIXES[accountType] || '9';
+    const typeAccounts = accounts.filter(a => 
+      a.account_code.startsWith(prefix) && a.account_type === accountType
+    );
+    
+    if (typeAccounts.length === 0) {
+      return `${prefix}000`;
+    }
+    
+    // Find highest code number in this type
+    const codes = typeAccounts.map(a => {
+      const numPart = a.account_code.slice(prefix.length);
+      return parseInt(numPart, 10) || 0;
+    });
+    const maxCode = Math.max(...codes);
+    const nextNum = maxCode + 1;
+    
+    // Pad to 3 digits minimum
+    return `${prefix}${nextNum.toString().padStart(3, '0')}`;
+  }, [accountType, accounts]);
+
+  // Auto-update code when type changes
+  useEffect(() => {
+    if (accountType && generateNextCode) {
+      setAccountCode(generateNextCode);
+    }
+  }, [accountType, generateNextCode]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,9 +116,11 @@ export function CreateAccountDialog({ open, onOpenChange, accounts }: CreateAcco
                 id="account_code"
                 value={accountCode}
                 onChange={(e) => setAccountCode(e.target.value)}
-                placeholder="e.g., 1150"
+                placeholder="Auto-generated"
                 required
+                className="bg-muted"
               />
+              <p className="text-xs text-muted-foreground">Auto-generated based on account type</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="account_name">Account Name *</Label>
