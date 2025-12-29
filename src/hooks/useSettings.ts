@@ -55,16 +55,17 @@ export function useUpdateSettings() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ key, value }: { key: string; value: Record<string, unknown> }) => {
+    mutationFn: async ({ key, value, category }: { key: string; value: Record<string, unknown>; category?: string }) => {
       const { data: { user } } = await supabase.auth.getUser();
       
       const { data, error } = await supabase
         .from('settings')
-        .update({ 
+        .upsert({ 
+          key,
           value: value as unknown as Json,
+          category: category || 'general',
           updated_by: user?.id || null,
-        })
-        .eq('key', key)
+        }, { onConflict: 'key' })
         .select()
         .single();
 
