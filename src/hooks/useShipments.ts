@@ -37,6 +37,42 @@ export function useShipments(filters?: {
   });
 }
 
+// Get shipments that don't have customer invoices yet (for invoice creation)
+export function useUninvoicedShipments() {
+  return useQuery({
+    queryKey: ['shipments', 'uninvoiced'],
+    queryFn: async () => {
+      // First get all shipment IDs that already have customer invoices
+      const { data: invoicedShipments, error: invoiceError } = await supabase
+        .from('invoices')
+        .select('shipment_id')
+        .not('shipment_id', 'is', null)
+        .is('invoice_direction', null); // Customer invoices only (not B2B)
+
+      if (invoiceError) throw invoiceError;
+
+      const invoicedShipmentIds = invoicedShipments
+        ?.map(i => i.shipment_id)
+        .filter(Boolean) as string[] || [];
+
+      // Get shipments that are NOT in the invoiced list
+      let query = supabase
+        .from('shipments')
+        .select('*, customers(name, email, company_name, phone)')
+        .eq('is_draft', false)
+        .order('created_at', { ascending: false });
+
+      if (invoicedShipmentIds.length > 0) {
+        query = query.not('id', 'in', `(${invoicedShipmentIds.join(',')})`);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data as Shipment[];
+    },
+  });
+}
+
 export function useShipment(id: string) {
   return useQuery({
     queryKey: ['shipment', id],

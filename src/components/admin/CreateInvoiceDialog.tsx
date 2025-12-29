@@ -14,7 +14,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Plus, Trash2, FileText, Package } from 'lucide-react';
 import { useCreateInvoice } from '@/hooks/useInvoices';
 import { useCreateInvoiceItems } from '@/hooks/useInvoiceItems';
-import { useCustomers, useShipments } from '@/hooks/useShipments';
+import { useCustomers, useUninvoicedShipments } from '@/hooks/useShipments';
 import { useExchangeRates, convertToTZS } from '@/hooks/useExchangeRates';
 import { useChartOfAccounts } from '@/hooks/useAccounting';
 import { useProductsServices, SERVICE_TYPES } from '@/hooks/useProductsServices';
@@ -63,7 +63,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
   const createInvoice = useCreateInvoice();
   const createInvoiceItems = useCreateInvoiceItems();
   const { data: customers } = useCustomers();
-  const { data: shipments } = useShipments();
+  const { data: shipments } = useUninvoicedShipments();
   const { data: exchangeRates } = useExchangeRates();
   const { data: accounts } = useChartOfAccounts({ active: true });
   const { data: productsServices } = useProductsServices({ active: true });
