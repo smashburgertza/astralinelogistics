@@ -63,7 +63,7 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange }: EditInvoiceDi
       currency: 'USD',
       due_date: '',
       notes: '',
-      line_items: [{ description: '', quantity: 1, unit_price: 0, item_type: 'other' }],
+      line_items: [{ description: '', quantity: 1, unit_price: 0, item_type: 'other', unit_type: 'fixed' }],
     },
   });
 
@@ -92,6 +92,7 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange }: EditInvoiceDi
           quantity: item.quantity,
           unit_price: item.unit_price,
           item_type: item.item_type,
+          unit_type: item.unit_type || 'fixed',
         }));
       } else if (invoice.amount && invoice.amount > 0) {
         // No items exist but invoice has an amount - create a default item from invoice data
