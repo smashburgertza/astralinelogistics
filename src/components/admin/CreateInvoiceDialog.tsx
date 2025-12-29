@@ -7,17 +7,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Separator } from '@/components/ui/separator';
 import { Plus, Trash2, FileText } from 'lucide-react';
 import { useCreateInvoice } from '@/hooks/useInvoices';
 import { useCustomers, useShipments } from '@/hooks/useShipments';
 import { useExchangeRates, convertToTZS } from '@/hooks/useExchangeRates';
+import { useChartOfAccounts } from '@/hooks/useAccounting';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 import { supabase } from '@/integrations/supabase/client';
 
 const lineItemSchema = z.object({
+  account_id: z.string().optional(),
   description: z.string().min(1, 'Description is required'),
   quantity: z.coerce.number().min(1, 'Quantity must be at least 1'),
   unit_price: z.coerce.number().min(0, 'Price must be 0 or more'),
@@ -54,6 +56,16 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
   const { data: customers } = useCustomers();
   const { data: shipments } = useShipments();
   const { data: exchangeRates } = useExchangeRates();
+  const { data: accounts } = useChartOfAccounts({ active: true });
+
+  // Group accounts by type for the dropdown
+  const groupedAccounts = useMemo(() => {
+    if (!accounts) return { revenue: [], expense: [] };
+    return {
+      revenue: accounts.filter(a => a.account_type === 'revenue'),
+      expense: accounts.filter(a => a.account_type === 'expense'),
+    };
+  }, [accounts]);
 
   const form = useForm<InvoiceFormData>({
     resolver: zodResolver(invoiceSchema),
@@ -66,7 +78,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
       tax_rate: 0,
       notes: '',
       line_items: [
-        { description: '', quantity: 1, unit_price: 0 },
+        { account_id: '', description: '', quantity: 1, unit_price: 0 },
       ],
     },
   });
@@ -150,7 +162,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
   };
 
   const handleAddLineItem = () => {
-    append({ description: '', quantity: 1, unit_price: 0 });
+    append({ account_id: '', description: '', quantity: 1, unit_price: 0 });
   };
 
   return (
@@ -252,8 +264,9 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
               
               {/* Line Items Header */}
               <div className="grid grid-cols-12 gap-2 text-xs text-muted-foreground px-2">
-                <div className="col-span-5">Item Description</div>
-                <div className="col-span-2 text-center">Quantity</div>
+                <div className="col-span-3">Service</div>
+                <div className="col-span-3">Item Description</div>
+                <div className="col-span-1 text-center">Qty</div>
                 <div className="col-span-2 text-right">Unit Price</div>
                 <div className="col-span-2 text-right">Total</div>
                 <div className="col-span-1"></div>
@@ -268,7 +281,51 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
 
                   return (
                     <div key={field.id} className="grid grid-cols-12 gap-2 items-center">
-                      <div className="col-span-5">
+                      <div className="col-span-3">
+                        <FormField
+                          control={form.control}
+                          name={`line_items.${index}.account_id`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <Select 
+                                onValueChange={(val) => field.onChange(val === "none" ? "" : val)} 
+                                value={field.value || "none"}
+                              >
+                                <FormControl>
+                                  <SelectTrigger className="text-xs">
+                                    <SelectValue placeholder="Select service" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="none">No account</SelectItem>
+                                  {groupedAccounts.revenue.length > 0 && (
+                                    <SelectGroup>
+                                      <SelectLabel className="text-xs font-semibold text-primary">Revenue</SelectLabel>
+                                      {groupedAccounts.revenue.map((account) => (
+                                        <SelectItem key={account.id} value={account.id} className="text-xs">
+                                          {account.account_code} - {account.account_name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectGroup>
+                                  )}
+                                  {groupedAccounts.expense.length > 0 && (
+                                    <SelectGroup>
+                                      <SelectLabel className="text-xs font-semibold text-destructive">Costs/Expenses</SelectLabel>
+                                      {groupedAccounts.expense.map((account) => (
+                                        <SelectItem key={account.id} value={account.id} className="text-xs">
+                                          {account.account_code} - {account.account_name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectGroup>
+                                  )}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <div className="col-span-3">
                         <FormField
                           control={form.control}
                           name={`line_items.${index}.description`}
@@ -276,9 +333,9 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
                             <FormItem>
                               <FormControl>
                                 <Input 
-                                  placeholder="e.g., Standard Parcel Delivery" 
+                                  placeholder="Description" 
                                   {...field} 
-                                  className="border-2 border-dashed"
+                                  className="border-2 border-dashed text-xs"
                                 />
                               </FormControl>
                               <FormMessage />
@@ -286,7 +343,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
                           )}
                         />
                       </div>
-                      <div className="col-span-2">
+                      <div className="col-span-1">
                         <FormField
                           control={form.control}
                           name={`line_items.${index}.quantity`}
@@ -296,7 +353,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
                                 <Input 
                                   type="number" 
                                   min="1"
-                                  className="text-center"
+                                  className="text-center text-xs"
                                   {...field} 
                                 />
                               </FormControl>
@@ -316,7 +373,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
                                   type="number" 
                                   step="0.01"
                                   min="0"
-                                  className="text-right"
+                                  className="text-right text-xs"
                                   {...field} 
                                 />
                               </FormControl>
@@ -325,7 +382,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
                           )}
                         />
                       </div>
-                      <div className="col-span-2 text-right font-medium">
+                      <div className="col-span-2 text-right font-medium text-sm">
                         {currencySymbol}{lineTotal.toFixed(2)}
                       </div>
                       <div className="col-span-1 text-center">
