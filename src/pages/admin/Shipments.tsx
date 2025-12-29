@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { ShipmentFilters } from '@/components/admin/ShipmentFilters';
-import { ShipmentTable } from '@/components/admin/ShipmentTable';
+import { BatchGroupedShipmentTable } from '@/components/admin/BatchGroupedShipmentTable';
 import { BulkActionsBar } from '@/components/admin/BulkActionsBar';
 import { CreateShipmentDialog } from '@/components/admin/CreateShipmentDialog';
 import { ParcelCheckout } from '@/components/admin/ParcelCheckout';
@@ -103,8 +103,8 @@ export default function AdminShipmentsPage() {
             ))}
           </div>
 
-          {/* Table */}
-          <ShipmentTable 
+          {/* Batch-Grouped Table */}
+          <BatchGroupedShipmentTable 
             shipments={shipments} 
             isLoading={isLoading}
             selectedIds={selectedIds}
