@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FileStack, ReceiptText, Package, Users } from 'lucide-react';
+import { FileStack, ReceiptText, Users } from 'lucide-react';
 
 // Import invoice content
 import { InvoicesTabContent } from '@/components/admin/billing/InvoicesTabContent';
 import { EstimatesTabContent } from '@/components/admin/billing/EstimatesTabContent';
-import { AgentCargoBilling } from '@/components/admin/AgentCargoBilling';
 import { B2BInvoices } from '@/components/admin/B2BInvoices';
 
 export default function BillingPage() {
@@ -15,7 +14,7 @@ export default function BillingPage() {
   return (
     <AdminLayout title="Billing" subtitle="Manage invoices and estimates">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full max-w-2xl grid-cols-4">
+        <TabsList className="grid w-full max-w-lg grid-cols-3">
           <TabsTrigger value="invoices" className="flex items-center gap-2">
             <FileStack className="h-4 w-4" />
             Invoices
@@ -27,10 +26,6 @@ export default function BillingPage() {
           <TabsTrigger value="b2b" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             B2B Agents
-          </TabsTrigger>
-          <TabsTrigger value="agent-cargo" className="flex items-center gap-2">
-            <Package className="h-4 w-4" />
-            Agent Cargo
           </TabsTrigger>
         </TabsList>
 
@@ -44,10 +39,6 @@ export default function BillingPage() {
 
         <TabsContent value="b2b" className="space-y-6">
           <B2BInvoices />
-        </TabsContent>
-
-        <TabsContent value="agent-cargo" className="space-y-6">
-          <AgentCargoBilling />
         </TabsContent>
       </Tabs>
     </AdminLayout>
