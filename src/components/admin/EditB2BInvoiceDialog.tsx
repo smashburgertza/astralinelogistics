@@ -183,6 +183,7 @@ export function EditB2BInvoiceDialog({ invoice, open, onOpenChange }: EditB2BInv
             item_type: (item.item_type || 'other') as 'freight' | 'customs' | 'handling' | 'insurance' | 'duty' | 'transit' | 'other',
             currency: data.currency,
             weight_kg: null,
+            unit_type: 'fixed',
           });
         }
       }

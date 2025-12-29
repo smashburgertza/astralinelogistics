@@ -183,6 +183,7 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange }: EditInvoiceDi
             item_type: (item.item_type || 'other') as 'freight' | 'customs' | 'handling' | 'insurance' | 'duty' | 'transit' | 'other',
             currency: data.currency,
             weight_kg: null,
+            unit_type: 'fixed',
           });
         }
       }
