@@ -176,9 +176,19 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange }: EditInvoiceDi
         }
       }
 
-      // Update or create items
-      for (const item of data.line_items) {
-        const amount = Number(item.quantity) * Number(item.unit_price);
+      // Update or create items - calculate amounts with cascading percentages
+      let runningTotal = 0;
+      for (let i = 0; i < data.line_items.length; i++) {
+        const item = data.line_items[i];
+        let amount: number;
+        
+        if (item.unit_type === 'percent') {
+          amount = runningTotal * (Number(item.unit_price) / 100);
+        } else {
+          amount = Number(item.quantity) * Number(item.unit_price);
+        }
+        runningTotal += amount;
+
         if (item.id && existingIds.includes(item.id)) {
           // Update existing
           await updateInvoiceItem.mutateAsync({
@@ -200,7 +210,7 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange }: EditInvoiceDi
             item_type: (item.item_type || 'other') as 'freight' | 'customs' | 'handling' | 'insurance' | 'duty' | 'transit' | 'other',
             currency: data.currency,
             weight_kg: null,
-            unit_type: 'fixed',
+            unit_type: item.unit_type || 'fixed',
           });
         }
       }
