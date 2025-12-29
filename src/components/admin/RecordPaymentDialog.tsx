@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useBankAccounts } from '@/hooks/useAccounting';
+import { useChartOfAccounts } from '@/hooks/useAccounting';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { Invoice } from '@/hooks/useInvoices';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
@@ -23,7 +23,7 @@ export interface PaymentDetails {
   invoiceId: string;
   amount: number;
   paymentMethod: string;
-  bankAccountId?: string;
+  depositAccountId?: string;
   paymentCurrency: string;
   paymentDate: string;
   reference?: string;
@@ -45,15 +45,24 @@ export function RecordPaymentDialog({
   isLoading 
 }: RecordPaymentDialogProps) {
   const [paymentMethod, setPaymentMethod] = useState('bank_transfer');
-  const [bankAccountId, setBankAccountId] = useState('');
+  const [depositAccountId, setDepositAccountId] = useState('');
   const [paymentCurrency, setPaymentCurrency] = useState(invoice?.currency || 'USD');
   const [amount, setAmount] = useState(invoice?.amount?.toString() || '');
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
   const [reference, setReference] = useState('');
   const [notes, setNotes] = useState('');
 
-  const { data: bankAccounts = [] } = useBankAccounts();
+  // Get all active asset accounts (cash, bank, mobile money accounts)
+  const { data: accounts = [] } = useChartOfAccounts({ active: true });
   const { data: exchangeRates = [] } = useExchangeRates();
+
+  // Filter to cash/bank type accounts
+  const depositAccounts = accounts.filter(a => 
+    a.account_type === 'asset' && 
+    (a.account_subtype?.toLowerCase().includes('cash') || 
+     a.account_subtype?.toLowerCase().includes('bank') ||
+     a.account_code.startsWith('11')) // Cash and bank accounts typically start with 11
+  );
 
   // Reset form when invoice changes
   useState(() => {
@@ -72,7 +81,7 @@ export function RecordPaymentDialog({
       invoiceId: invoice.id,
       amount: parseFloat(amount),
       paymentMethod,
-      bankAccountId: bankAccountId || undefined,
+      depositAccountId: depositAccountId || undefined,
       paymentCurrency,
       paymentDate,
       reference: reference || undefined,
@@ -81,7 +90,6 @@ export function RecordPaymentDialog({
   };
 
   const currencySymbol = CURRENCY_SYMBOLS[invoice?.currency || 'USD'] || '$';
-  const activeBankAccounts = bankAccounts.filter(b => b.is_active);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -132,24 +140,22 @@ export function RecordPaymentDialog({
             </div>
           </div>
 
-          {/* Bank Account Selection */}
-          {(paymentMethod === 'bank_transfer' || paymentMethod === 'card') && (
-            <div className="space-y-2">
-              <Label>Deposit To Account</Label>
-              <Select value={bankAccountId} onValueChange={setBankAccountId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select bank account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {activeBankAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.account_name} ({account.bank_name}) - {account.currency}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          {/* Deposit Account Selection - Always show */}
+          <div className="space-y-2">
+            <Label>Deposit To Account</Label>
+            <Select value={depositAccountId} onValueChange={setDepositAccountId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select account" />
+              </SelectTrigger>
+              <SelectContent>
+                {depositAccounts.map((account) => (
+                  <SelectItem key={account.id} value={account.id}>
+                    {account.account_code} - {account.account_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
           {/* Amount and Currency */}
           <div className="grid grid-cols-2 gap-4">

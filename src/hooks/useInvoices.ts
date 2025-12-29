@@ -157,7 +157,7 @@ export interface RecordPaymentParams {
   invoiceId: string;
   amount: number;
   paymentMethod: string;
-  bankAccountId?: string;
+  depositAccountId?: string;
   paymentCurrency: string;
   paymentDate: string;
   reference?: string;
@@ -204,6 +204,7 @@ export function useRecordPayment() {
           currency: data.currency || 'USD',
           exchangeRate,
           paymentCurrency: params.paymentCurrency,
+          depositAccountId: params.depositAccountId,
         });
       } catch (journalError) {
         console.error('Failed to create payment journal entry:', journalError);
