@@ -383,3 +383,90 @@ export async function createInvoiceJournalEntry({
     ],
   });
 }
+
+/**
+ * Create journal entry for paying an agent (B2B payment where we owe the agent)
+ * This is for invoices with invoice_direction = 'from_agent'
+ * Accounting: Debit Agent Payables (clearing liability), Credit Cash (money going out)
+ */
+export async function createAgentPaymentJournalEntry({
+  invoiceId,
+  invoiceNumber,
+  amount,
+  currency,
+  exchangeRate = 1,
+  paymentCurrency,
+  sourceAccountId,
+}: {
+  invoiceId: string;
+  invoiceNumber: string;
+  amount: number;
+  currency: string;
+  exchangeRate?: number;
+  paymentCurrency?: string;
+  sourceAccountId?: string;
+}) {
+  const effectiveCurrency = paymentCurrency || currency;
+  const effectiveRate = paymentCurrency === 'TZS' ? 1 : exchangeRate;
+
+  // If a specific source account was selected, use it directly
+  if (sourceAccountId) {
+    return createJournalEntryWithAccountIds({
+      description: `Payment to agent for Invoice ${invoiceNumber}`,
+      referenceType: 'payment',
+      referenceId: invoiceId,
+      autoPost: true,
+      lines: [
+        {
+          account_code: ACCOUNT_CODES.AGENT_PAYABLES,
+          description: `Clear agent payable - Invoice ${invoiceNumber}`,
+          debit_amount: amount,
+          credit_amount: 0,
+          currency: effectiveCurrency,
+          exchange_rate: effectiveRate,
+        },
+        {
+          account_id: sourceAccountId,
+          description: `Payment to agent - Invoice ${invoiceNumber}`,
+          debit_amount: 0,
+          credit_amount: amount,
+          currency: effectiveCurrency,
+          exchange_rate: effectiveRate,
+        },
+      ],
+    });
+  }
+
+  // Fallback: Determine which cash account to use based on payment currency
+  let cashAccountCode = ACCOUNT_CODES.CASH_TZS;
+  if (paymentCurrency === 'USD' || (currency === 'USD' && !paymentCurrency)) {
+    cashAccountCode = ACCOUNT_CODES.CASH_USD;
+  } else if (paymentCurrency === 'GBP' || (currency === 'GBP' && !paymentCurrency)) {
+    cashAccountCode = ACCOUNT_CODES.CASH_GBP;
+  }
+
+  return createJournalEntry({
+    description: `Payment to agent for Invoice ${invoiceNumber}`,
+    referenceType: 'payment',
+    referenceId: invoiceId,
+    autoPost: true,
+    lines: [
+      {
+        account_code: ACCOUNT_CODES.AGENT_PAYABLES,
+        description: `Clear agent payable - Invoice ${invoiceNumber}`,
+        debit_amount: amount,
+        credit_amount: 0,
+        currency: effectiveCurrency,
+        exchange_rate: effectiveRate,
+      },
+      {
+        account_code: cashAccountCode,
+        description: `Payment to agent - Invoice ${invoiceNumber}`,
+        debit_amount: 0,
+        credit_amount: amount,
+        currency: effectiveCurrency,
+        exchange_rate: effectiveRate,
+      },
+    ],
+  });
+}
