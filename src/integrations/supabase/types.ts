@@ -723,6 +723,33 @@ export type Database = {
         }
         Relationships: []
       }
+      document_counters: {
+        Row: {
+          counter_key: string
+          counter_value: number
+          description: string | null
+          id: string
+          prefix: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          counter_key: string
+          counter_value?: number
+          description?: string | null
+          id?: string
+          prefix?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          counter_key?: string
+          counter_value?: number
+          description?: string | null
+          id?: string
+          prefix?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       employee_badges: {
         Row: {
           achieved_at: string
@@ -2381,9 +2408,12 @@ export type Database = {
       generate_batch_number: { Args: never; Returns: string }
       generate_customer_code: { Args: never; Returns: string }
       generate_document_number: { Args: { prefix: string }; Returns: string }
+      generate_estimate_number: { Args: never; Returns: string }
+      generate_invoice_number: { Args: never; Returns: string }
       generate_journal_number: { Args: never; Returns: string }
       generate_settlement_number: { Args: never; Returns: string }
       generate_tracking_number: { Args: never; Returns: string }
+      get_next_sequence: { Args: { p_counter_key: string }; Returns: string }
       get_or_create_batch: {
         Args: {
           _cargo_type?: string
