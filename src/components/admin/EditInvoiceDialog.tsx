@@ -80,15 +80,29 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange }: EditInvoiceDi
   // Initialize form when dialog opens AND data is loaded
   useEffect(() => {
     if (open && !hasInitialized && !isLoadingItems) {
-      const lineItems = invoiceItems && invoiceItems.length > 0
-        ? invoiceItems.map(item => ({
-            id: item.id,
-            description: item.description || '',
-            quantity: item.quantity,
-            unit_price: item.unit_price,
-            item_type: item.item_type,
-          }))
-        : [{ description: '', quantity: 1, unit_price: 0, item_type: 'other' }];
+      let lineItems;
+      
+      if (invoiceItems && invoiceItems.length > 0) {
+        // Use existing invoice items
+        lineItems = invoiceItems.map(item => ({
+          id: item.id,
+          description: item.description || '',
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          item_type: item.item_type,
+        }));
+      } else if (invoice.amount && invoice.amount > 0) {
+        // No items exist but invoice has an amount - create a default item from invoice data
+        lineItems = [{
+          description: invoice.shipment_id ? 'Shipping charges' : 'Invoice amount',
+          quantity: 1,
+          unit_price: invoice.amount,
+          item_type: 'freight' as const,
+        }];
+      } else {
+        // No items and no amount - start with empty item
+        lineItems = [{ description: '', quantity: 1, unit_price: 0, item_type: 'other' }];
+      }
 
       form.reset({
         customer_id: invoice.customer_id || '',
