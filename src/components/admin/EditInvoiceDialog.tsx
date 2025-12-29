@@ -341,7 +341,7 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange }: EditInvoiceDi
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => append({ description: '', quantity: 1, unit_price: 0, item_type: 'other' })}
+                    onClick={() => append({ description: '', quantity: 1, unit_price: 0, item_type: 'other', unit_type: 'fixed' })}
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Add Item
@@ -388,7 +388,9 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange }: EditInvoiceDi
                         name={`line_items.${index}.unit_price`}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-xs">Price</FormLabel>
+                            <FormLabel className="text-xs">
+                              {watchedItems[index]?.unit_type === 'percent' ? 'Rate (%)' : 'Price'}
+                            </FormLabel>
                             <FormControl>
                               <Input {...field} type="number" step="0.01" min="0" />
                             </FormControl>
@@ -400,7 +402,12 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange }: EditInvoiceDi
 
                     <div className="col-span-2 pt-6">
                       <p className="text-sm font-medium">
-                        {currencySymbol}{(Number(watchedItems[index]?.quantity || 0) * Number(watchedItems[index]?.unit_price || 0)).toFixed(2)}
+                        {currencySymbol}{(calculations.lineItemAmounts?.[index] ?? 0).toFixed(2)}
+                        {watchedItems[index]?.unit_type === 'percent' && (
+                          <span className="text-xs text-muted-foreground ml-1">
+                            ({watchedItems[index]?.unit_price}%)
+                          </span>
+                        )}
                       </p>
                     </div>
 
