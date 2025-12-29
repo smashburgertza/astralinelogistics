@@ -54,6 +54,15 @@ interface B2BInvoice {
   company_name: string | null;
   shipment_tracking: string | null;
   shipment_weight: number | null;
+  // Additional fields for InvoiceDetailDialog compatibility
+  amount_paid?: number;
+  notes?: string | null;
+  rate_per_kg?: number | null;
+  shipment_id?: string | null;
+  customers?: { name: string; company_name?: string; email?: string; phone?: string; address?: string } | null;
+  shipments?: { tracking_number: string; origin_region?: string; total_weight_kg?: number; customer_name?: string } | null;
+  // Agent info for display in dialog
+  agent?: { full_name: string | null; company_name: string | null; agent_code: string | null } | null;
 }
 
 interface AgentCargoShipment {
@@ -159,6 +168,17 @@ export function B2BInvoices() {
           company_name: profile?.company_name || null,
           shipment_tracking: shipment?.tracking_number || null,
           shipment_weight: shipment?.total_weight_kg || null,
+          // Add agent info for dialog display
+          agent: profile ? {
+            full_name: profile.full_name,
+            company_name: profile.company_name,
+            agent_code: profile.agent_code,
+          } : null,
+          // Add shipments for dialog display
+          shipments: shipment ? {
+            tracking_number: shipment.tracking_number,
+            total_weight_kg: shipment.total_weight_kg,
+          } : null,
         } as B2BInvoice;
       }) || [];
     },
