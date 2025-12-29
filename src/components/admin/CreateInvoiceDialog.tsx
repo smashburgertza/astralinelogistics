@@ -204,21 +204,27 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
     form.setValue('line_items', newLineItems);
   }, [watchShipmentIds, customerShipments, form]);
 
-  // Calculate totals - first pass for non-percentage items, then apply percentages
+  // Calculate totals - percentages cascade (each % applies to running total above it)
   const calculations = useMemo(() => {
-    // First, calculate subtotal from non-percentage items only
-    const nonPercentageSubtotal = watchLineItems.reduce((sum, item) => {
-      if (item.unit_type === 'percent') return sum;
-      return sum + (item.quantity * item.unit_price);
-    }, 0);
+    // Calculate with cascading percentages - each % applies to all items above it
+    let runningTotal = 0;
+    const lineItemAmounts: number[] = [];
 
-    // Then calculate percentage items based on the non-percentage subtotal
-    const percentageTotal = watchLineItems.reduce((sum, item) => {
-      if (item.unit_type !== 'percent') return sum;
-      return sum + (nonPercentageSubtotal * (item.unit_price / 100));
-    }, 0);
+    watchLineItems.forEach((item) => {
+      if (item.unit_type === 'percent') {
+        // Apply percentage to the running total (everything above)
+        const percentageAmount = runningTotal * (item.unit_price / 100);
+        lineItemAmounts.push(percentageAmount);
+        runningTotal += percentageAmount;
+      } else {
+        // Regular item - add to running total
+        const itemAmount = item.quantity * item.unit_price;
+        lineItemAmounts.push(itemAmount);
+        runningTotal += itemAmount;
+      }
+    });
 
-    const subtotal = nonPercentageSubtotal + percentageTotal;
+    const subtotal = runningTotal;
 
     let discountAmount = 0;
     if (watchDiscount) {
@@ -254,6 +260,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
       tzsDiscount,
       tzsTax,
       tzsTotal,
+      lineItemAmounts, // Individual amounts for each line item (including calculated % amounts)
     };
   }, [watchLineItems, watchDiscount, watchTaxRate, watchCurrency, exchangeRates]);
 
@@ -471,15 +478,10 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
                   const unitType = watchLineItems[index]?.unit_type || '';
                   const isPercentage = unitType === 'percent';
                   
-                  // Calculate non-percentage subtotal for percentage-based items
-                  const nonPercentageSubtotal = watchLineItems.reduce((sum, item) => {
-                    if (item.unit_type === 'percent') return sum;
-                    return sum + ((item.quantity || 0) * (item.unit_price || 0));
-                  }, 0);
-                  
-                  const lineTotal = isPercentage 
-                    ? (nonPercentageSubtotal * (unitPrice / 100))
-                    : (quantity * unitPrice);
+                  // Use the pre-calculated cascading amounts
+                  const lineTotal = calculations.lineItemAmounts[index] || (isPercentage 
+                    ? 0 
+                    : (quantity * unitPrice));
 
                   return (
                     <div key={field.id} className="grid grid-cols-12 gap-2 items-center">
