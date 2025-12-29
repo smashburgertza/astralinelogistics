@@ -122,10 +122,25 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange }: EditInvoiceDi
   const watchedCurrency = form.watch('currency');
 
   const calculations = useMemo(() => {
-    const subtotal = watchedItems.reduce((sum, item) => {
-      return sum + (Number(item.quantity) * Number(item.unit_price));
-    }, 0);
-    return { subtotal, total: subtotal };
+    // Calculate with cascading percentages - each % applies to all items above it
+    let runningTotal = 0;
+    const lineItemAmounts: number[] = [];
+
+    watchedItems.forEach((item) => {
+      if (item.unit_type === 'percent') {
+        // Apply percentage to the running total (everything above)
+        const percentageAmount = runningTotal * (Number(item.unit_price) / 100);
+        lineItemAmounts.push(percentageAmount);
+        runningTotal += percentageAmount;
+      } else {
+        // Regular item - add to running total
+        const itemAmount = Number(item.quantity) * Number(item.unit_price);
+        lineItemAmounts.push(itemAmount);
+        runningTotal += itemAmount;
+      }
+    });
+
+    return { subtotal: runningTotal, total: runningTotal, lineItemAmounts };
   }, [watchedItems]);
 
   const currencySymbol = CURRENCY_SYMBOLS[watchedCurrency] || watchedCurrency;
