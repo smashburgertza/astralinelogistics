@@ -30,6 +30,7 @@ export interface Agent {
     contact_person_name: string | null;
     contact_person_email: string | null;
     contact_person_phone: string | null;
+    agent_code: string | null;
   } | null;
 }
 
@@ -155,6 +156,12 @@ export function useCreateAgent() {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
 
+      // Generate agent code
+      const { data: agentCodeResult } = await supabase
+        .rpc('generate_agent_code');
+      
+      const agentCode = agentCodeResult || `AG${Date.now()}`;
+
       // Update the profile with company and contact info
       const { error: profileError } = await supabase
         .from('profiles')
@@ -166,6 +173,7 @@ export function useCreateAgent() {
           contact_person_name: contactPersonName,
           contact_person_email: contactPersonEmail,
           contact_person_phone: contactPersonPhone,
+          agent_code: agentCode,
         })
         .eq('id', userId);
 

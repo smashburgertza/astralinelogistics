@@ -109,8 +109,9 @@ export function AgentTable({ agents, isLoading }: AgentTableProps) {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
+              <TableHead>ID</TableHead>
               <TableHead>Agent</TableHead>
-              <TableHead>Email</TableHead>
+              <TableHead>Company</TableHead>
               <TableHead>Regions</TableHead>
               <TableHead>Created</TableHead>
               <TableHead className="w-[50px]"></TableHead>
@@ -119,8 +120,9 @@ export function AgentTable({ agents, isLoading }: AgentTableProps) {
           <TableBody>
             {[...Array(5)].map((_, i) => (
               <TableRow key={i}>
+                <TableCell><Skeleton className="h-4 w-16" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+                <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                 <TableCell><Skeleton className="h-6 w-24" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                 <TableCell><Skeleton className="h-8 w-8" /></TableCell>
@@ -150,8 +152,9 @@ export function AgentTable({ agents, isLoading }: AgentTableProps) {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50 hover:bg-muted/50">
-              <TableHead className="font-semibold">Agent</TableHead>
-              <TableHead className="font-semibold">Email</TableHead>
+              <TableHead className="font-semibold">ID</TableHead>
+              <TableHead className="font-semibold">Contact Person</TableHead>
+              <TableHead className="font-semibold">Company</TableHead>
               <TableHead className="font-semibold">Regions</TableHead>
               <TableHead className="font-semibold">Created</TableHead>
               <TableHead className="w-[120px]"></TableHead>
@@ -165,26 +168,38 @@ export function AgentTable({ agents, isLoading }: AgentTableProps) {
               return (
                 <TableRow key={agent.id}>
                   <TableCell>
+                    <Badge variant="outline" className="font-mono text-xs">
+                      {agent.profile?.agent_code || '-'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
                         <span className="text-sm font-semibold text-primary">
-                          {agent.profile?.full_name?.charAt(0).toUpperCase() || 'A'}
+                          {agent.profile?.contact_person_name?.charAt(0).toUpperCase() || agent.profile?.full_name?.charAt(0).toUpperCase() || 'A'}
                         </span>
                       </div>
                       <div>
                         <div className="font-medium">
-                          {agent.profile?.full_name || 'Unknown'}
+                          {agent.profile?.contact_person_name || agent.profile?.full_name || 'Unknown'}
                         </div>
-                        {agent.profile?.phone && (
-                          <div className="text-xs text-muted-foreground">
-                            {agent.profile.phone}
-                          </div>
-                        )}
+                        <div className="text-xs text-muted-foreground">
+                          {agent.profile?.contact_person_email || agent.profile?.email || 'No email'}
+                        </div>
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {agent.profile?.email || 'No email'}
+                  <TableCell>
+                    <div>
+                      <div className="font-medium">
+                        {agent.profile?.company_name || '-'}
+                      </div>
+                      {agent.profile?.contact_person_phone && (
+                        <div className="text-xs text-muted-foreground">
+                          {agent.profile.contact_person_phone}
+                        </div>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">

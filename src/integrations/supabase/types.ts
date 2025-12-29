@@ -1554,6 +1554,7 @@ export type Database = {
       profiles: {
         Row: {
           address: string | null
+          agent_code: string | null
           company_address: string | null
           company_name: string | null
           contact_person_email: string | null
@@ -1568,6 +1569,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          agent_code?: string | null
           company_address?: string | null
           company_name?: string | null
           contact_person_email?: string | null
@@ -1582,6 +1584,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          agent_code?: string | null
           company_address?: string | null
           company_name?: string | null
           contact_person_email?: string | null
@@ -2417,6 +2420,7 @@ export type Database = {
     }
     Functions: {
       allocate_batch_costs: { Args: { p_batch_id: string }; Returns: undefined }
+      generate_agent_code: { Args: never; Returns: string }
       generate_batch_number: { Args: never; Returns: string }
       generate_customer_code: { Args: never; Returns: string }
       generate_document_number: { Args: { prefix: string }; Returns: string }
