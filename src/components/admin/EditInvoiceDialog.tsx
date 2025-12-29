@@ -26,6 +26,7 @@ const lineItemSchema = z.object({
   quantity: z.coerce.number().min(0, 'Quantity must be 0 or more'),
   unit_price: z.coerce.number().min(0, 'Price must be 0 or more'),
   item_type: z.string().default('other'),
+  unit_type: z.string().optional(), // 'fixed', 'percent', 'kg'
 });
 
 const invoiceSchema = z.object({
