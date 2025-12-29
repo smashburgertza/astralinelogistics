@@ -1562,6 +1562,7 @@ export type Database = {
           contact_person_phone: string | null
           created_at: string | null
           email: string
+          employee_code: string | null
           full_name: string | null
           id: string
           phone: string | null
@@ -1577,6 +1578,7 @@ export type Database = {
           contact_person_phone?: string | null
           created_at?: string | null
           email: string
+          employee_code?: string | null
           full_name?: string | null
           id: string
           phone?: string | null
@@ -1592,6 +1594,7 @@ export type Database = {
           contact_person_phone?: string | null
           created_at?: string | null
           email?: string
+          employee_code?: string | null
           full_name?: string | null
           id?: string
           phone?: string | null
@@ -2424,6 +2427,7 @@ export type Database = {
       generate_batch_number: { Args: never; Returns: string }
       generate_customer_code: { Args: never; Returns: string }
       generate_document_number: { Args: { prefix: string }; Returns: string }
+      generate_employee_code: { Args: never; Returns: string }
       generate_estimate_number: { Args: never; Returns: string }
       generate_invoice_number: { Args: never; Returns: string }
       generate_journal_number: { Args: never; Returns: string }
