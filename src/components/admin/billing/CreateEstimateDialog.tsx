@@ -11,11 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Separator } from '@/components/ui/separator';
 import { Plus, Trash2, FileText } from 'lucide-react';
-import { useCreateInvoice } from '@/hooks/useInvoices';
+import { useCreateEstimate } from '@/hooks/useEstimates';
 import { useCustomers, useShipments } from '@/hooks/useShipments';
-import { useExchangeRates, convertToTZS } from '@/hooks/useExchangeRates';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
-import { supabase } from '@/integrations/supabase/client';
 
 const lineItemSchema = z.object({
   description: z.string().min(1, 'Description is required'),
@@ -23,45 +21,44 @@ const lineItemSchema = z.object({
   unit_price: z.coerce.number().min(0, 'Price must be 0 or more'),
 });
 
-const invoiceSchema = z.object({
+const estimateSchema = z.object({
   customer_id: z.string().min(1, 'Customer is required'),
   shipment_id: z.string().optional(),
+  origin_region: z.string().min(1, 'Region is required'),
   currency: z.string().default('USD'),
-  payment_terms: z.string().default('net_30'),
+  valid_days: z.coerce.number().min(1).default(30),
   discount: z.string().optional(),
   tax_rate: z.coerce.number().min(0).max(100).default(0),
   notes: z.string().optional(),
   line_items: z.array(lineItemSchema).min(1, 'At least one line item is required'),
 });
 
-type InvoiceFormData = z.infer<typeof invoiceSchema>;
+type EstimateFormData = z.infer<typeof estimateSchema>;
 
-const PAYMENT_TERMS = [
-  { value: 'due_receipt', label: 'Due on Receipt' },
-  { value: 'net_7', label: 'Net 7 Days' },
-  { value: 'net_15', label: 'Net 15 Days' },
-  { value: 'net_30', label: 'Net 30 Days' },
-  { value: 'net_60', label: 'Net 60 Days' },
-];
-
-interface CreateInvoiceDialogProps {
+interface CreateEstimateDialogProps {
   trigger?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  regions?: Array<{ code: string; name: string; flag_emoji?: string | null }>;
 }
 
-export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
-  const [open, setOpen] = useState(false);
-  const createInvoice = useCreateInvoice();
+export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChange, regions = [] }: CreateEstimateDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = onOpenChange ?? setInternalOpen;
+
+  const createEstimate = useCreateEstimate();
   const { data: customers } = useCustomers();
   const { data: shipments } = useShipments();
-  const { data: exchangeRates } = useExchangeRates();
 
-  const form = useForm<InvoiceFormData>({
-    resolver: zodResolver(invoiceSchema),
+  const form = useForm<EstimateFormData>({
+    resolver: zodResolver(estimateSchema),
     defaultValues: {
       customer_id: '',
       shipment_id: '',
+      origin_region: '',
       currency: 'USD',
-      payment_terms: 'net_30',
+      valid_days: 30,
       discount: '',
       tax_rate: 0,
       notes: '',
@@ -114,35 +111,25 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
 
   const currencySymbol = CURRENCY_SYMBOLS[watchCurrency] || '$';
 
-  const getDueDays = (terms: string) => {
-    switch (terms) {
-      case 'due_receipt': return 0;
-      case 'net_7': return 7;
-      case 'net_15': return 15;
-      case 'net_30': return 30;
-      case 'net_60': return 60;
-      default: return 30;
-    }
-  };
+  const onSubmit = async (data: EstimateFormData) => {
+    // For estimates, we'll store line items info in the existing fields
+    // Using the first line item as the primary description
+    const totalWeight = data.line_items.reduce((sum, item) => sum + item.quantity, 0);
+    const avgRate = calculations.subtotal / totalWeight || 0;
 
-  const onSubmit = async (data: InvoiceFormData) => {
-    const { data: invoiceNumber } = await supabase.rpc('generate_document_number', { prefix: 'INV' });
-
-    const tzs = exchangeRates ? convertToTZS(calculations.total, data.currency, exchangeRates) : null;
-
-    const dueDate = new Date();
-    dueDate.setDate(dueDate.getDate() + getDueDays(data.payment_terms));
-
-    await createInvoice.mutateAsync({
-      invoice_number: invoiceNumber || `INV-${Date.now()}`,
+    await createEstimate.mutateAsync({
       customer_id: data.customer_id,
-      shipment_id: data.shipment_id || null,
-      amount: calculations.total,
+      shipment_id: data.shipment_id || undefined,
+      origin_region: data.origin_region,
+      weight_kg: totalWeight,
+      rate_per_kg: avgRate,
+      handling_fee: 0,
       currency: data.currency,
-      amount_in_tzs: tzs,
-      due_date: dueDate.toISOString().split('T')[0],
-      notes: data.notes || null,
-      status: 'pending',
+      notes: data.notes || `Line Items: ${data.line_items.map(i => `${i.description} (${i.quantity} x ${currencySymbol}${i.unit_price})`).join(', ')}`,
+      valid_days: data.valid_days,
+      estimate_type: 'shipping',
+      product_cost: 0,
+      purchase_fee: 0,
     });
 
     form.reset();
@@ -155,18 +142,15 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger || (
-          <Button className="gap-2">
-            <Plus className="h-4 w-4" />
-            Create Invoice
-          </Button>
-        )}
-      </DialogTrigger>
+      {trigger && (
+        <DialogTrigger asChild>
+          {trigger}
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-primary">
-            Generate Invoice
+            Generate Estimate
           </DialogTitle>
         </DialogHeader>
 
@@ -202,7 +186,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
                   />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground mb-2">Invoice Date</p>
+                  <p className="text-xs text-muted-foreground mb-2">Estimate Date</p>
                   <p className="font-medium">{format(new Date(), 'MMMM dd, yyyy')}</p>
                 </div>
                 <div>
@@ -213,8 +197,32 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
                 </div>
               </div>
 
-              {/* Optional Shipment Link */}
-              <div className="mt-4">
+              {/* Region & Shipment */}
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                <FormField
+                  control={form.control}
+                  name="origin_region"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs text-muted-foreground">Origin Region</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select region" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {regions.map((region) => (
+                            <SelectItem key={region.code} value={region.code}>
+                              {region.flag_emoji} {region.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <FormField
                   control={form.control}
                   name="shipment_id"
@@ -245,7 +253,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
 
             {/* Line Items Section */}
             <div className="space-y-4">
-              <h3 className="font-semibold text-lg">Invoice Line Items</h3>
+              <h3 className="font-semibold text-lg">Estimate Line Items</h3>
               
               {/* Line Items Header */}
               <div className="grid grid-cols-12 gap-2 text-xs text-muted-foreground px-2">
@@ -352,9 +360,9 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
               </button>
             </div>
 
-            {/* Discount, Payment Terms & Summary */}
+            {/* Discount, Validity & Summary */}
             <div className="grid grid-cols-2 gap-6">
-              {/* Left Column - Discount & Payment Terms */}
+              {/* Left Column */}
               <div className="space-y-4">
                 <FormField
                   control={form.control}
@@ -376,24 +384,13 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
 
                 <FormField
                   control={form.control}
-                  name="payment_terms"
+                  name="valid_days"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Payment Terms</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {PAYMENT_TERMS.map((term) => (
-                            <SelectItem key={term.value} value={term.value}>
-                              {term.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormLabel>Valid For (days)</FormLabel>
+                      <FormControl>
+                        <Input type="number" min="1" {...field} />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -466,7 +463,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
                 )}
                 <Separator />
                 <div className="flex justify-between text-lg font-bold">
-                  <span>Total Amount Due</span>
+                  <span>Total Amount</span>
                   <span className="text-primary">{currencySymbol}{calculations.total.toFixed(2)}</span>
                 </div>
               </div>
@@ -499,10 +496,10 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
               </Button>
               <Button 
                 type="submit" 
-                disabled={createInvoice.isPending || calculations.total <= 0}
+                disabled={createEstimate.isPending || calculations.total <= 0}
                 className="px-6 bg-amber-500 hover:bg-amber-600 text-white"
               >
-                {createInvoice.isPending ? 'Creating...' : 'Finalize & Send Invoice'}
+                {createEstimate.isPending ? 'Creating...' : 'Finalize & Send Estimate'}
               </Button>
             </div>
           </form>
