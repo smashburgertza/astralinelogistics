@@ -8,10 +8,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { EXPENSE_CATEGORIES } from '@/hooks/useExpenses';
+import { useExchangeRates } from '@/hooks/useExchangeRates';
 import {
   AreaChart, Area, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ComposedChart
 } from 'recharts';
+
+// Platform base currency
+const PLATFORM_BASE_CURRENCY = 'TZS';
 
 const CHART_COLORS = {
   primary: 'hsl(var(--primary))',
@@ -68,7 +72,7 @@ export default function ReportsPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('expenses')
-        .select('id, amount, category, created_at, status')
+        .select('id, amount, category, created_at, status, currency')
         .eq('status', 'approved')
         .order('created_at', { ascending: true });
       if (error) throw error;
@@ -76,9 +80,34 @@ export default function ReportsPage() {
     },
   });
 
+  // Fetch exchange rates
+  const { data: exchangeRates } = useExchangeRates();
+  
+  // Build rate map for currency conversion to TZS
+  const rateMap = useMemo(() => {
+    const map = new Map<string, number>();
+    map.set('TZS', 1);
+    exchangeRates?.forEach(r => map.set(r.currency_code, r.rate_to_tzs));
+    return map;
+  }, [exchangeRates]);
+  
+  // Helper to convert amount to base currency (TZS)
+  const convertToBaseCurrency = (amount: number, currency: string): number => {
+    const rate = rateMap.get(currency) || 1;
+    return amount * rate;
+  };
+  
+  // Format TZS with thousands separator
+  const formatTZS = (amount: number): string => {
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
   const isLoading = shipmentsLoading || invoicesLoading || customersLoading || expensesLoading;
 
-  // Calculate monthly data for charts including P&L
+  // Calculate monthly data for charts including P&L (all amounts in TZS)
   const monthlyData = useMemo(() => {
     if (!shipments || !invoices || !customers || !expenses) return [];
 
@@ -113,15 +142,17 @@ export default function ReportsPage() {
         return date >= monthStart && date <= monthEnd;
       });
 
+      // Convert all amounts to TZS
       const revenue = monthInvoices
         .filter((i) => i.status === 'paid')
-        .reduce((sum, i) => sum + (i.amount || 0), 0);
+        .reduce((sum, i) => sum + convertToBaseCurrency(i.amount || 0, i.currency || 'USD'), 0);
 
       const pending = monthInvoices
         .filter((i) => i.status === 'pending')
-        .reduce((sum, i) => sum + (i.amount || 0), 0);
+        .reduce((sum, i) => sum + convertToBaseCurrency(i.amount || 0, i.currency || 'USD'), 0);
 
-      const totalExpenses = monthExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+      const totalExpenses = monthExpenses.reduce((sum, e) => 
+        sum + convertToBaseCurrency(e.amount || 0, e.currency || 'USD'), 0);
       const netProfit = revenue - totalExpenses;
 
       return {
@@ -137,15 +168,16 @@ export default function ReportsPage() {
         delivered: monthShipments.filter((s) => s.status === 'delivered').length,
       };
     });
-  }, [shipments, invoices, customers, expenses]);
+  }, [shipments, invoices, customers, expenses, rateMap]);
 
-  // Expenses by category for P&L breakdown
+  // Expenses by category for P&L breakdown (in TZS)
   const expensesByCategory = useMemo(() => {
     if (!expenses) return [];
     const categoryCounts: Record<string, number> = {};
     expenses.forEach((e) => {
       const category = e.category || 'other';
-      categoryCounts[category] = (categoryCounts[category] || 0) + (e.amount || 0);
+      const amountInTZS = convertToBaseCurrency(e.amount || 0, e.currency || 'USD');
+      categoryCounts[category] = (categoryCounts[category] || 0) + amountInTZS;
     });
     return Object.entries(categoryCounts)
       .map(([key, value]) => ({
@@ -153,7 +185,7 @@ export default function ReportsPage() {
         value,
       }))
       .sort((a, b) => b.value - a.value);
-  }, [expenses]);
+  }, [expenses, rateMap]);
 
   // Status distribution for pie chart
   const statusDistribution = useMemo(() => {
@@ -183,11 +215,13 @@ export default function ReportsPage() {
     }));
   }, [shipments]);
 
-  // Summary stats including P&L
+  // Summary stats including P&L (all amounts in TZS)
   const stats = useMemo(() => {
     const totalShipments = shipments?.length || 0;
-    const totalRevenue = invoices?.filter((i) => i.status === 'paid').reduce((sum, i) => sum + (i.amount || 0), 0) || 0;
-    const totalExpenses = expenses?.reduce((sum, e) => sum + (e.amount || 0), 0) || 0;
+    const totalRevenue = invoices?.filter((i) => i.status === 'paid')
+      .reduce((sum, i) => sum + convertToBaseCurrency(i.amount || 0, i.currency || 'USD'), 0) || 0;
+    const totalExpenses = expenses?.reduce((sum, e) => 
+      sum + convertToBaseCurrency(e.amount || 0, e.currency || 'USD'), 0) || 0;
     const totalCustomers = customers?.length || 0;
     const totalWeight = shipments?.reduce((sum, s) => sum + (s.total_weight_kg || 0), 0) || 0;
     const netProfit = totalRevenue - totalExpenses;
@@ -223,7 +257,7 @@ export default function ReportsPage() {
       customerGrowth,
       profitGrowth,
     };
-  }, [shipments, invoices, customers, expenses, monthlyData]);
+  }, [shipments, invoices, customers, expenses, monthlyData, rateMap]);
 
   if (isLoading) {
     return (
@@ -272,7 +306,7 @@ export default function ReportsPage() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${stats.totalRevenue.toLocaleString()}</div>
+              <div className="text-2xl font-bold">TZS {formatTZS(stats.totalRevenue)}</div>
               <div className="flex items-center text-xs">
                 {stats.revenueGrowth >= 0 ? (
                   <ArrowUpRight className="h-3 w-3 text-green-500 mr-1" />
@@ -340,7 +374,7 @@ export default function ReportsPage() {
                   <TrendingUp className="h-4 w-4 text-emerald-600" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">${stats.totalRevenue.toLocaleString()}</div>
+                  <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">TZS {formatTZS(stats.totalRevenue)}</div>
                   <p className="text-xs text-emerald-600 dark:text-emerald-400">From paid invoices</p>
                 </CardContent>
               </Card>
@@ -351,7 +385,7 @@ export default function ReportsPage() {
                   <Wallet className="h-4 w-4 text-red-600" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-red-700 dark:text-red-300">${stats.totalExpenses.toLocaleString()}</div>
+                  <div className="text-2xl font-bold text-red-700 dark:text-red-300">TZS {formatTZS(stats.totalExpenses)}</div>
                   <p className="text-xs text-red-600 dark:text-red-400">Approved expenses only</p>
                 </CardContent>
               </Card>
@@ -365,7 +399,7 @@ export default function ReportsPage() {
                 </CardHeader>
                 <CardContent>
                   <div className={`text-2xl font-bold ${stats.netProfit >= 0 ? 'text-blue-700 dark:text-blue-300' : 'text-orange-700 dark:text-orange-300'}`}>
-                    ${Math.abs(stats.netProfit).toLocaleString()}
+                    TZS {formatTZS(Math.abs(stats.netProfit))}
                   </div>
                   <div className="flex items-center text-xs">
                     {stats.profitGrowth >= 0 ? (
@@ -406,14 +440,14 @@ export default function ReportsPage() {
                       <ComposedChart data={monthlyData}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                         <XAxis dataKey="month" className="text-xs" />
-                        <YAxis className="text-xs" tickFormatter={(value) => `$${value}`} />
+                        <YAxis className="text-xs" tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`} />
                         <Tooltip
                           contentStyle={{
                             backgroundColor: 'hsl(var(--background))',
                             border: '1px solid hsl(var(--border))',
                             borderRadius: '8px',
                           }}
-                          formatter={(value: number) => [`$${value.toLocaleString()}`, '']}
+                          formatter={(value: number) => [`TZS ${formatTZS(value)}`, '']}
                         />
                         <Legend />
                         <Bar dataKey="revenue" name="Revenue" fill="#10B981" radius={[4, 4, 0, 0]} />
@@ -463,7 +497,7 @@ export default function ReportsPage() {
                               border: '1px solid hsl(var(--border))',
                               borderRadius: '8px',
                             }}
-                            formatter={(value: number) => [`$${value.toLocaleString()}`, '']}
+                            formatter={(value: number) => [`TZS ${formatTZS(value)}`, '']}
                           />
                         </PieChart>
                       </ResponsiveContainer>
@@ -493,7 +527,7 @@ export default function ReportsPage() {
                           <span className="text-sm font-medium">{category.name}</span>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-semibold">${category.value.toLocaleString()}</p>
+                          <p className="text-sm font-semibold">TZS {formatTZS(category.value)}</p>
                           <p className="text-xs text-muted-foreground">
                             {stats.totalExpenses > 0 ? ((category.value / stats.totalExpenses) * 100).toFixed(1) : 0}%
                           </p>
@@ -588,14 +622,14 @@ export default function ReportsPage() {
                       <BarChart data={monthlyData}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                         <XAxis dataKey="month" className="text-xs" />
-                        <YAxis className="text-xs" tickFormatter={(value) => `$${value}`} />
+                        <YAxis className="text-xs" tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`} />
                         <Tooltip
                           contentStyle={{
                             backgroundColor: 'hsl(var(--background))',
                             border: '1px solid hsl(var(--border))',
                             borderRadius: '8px',
                           }}
-                          formatter={(value: number) => [`$${value.toLocaleString()}`, '']}
+                          formatter={(value: number) => [`TZS ${formatTZS(value)}`, '']}
                         />
                         <Legend />
                         <Bar dataKey="revenue" name="Paid" fill={CHART_COLORS.primary} radius={[4, 4, 0, 0]} />
