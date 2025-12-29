@@ -7,15 +7,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Separator } from '@/components/ui/separator';
 import { Plus, Trash2, FileText } from 'lucide-react';
 import { useCreateEstimate } from '@/hooks/useEstimates';
 import { useCustomers, useShipments } from '@/hooks/useShipments';
+import { useChartOfAccounts } from '@/hooks/useAccounting';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 
 const lineItemSchema = z.object({
+  account_id: z.string().optional(),
   description: z.string().min(1, 'Description is required'),
   quantity: z.coerce.number().min(1, 'Quantity must be at least 1'),
   unit_price: z.coerce.number().min(0, 'Price must be 0 or more'),
@@ -50,6 +52,16 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
   const createEstimate = useCreateEstimate();
   const { data: customers } = useCustomers();
   const { data: shipments } = useShipments();
+  const { data: accounts } = useChartOfAccounts({ active: true });
+
+  // Group accounts by type for the dropdown
+  const groupedAccounts = useMemo(() => {
+    if (!accounts) return { revenue: [], expense: [] };
+    return {
+      revenue: accounts.filter(a => a.account_type === 'revenue'),
+      expense: accounts.filter(a => a.account_type === 'expense'),
+    };
+  }, [accounts]);
 
   const form = useForm<EstimateFormData>({
     resolver: zodResolver(estimateSchema),
@@ -63,7 +75,7 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
       tax_rate: 0,
       notes: '',
       line_items: [
-        { description: '', quantity: 1, unit_price: 0 },
+        { account_id: '', description: '', quantity: 1, unit_price: 0 },
       ],
     },
   });
@@ -137,7 +149,7 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
   };
 
   const handleAddLineItem = () => {
-    append({ description: '', quantity: 1, unit_price: 0 });
+    append({ account_id: '', description: '', quantity: 1, unit_price: 0 });
   };
 
   return (
@@ -229,14 +241,17 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-xs text-muted-foreground">Link to Shipment (optional)</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select 
+                        onValueChange={(val) => field.onChange(val === "none" ? "" : val)} 
+                        value={field.value || "none"}
+                      >
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select shipment" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">No shipment</SelectItem>
+                          <SelectItem value="none">No shipment</SelectItem>
                           {shipments?.map((shipment) => (
                             <SelectItem key={shipment.id} value={shipment.id}>
                               {shipment.tracking_number} ({shipment.total_weight_kg} kg)
@@ -257,8 +272,9 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
               
               {/* Line Items Header */}
               <div className="grid grid-cols-12 gap-2 text-xs text-muted-foreground px-2">
-                <div className="col-span-5">Item Description</div>
-                <div className="col-span-2 text-center">Quantity</div>
+                <div className="col-span-3">Service</div>
+                <div className="col-span-3">Item Description</div>
+                <div className="col-span-1 text-center">Qty</div>
                 <div className="col-span-2 text-right">Unit Price</div>
                 <div className="col-span-2 text-right">Total</div>
                 <div className="col-span-1"></div>
@@ -273,7 +289,51 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
 
                   return (
                     <div key={field.id} className="grid grid-cols-12 gap-2 items-center">
-                      <div className="col-span-5">
+                      <div className="col-span-3">
+                        <FormField
+                          control={form.control}
+                          name={`line_items.${index}.account_id`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <Select 
+                                onValueChange={(val) => field.onChange(val === "none" ? "" : val)} 
+                                value={field.value || "none"}
+                              >
+                                <FormControl>
+                                  <SelectTrigger className="text-xs">
+                                    <SelectValue placeholder="Select service" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="none">No account</SelectItem>
+                                  {groupedAccounts.revenue.length > 0 && (
+                                    <SelectGroup>
+                                      <SelectLabel className="text-xs font-semibold text-primary">Revenue</SelectLabel>
+                                      {groupedAccounts.revenue.map((account) => (
+                                        <SelectItem key={account.id} value={account.id} className="text-xs">
+                                          {account.account_code} - {account.account_name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectGroup>
+                                  )}
+                                  {groupedAccounts.expense.length > 0 && (
+                                    <SelectGroup>
+                                      <SelectLabel className="text-xs font-semibold text-destructive">Costs/Expenses</SelectLabel>
+                                      {groupedAccounts.expense.map((account) => (
+                                        <SelectItem key={account.id} value={account.id} className="text-xs">
+                                          {account.account_code} - {account.account_name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectGroup>
+                                  )}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <div className="col-span-3">
                         <FormField
                           control={form.control}
                           name={`line_items.${index}.description`}
@@ -281,9 +341,9 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
                             <FormItem>
                               <FormControl>
                                 <Input 
-                                  placeholder="e.g., Standard Parcel Delivery" 
+                                  placeholder="Description" 
                                   {...field} 
-                                  className="border-2 border-dashed"
+                                  className="border-2 border-dashed text-xs"
                                 />
                               </FormControl>
                               <FormMessage />
@@ -291,7 +351,7 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
                           )}
                         />
                       </div>
-                      <div className="col-span-2">
+                      <div className="col-span-1">
                         <FormField
                           control={form.control}
                           name={`line_items.${index}.quantity`}
@@ -301,7 +361,7 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
                                 <Input 
                                   type="number" 
                                   min="1"
-                                  className="text-center"
+                                  className="text-center text-xs"
                                   {...field} 
                                 />
                               </FormControl>
@@ -321,7 +381,7 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
                                   type="number" 
                                   step="0.01"
                                   min="0"
-                                  className="text-right"
+                                  className="text-right text-xs"
                                   {...field} 
                                 />
                               </FormControl>
@@ -330,7 +390,7 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
                           )}
                         />
                       </div>
-                      <div className="col-span-2 text-right font-medium">
+                      <div className="col-span-2 text-right font-medium text-sm">
                         {currencySymbol}{lineTotal.toFixed(2)}
                       </div>
                       <div className="col-span-1 text-center">
