@@ -184,8 +184,8 @@ export function B2BInvoices() {
     },
   });
 
-  // Query for agent cargo shipments that need invoicing
-  // Only show shipments where shipment_owner is NOT 'agent' (agent's own cargo shouldn't be invoiced)
+  // Query for agent cargo shipments that need invoicing (Astraline bills agent for clearing)
+  // Only show shipments where shipment_owner IS 'agent' (agent's own cargo that needs clearing charges)
   const { data: agentCargoShipments, isLoading: isLoadingCargo } = useQuery({
     queryKey: ["agent-cargo-shipments"],
     queryFn: async () => {
@@ -202,7 +202,7 @@ export function B2BInvoices() {
           shipment_owner
         `)
         .gt("agent_cargo_weight_kg", 0)
-        .neq("shipment_owner", "agent") // Exclude agent-owned cargo - no B2B invoicing needed
+        .eq("shipment_owner", "agent") // Only agent-owned cargo - needs clearing invoice TO agent
         .order("created_at", { ascending: false });
 
       if (error) throw error;
