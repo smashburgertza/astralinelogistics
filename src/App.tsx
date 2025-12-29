@@ -39,7 +39,7 @@ const AgentSettingsPage = lazy(() => import("./pages/agent/Settings"));
 // Admin Portal - lazy loaded
 const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
 const AdminShipmentsPage = lazy(() => import("./pages/admin/Shipments"));
-const AdminInvoicesPage = lazy(() => import("./pages/admin/Invoices"));
+const AdminBillingPage = lazy(() => import("./pages/admin/Billing"));
 const AdminCustomersPage = lazy(() => import("./pages/admin/Customers"));
 const AdminExpensesPage = lazy(() => import("./pages/admin/Expenses"));
 const AdminOrderRequestsPage = lazy(() => import("./pages/admin/OrderRequests"));
@@ -49,7 +49,6 @@ const AdminEmployeesPage = lazy(() => import("./pages/admin/Employees"));
 const AdminSettingsPage = lazy(() => import("./pages/admin/Settings"));
 const AdminReportsPage = lazy(() => import("./pages/admin/Reports"));
 const AdminCommissionsPage = lazy(() => import("./pages/admin/Commissions"));
-const AdminEstimatesPage = lazy(() => import("./pages/admin/Estimates"));
 const AdminEmployeeDashboard = lazy(() => import("./pages/admin/EmployeeDashboard"));
 const AdminAccountingPage = lazy(() => import("./pages/admin/Accounting"));
 const AdminAnalyticsPage = lazy(() => import("./pages/admin/Analytics"));
@@ -118,7 +117,7 @@ const App = () => (
             {/* Admin Portal - Lazy Loaded */}
             <Route path="/admin" element={<Suspense fallback={<PageLoader />}><AdminDashboard /></Suspense>} />
             <Route path="/admin/shipments" element={<Suspense fallback={<PageLoader />}><AdminShipmentsPage /></Suspense>} />
-            <Route path="/admin/invoices" element={<Suspense fallback={<PageLoader />}><AdminInvoicesPage /></Suspense>} />
+            <Route path="/admin/billing" element={<Suspense fallback={<PageLoader />}><AdminBillingPage /></Suspense>} />
             <Route path="/admin/customers" element={<Suspense fallback={<PageLoader />}><AdminCustomersPage /></Suspense>} />
             <Route path="/admin/expenses" element={<Suspense fallback={<PageLoader />}><AdminExpensesPage /></Suspense>} />
             <Route path="/admin/orders" element={<Suspense fallback={<PageLoader />}><AdminOrderRequestsPage /></Suspense>} />
@@ -128,7 +127,7 @@ const App = () => (
             <Route path="/admin/settings" element={<Suspense fallback={<PageLoader />}><AdminSettingsPage /></Suspense>} />
             <Route path="/admin/reports" element={<Suspense fallback={<PageLoader />}><AdminReportsPage /></Suspense>} />
             <Route path="/admin/commissions" element={<Suspense fallback={<PageLoader />}><AdminCommissionsPage /></Suspense>} />
-            <Route path="/admin/estimates" element={<Suspense fallback={<PageLoader />}><AdminEstimatesPage /></Suspense>} />
+            <Route path="/admin/my-dashboard" element={<Suspense fallback={<PageLoader />}><AdminEmployeeDashboard /></Suspense>} />
             <Route path="/admin/my-dashboard" element={<Suspense fallback={<PageLoader />}><AdminEmployeeDashboard /></Suspense>} />
             <Route path="/admin/accounting" element={<Suspense fallback={<PageLoader />}><AdminAccountingPage /></Suspense>} />
             <Route path="/admin/analytics" element={<Suspense fallback={<PageLoader />}><AdminAnalyticsPage /></Suspense>} />
