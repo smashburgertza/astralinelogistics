@@ -152,6 +152,7 @@ export type Database = {
       }
       agent_settings: {
         Row: {
+          base_currency: string
           can_have_consolidated_cargo: boolean
           created_at: string | null
           id: string
@@ -159,6 +160,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          base_currency?: string
           can_have_consolidated_cargo?: boolean
           created_at?: string | null
           id?: string
@@ -166,6 +168,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          base_currency?: string
           can_have_consolidated_cargo?: boolean
           created_at?: string | null
           id?: string

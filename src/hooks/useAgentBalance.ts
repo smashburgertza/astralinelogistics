@@ -10,6 +10,7 @@ export interface AgentBalanceSummary {
   paid_from_agent: number;
   pending_from_agent: number;
   net_balance: number;
+  base_currency: string;
 }
 
 export function useAgentBalance() {
@@ -20,15 +21,37 @@ export function useAgentBalance() {
     queryFn: async () => {
       if (!user?.id) return null;
 
-      // Query invoices for this agent
-      const { data: invoices, error } = await supabase
-        .from('invoices')
-        .select('amount, status, invoice_direction')
-        .eq('agent_id', user.id);
+      // Fetch invoices and agent settings in parallel
+      const [invoicesResult, settingsResult, ratesResult] = await Promise.all([
+        supabase
+          .from('invoices')
+          .select('amount, currency, status, invoice_direction')
+          .eq('agent_id', user.id),
+        supabase
+          .from('agent_settings')
+          .select('base_currency')
+          .eq('user_id', user.id)
+          .maybeSingle(),
+        supabase
+          .from('currency_exchange_rates')
+          .select('currency_code, rate_to_tzs'),
+      ]);
 
-      if (error) throw error;
+      if (invoicesResult.error) throw invoicesResult.error;
+      
+      const invoices = invoicesResult.data || [];
+      const baseCurrency = (settingsResult.data as any)?.base_currency || 'USD';
+      const exchangeRates = ratesResult.data || [];
+      
+      // Build rate map (currency -> rate to TZS)
+      const rateMap = new Map<string, number>();
+      rateMap.set('TZS', 1);
+      exchangeRates.forEach(r => rateMap.set(r.currency_code, r.rate_to_tzs));
+      
+      // Get base currency rate
+      const baseCurrencyRate = rateMap.get(baseCurrency) || 1;
 
-      // Calculate balance summary manually since view might have RLS issues
+      // Calculate balance summary with currency conversion
       const summary: AgentBalanceSummary = {
         agent_id: user.id,
         agent_name: '',
@@ -37,21 +60,28 @@ export function useAgentBalance() {
         paid_from_agent: 0,
         pending_from_agent: 0,
         net_balance: 0,
+        base_currency: baseCurrency,
       };
 
-      invoices?.forEach((inv) => {
-        const amount = inv.amount || 0;
+      invoices.forEach((inv) => {
+        const invoiceCurrency = inv.currency || 'USD';
+        const invoiceCurrencyRate = rateMap.get(invoiceCurrency) || 1;
+        
+        // Convert amount to TZS first, then to base currency
+        const amountInTZS = (inv.amount || 0) * invoiceCurrencyRate;
+        const amountInBaseCurrency = baseCurrencyRate > 0 ? amountInTZS / baseCurrencyRate : amountInTZS;
+        
         if (inv.invoice_direction === 'to_agent') {
           if (inv.status === 'paid') {
-            summary.paid_to_agent += amount;
+            summary.paid_to_agent += amountInBaseCurrency;
           } else if (inv.status === 'pending') {
-            summary.pending_to_agent += amount;
+            summary.pending_to_agent += amountInBaseCurrency;
           }
         } else if (inv.invoice_direction === 'from_agent') {
           if (inv.status === 'paid') {
-            summary.paid_from_agent += amount;
+            summary.paid_from_agent += amountInBaseCurrency;
           } else if (inv.status === 'pending') {
-            summary.pending_from_agent += amount;
+            summary.pending_from_agent += amountInBaseCurrency;
           }
         }
       });
@@ -71,33 +101,59 @@ export function useAllAgentBalances() {
   return useQuery({
     queryKey: ['all-agent-balances'],
     queryFn: async () => {
-      // Get all agents with their invoices
-      const { data: invoices, error } = await supabase
-        .from('invoices')
-        .select(`
-          amount, 
-          status, 
-          invoice_direction,
-          agent_id
-        `)
-        .not('agent_id', 'is', null);
+      // Get all agents with their invoices, settings, and exchange rates in parallel
+      const [invoicesResult, settingsResult, profilesResult, ratesResult] = await Promise.all([
+        supabase
+          .from('invoices')
+          .select(`
+            amount, 
+            currency,
+            status, 
+            invoice_direction,
+            agent_id
+          `)
+          .not('agent_id', 'is', null),
+        supabase
+          .from('agent_settings')
+          .select('user_id, base_currency'),
+        supabase
+          .from('profiles')
+          .select('id, full_name'),
+        supabase
+          .from('currency_exchange_rates')
+          .select('currency_code, rate_to_tzs'),
+      ]);
 
-      if (error) throw error;
+      if (invoicesResult.error) throw invoicesResult.error;
+      
+      const invoices = invoicesResult.data || [];
+      const settingsData = settingsResult.data || [];
+      const profiles = profilesResult.data || [];
+      const exchangeRates = ratesResult.data || [];
 
-      // Get agent profiles
-      const agentIds = [...new Set(invoices?.map(i => i.agent_id).filter(Boolean))];
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, full_name')
-        .in('id', agentIds);
-
-      const profileMap = new Map(profiles?.map(p => [p.id, p.full_name]) || []);
+      // Build maps
+      const profileMap = new Map(profiles.map(p => [p.id, p.full_name]));
+      const settingsMap = new Map(settingsData.map((s: any) => [s.user_id, s.base_currency || 'USD']));
+      
+      // Build rate map (currency -> rate to TZS)
+      const rateMap = new Map<string, number>();
+      rateMap.set('TZS', 1);
+      exchangeRates.forEach(r => rateMap.set(r.currency_code, r.rate_to_tzs));
 
       // Group by agent and calculate balances
       const balancesByAgent = new Map<string, AgentBalanceSummary>();
 
-      invoices?.forEach((inv) => {
+      invoices.forEach((inv) => {
         if (!inv.agent_id) return;
+        
+        const baseCurrency = settingsMap.get(inv.agent_id) || 'USD';
+        const baseCurrencyRate = rateMap.get(baseCurrency) || 1;
+        const invoiceCurrency = inv.currency || 'USD';
+        const invoiceCurrencyRate = rateMap.get(invoiceCurrency) || 1;
+        
+        // Convert amount to TZS first, then to base currency
+        const amountInTZS = (inv.amount || 0) * invoiceCurrencyRate;
+        const amountInBaseCurrency = baseCurrencyRate > 0 ? amountInTZS / baseCurrencyRate : amountInTZS;
 
         if (!balancesByAgent.has(inv.agent_id)) {
           balancesByAgent.set(inv.agent_id, {
@@ -108,23 +164,23 @@ export function useAllAgentBalances() {
             paid_from_agent: 0,
             pending_from_agent: 0,
             net_balance: 0,
+            base_currency: baseCurrency,
           });
         }
 
         const summary = balancesByAgent.get(inv.agent_id)!;
-        const amount = inv.amount || 0;
 
         if (inv.invoice_direction === 'to_agent') {
           if (inv.status === 'paid') {
-            summary.paid_to_agent += amount;
+            summary.paid_to_agent += amountInBaseCurrency;
           } else if (inv.status === 'pending') {
-            summary.pending_to_agent += amount;
+            summary.pending_to_agent += amountInBaseCurrency;
           }
         } else if (inv.invoice_direction === 'from_agent') {
           if (inv.status === 'paid') {
-            summary.paid_from_agent += amount;
+            summary.paid_from_agent += amountInBaseCurrency;
           } else if (inv.status === 'pending') {
-            summary.pending_from_agent += amount;
+            summary.pending_from_agent += amountInBaseCurrency;
           }
         }
       });

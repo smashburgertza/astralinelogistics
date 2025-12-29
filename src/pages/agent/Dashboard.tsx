@@ -25,11 +25,12 @@ export default function AgentDashboard() {
   
   const recentShipments = shipments?.slice(0, 5) || [];
 
-  // Format currency
+  // Format currency with base currency from agent settings
+  const baseCurrency = balance?.base_currency || 'USD';
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: baseCurrency,
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount);
