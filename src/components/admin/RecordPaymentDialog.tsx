@@ -54,8 +54,8 @@ export function RecordPaymentDialog({
 }: RecordPaymentDialogProps) {
   const [paymentMethod, setPaymentMethod] = useState('bank_transfer');
   const [depositAccountId, setDepositAccountId] = useState('');
-  const [paymentCurrency, setPaymentCurrency] = useState(invoice?.currency || 'USD');
-  const [amount, setAmount] = useState('');
+  const [paymentCurrency, setPaymentCurrency] = useState('TZS');
+  const [amountInPaymentCurrency, setAmountInPaymentCurrency] = useState('');
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
   const [reference, setReference] = useState('');
   const [notes, setNotes] = useState('');
@@ -67,30 +67,61 @@ export function RecordPaymentDialog({
   // Filter to active bank accounts
   const activeBankAccounts = bankAccounts.filter(a => a.is_active);
 
+  const invoiceCurrency = invoice?.currency || 'USD';
+  const invoiceAmount = Number(invoice?.amount || 0);
+  const amountPaid = Number(invoice?.amount_paid || 0);
+  const balance = remainingBalance !== undefined ? remainingBalance : invoiceAmount - amountPaid;
+  const currencySymbol = CURRENCY_SYMBOLS[invoiceCurrency] || '$';
+  const paymentCurrencySymbol = CURRENCY_SYMBOLS[paymentCurrency] || paymentCurrency;
+
+  // Get exchange rate for the invoice currency to TZS
+  const invoiceCurrencyRate = exchangeRates.find(r => r.currency_code === invoiceCurrency)?.rate_to_tzs || 1;
+  const paymentCurrencyRate = paymentCurrency === 'TZS' ? 1 : (exchangeRates.find(r => r.currency_code === paymentCurrency)?.rate_to_tzs || 1);
+  
+  // Calculate the balance in TZS, then convert to payment currency
+  const balanceInTZS = balance * invoiceCurrencyRate;
+  const balanceInPaymentCurrency = paymentCurrencyRate > 0 ? balanceInTZS / paymentCurrencyRate : balanceInTZS;
+  
+  // Calculate how much of the invoice currency is being paid
+  const paymentAmountNum = parseFloat(amountInPaymentCurrency) || 0;
+  const amountInInvoiceCurrency = paymentCurrencyRate > 0 
+    ? (paymentAmountNum * paymentCurrencyRate) / invoiceCurrencyRate 
+    : paymentAmountNum;
+
+  const isDifferentCurrency = paymentCurrency !== invoiceCurrency;
+
   // Reset form when invoice changes or dialog opens
   useEffect(() => {
     if (invoice && open) {
-      // Use remaining balance if provided, otherwise use full invoice amount
-      const defaultAmount = remainingBalance !== undefined 
-        ? remainingBalance 
-        : Number(invoice.amount) - Number(invoice.amount_paid || 0);
-      setAmount(defaultAmount > 0 ? defaultAmount.toString() : invoice.amount?.toString() || '');
-      setPaymentCurrency(invoice.currency || 'USD');
+      // Default to TZS for payment (common local currency)
+      setPaymentCurrency('TZS');
       setPaymentDate(new Date().toISOString().split('T')[0]);
       setReference('');
       setNotes('');
       setDepositAccountId('');
+      setAmountInPaymentCurrency('');
     }
   }, [invoice, open, remainingBalance]);
+
+  // Update amount when payment currency changes
+  useEffect(() => {
+    if (invoice && open && balance > 0) {
+      const newBalanceInPaymentCurrency = paymentCurrencyRate > 0 
+        ? (balance * invoiceCurrencyRate) / paymentCurrencyRate 
+        : balance * invoiceCurrencyRate;
+      setAmountInPaymentCurrency(newBalanceInPaymentCurrency.toFixed(2));
+    }
+  }, [paymentCurrency, invoice, open, balance, invoiceCurrencyRate, paymentCurrencyRate]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!invoice) return;
 
+    // We record the payment in invoice currency for consistency
     onRecordPayment({
       invoiceId: invoice.id,
-      amount: parseFloat(amount),
+      amount: amountInInvoiceCurrency,
       paymentMethod,
       depositAccountId: depositAccountId || undefined,
       paymentCurrency,
@@ -99,11 +130,6 @@ export function RecordPaymentDialog({
       notes: notes || undefined,
     });
   };
-
-  const currencySymbol = CURRENCY_SYMBOLS[invoice?.currency || 'USD'] || '$';
-  const invoiceAmount = Number(invoice?.amount || 0);
-  const amountPaid = Number(invoice?.amount_paid || 0);
-  const balance = remainingBalance !== undefined ? remainingBalance : invoiceAmount - amountPaid;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -196,40 +222,73 @@ export function RecordPaymentDialog({
             )}
           </div>
 
-          {/* Amount and Currency */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>{isOutgoingPayment ? 'Amount to Pay' : 'Amount Received'}</Label>
-              <Input
-                type="number"
-                min="0"
-                max={balance}
-                step="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                required
-              />
-              {parseFloat(amount) < balance && parseFloat(amount) > 0 && (
-                <p className="text-xs text-blue-600">This will be a partial payment</p>
+          {/* Payment Currency */}
+          <div className="space-y-2">
+            <Label>Payment Currency</Label>
+            <Select value={paymentCurrency} onValueChange={setPaymentCurrency}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="TZS">TZS - Tanzanian Shilling</SelectItem>
+                <SelectItem value="USD">USD - US Dollar</SelectItem>
+                {exchangeRates.filter(r => r.currency_code !== 'USD' && r.currency_code !== 'TZS').map((rate) => (
+                  <SelectItem key={rate.currency_code} value={rate.currency_code}>
+                    {rate.currency_code}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Exchange Rate Info */}
+          {isDifferentCurrency && (
+            <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-blue-700 dark:text-blue-300">Exchange Rate:</span>
+                <span className="font-medium text-blue-800 dark:text-blue-200">
+                  1 {invoiceCurrency} = {invoiceCurrencyRate.toLocaleString()} TZS
+                </span>
+              </div>
+              {paymentCurrency !== 'TZS' && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-blue-700 dark:text-blue-300">Payment Currency Rate:</span>
+                  <span className="font-medium text-blue-800 dark:text-blue-200">
+                    1 {paymentCurrency} = {paymentCurrencyRate.toLocaleString()} TZS
+                  </span>
+                </div>
               )}
+              <div className="flex justify-between text-sm border-t border-blue-200 dark:border-blue-700 pt-2">
+                <span className="text-blue-700 dark:text-blue-300">Balance in {paymentCurrency}:</span>
+                <span className="font-bold text-blue-800 dark:text-blue-200">
+                  {paymentCurrencySymbol}{balanceInPaymentCurrency.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label>Currency</Label>
-              <Select value={paymentCurrency} onValueChange={setPaymentCurrency}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="USD">USD</SelectItem>
-                  <SelectItem value="TZS">TZS</SelectItem>
-                  {exchangeRates.map((rate) => (
-                    <SelectItem key={rate.currency_code} value={rate.currency_code}>
-                      {rate.currency_code}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          )}
+
+          {/* Amount in Payment Currency */}
+          <div className="space-y-2">
+            <Label>
+              {isOutgoingPayment ? 'Amount to Pay' : 'Amount Received'} ({paymentCurrency})
+            </Label>
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={amountInPaymentCurrency}
+              onChange={(e) => setAmountInPaymentCurrency(e.target.value)}
+              required
+            />
+            {isDifferentCurrency && paymentAmountNum > 0 && (
+              <p className="text-xs text-muted-foreground">
+                ≈ {currencySymbol}{amountInInvoiceCurrency.toFixed(2)} {invoiceCurrency}
+                {amountInInvoiceCurrency < balance && ' (partial payment)'}
+              </p>
+            )}
+            {!isDifferentCurrency && paymentAmountNum < balance && paymentAmountNum > 0 && (
+              <p className="text-xs text-blue-600">This will be a partial payment</p>
+            )}
           </div>
 
           {/* Payment Date */}
@@ -268,7 +327,7 @@ export function RecordPaymentDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading || parseFloat(amount) <= 0}>
+            <Button type="submit" disabled={isLoading || paymentAmountNum <= 0}>
               {isLoading ? 'Recording...' : 'Record Payment'}
             </Button>
           </div>
