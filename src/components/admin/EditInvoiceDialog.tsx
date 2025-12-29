@@ -45,8 +45,9 @@ interface EditInvoiceDialogProps {
 
 export function EditInvoiceDialog({ invoice, open, onOpenChange }: EditInvoiceDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasInitialized, setHasInitialized] = useState(false);
   const updateInvoice = useUpdateInvoice();
-  const { data: invoiceItems } = useInvoiceItems(invoice.id);
+  const { data: invoiceItems, isLoading: isLoadingItems } = useInvoiceItems(open ? invoice.id : '');
   const createInvoiceItem = useCreateInvoiceItem();
   const updateInvoiceItem = useUpdateInvoiceItem();
   const deleteInvoiceItem = useDeleteInvoiceItem();
@@ -56,11 +57,11 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange }: EditInvoiceDi
   const form = useForm<InvoiceFormData>({
     resolver: zodResolver(invoiceSchema),
     defaultValues: {
-      customer_id: invoice.customer_id || '',
-      currency: invoice.currency || 'USD',
-      due_date: invoice.due_date || '',
-      notes: invoice.notes || '',
-      line_items: [],
+      customer_id: '',
+      currency: 'USD',
+      due_date: '',
+      notes: '',
+      line_items: [{ description: '', quantity: 1, unit_price: 0, item_type: 'other' }],
     },
   });
 
@@ -69,50 +70,36 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange }: EditInvoiceDi
     name: 'line_items',
   });
 
-  // Load invoice items when available
+  // Reset initialization flag when dialog closes
   useEffect(() => {
-    if (invoiceItems && invoiceItems.length > 0) {
-      form.setValue('line_items', invoiceItems.map(item => ({
-        id: item.id,
-        description: item.description || '',
-        quantity: item.quantity,
-        unit_price: item.unit_price,
-        item_type: item.item_type,
-      })));
-    } else if (open && (!invoiceItems || invoiceItems.length === 0)) {
-      // If no items, add a default one
-      form.setValue('line_items', [{
-        description: '',
-        quantity: 1,
-        unit_price: 0,
-        item_type: 'other',
-      }]);
+    if (!open) {
+      setHasInitialized(false);
     }
-  }, [invoiceItems, open, form]);
+  }, [open]);
 
-  // Reset form when dialog opens with invoice data
+  // Initialize form when dialog opens AND data is loaded
   useEffect(() => {
-    if (open) {
+    if (open && !hasInitialized && !isLoadingItems) {
+      const lineItems = invoiceItems && invoiceItems.length > 0
+        ? invoiceItems.map(item => ({
+            id: item.id,
+            description: item.description || '',
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            item_type: item.item_type,
+          }))
+        : [{ description: '', quantity: 1, unit_price: 0, item_type: 'other' }];
+
       form.reset({
         customer_id: invoice.customer_id || '',
         currency: invoice.currency || 'USD',
         due_date: invoice.due_date || '',
         notes: invoice.notes || '',
-        line_items: invoiceItems?.map(item => ({
-          id: item.id,
-          description: item.description || '',
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-          item_type: item.item_type,
-        })) || [{
-          description: '',
-          quantity: 1,
-          unit_price: 0,
-          item_type: 'other',
-        }],
+        line_items: lineItems,
       });
+      setHasInitialized(true);
     }
-  }, [open, invoice, invoiceItems, form]);
+  }, [open, hasInitialized, isLoadingItems, invoice, invoiceItems, form]);
 
   const watchedItems = form.watch('line_items');
   const watchedCurrency = form.watch('currency');
@@ -201,203 +188,209 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange }: EditInvoiceDi
           <DialogTitle>Edit Invoice {invoice.invoice_number}</DialogTitle>
         </DialogHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
+        {isLoadingItems ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        ) : (
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="customer_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Customer</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select customer" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {customers?.map((customer) => (
+                            <SelectItem key={customer.id} value={customer.id}>
+                              {customer.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="currency"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Currency</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="USD">USD ($)</SelectItem>
+                          <SelectItem value="GBP">GBP (£)</SelectItem>
+                          <SelectItem value="EUR">EUR (€)</SelectItem>
+                          <SelectItem value="CNY">CNY (¥)</SelectItem>
+                          <SelectItem value="AED">AED (د.إ)</SelectItem>
+                          <SelectItem value="TZS">TZS (TSh)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
               <FormField
                 control={form.control}
-                name="customer_id"
+                name="due_date"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Customer</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select customer" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {customers?.map((customer) => (
-                          <SelectItem key={customer.id} value={customer.id}>
-                            {customer.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>Due Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
+              <Separator />
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-medium">Line Items</h3>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => append({ description: '', quantity: 1, unit_price: 0, item_type: 'other' })}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Item
+                  </Button>
+                </div>
+
+                {fields.map((field, index) => (
+                  <div key={field.id} className="grid grid-cols-12 gap-2 items-start p-3 bg-muted/50 rounded-lg">
+                    <div className="col-span-5">
+                      <FormField
+                        control={form.control}
+                        name={`line_items.${index}.description`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">Description</FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="Item description" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="col-span-2">
+                      <FormField
+                        control={form.control}
+                        name={`line_items.${index}.quantity`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">Qty</FormLabel>
+                            <FormControl>
+                              <Input {...field} type="number" step="0.01" min="0" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="col-span-2">
+                      <FormField
+                        control={form.control}
+                        name={`line_items.${index}.unit_price`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">Price</FormLabel>
+                            <FormControl>
+                              <Input {...field} type="number" step="0.01" min="0" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="col-span-2 pt-6">
+                      <p className="text-sm font-medium">
+                        {currencySymbol}{(Number(watchedItems[index]?.quantity || 0) * Number(watchedItems[index]?.unit_price || 0)).toFixed(2)}
+                      </p>
+                    </div>
+
+                    <div className="col-span-1 pt-6">
+                      {fields.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => remove(index)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <Separator />
+
+              <div className="flex justify-end">
+                <div className="text-right space-y-1">
+                  <p className="text-lg font-bold">
+                    Total: {currencySymbol}{calculations.total.toFixed(2)}
+                  </p>
+                  {watchedCurrency !== 'TZS' && exchangeRates && (
+                    <p className="text-sm text-muted-foreground">
+                      ≈ TZS {convertToTZS(calculations.total, watchedCurrency, exchangeRates).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+              </div>
+
               <FormField
                 control={form.control}
-                name="currency"
+                name="notes"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Currency</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="USD">USD ($)</SelectItem>
-                        <SelectItem value="GBP">GBP (£)</SelectItem>
-                        <SelectItem value="EUR">EUR (€)</SelectItem>
-                        <SelectItem value="CNY">CNY (¥)</SelectItem>
-                        <SelectItem value="AED">AED (د.إ)</SelectItem>
-                        <SelectItem value="TZS">TZS (TSh)</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>Notes</FormLabel>
+                    <FormControl>
+                      <Textarea {...field} placeholder="Additional notes..." rows={3} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            </div>
 
-            <FormField
-              control={form.control}
-              name="due_date"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Due Date</FormLabel>
-                  <FormControl>
-                    <Input type="date" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <Separator />
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-medium">Line Items</h3>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => append({ description: '', quantity: 1, unit_price: 0, item_type: 'other' })}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Item
+              <div className="flex justify-end gap-3">
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isSubmitting || calculations.total <= 0}>
+                  {isSubmitting ? 'Saving...' : 'Save Changes'}
                 </Button>
               </div>
-
-              {fields.map((field, index) => (
-                <div key={field.id} className="grid grid-cols-12 gap-2 items-start p-3 bg-muted/50 rounded-lg">
-                  <div className="col-span-5">
-                    <FormField
-                      control={form.control}
-                      name={`line_items.${index}.description`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs">Description</FormLabel>
-                          <FormControl>
-                            <Input {...field} placeholder="Item description" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="col-span-2">
-                    <FormField
-                      control={form.control}
-                      name={`line_items.${index}.quantity`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs">Qty</FormLabel>
-                          <FormControl>
-                            <Input {...field} type="number" step="0.01" min="0" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="col-span-2">
-                    <FormField
-                      control={form.control}
-                      name={`line_items.${index}.unit_price`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs">Price</FormLabel>
-                          <FormControl>
-                            <Input {...field} type="number" step="0.01" min="0" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="col-span-2 pt-6">
-                    <p className="text-sm font-medium">
-                      {currencySymbol}{(Number(watchedItems[index]?.quantity || 0) * Number(watchedItems[index]?.unit_price || 0)).toFixed(2)}
-                    </p>
-                  </div>
-
-                  <div className="col-span-1 pt-6">
-                    {fields.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => remove(index)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <Separator />
-
-            <div className="flex justify-end">
-              <div className="text-right space-y-1">
-                <p className="text-lg font-bold">
-                  Total: {currencySymbol}{calculations.total.toFixed(2)}
-                </p>
-                {watchedCurrency !== 'TZS' && exchangeRates && (
-                  <p className="text-sm text-muted-foreground">
-                    ≈ TZS {convertToTZS(calculations.total, watchedCurrency, exchangeRates).toLocaleString()}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Notes</FormLabel>
-                  <FormControl>
-                    <Textarea {...field} placeholder="Additional notes..." rows={3} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="flex justify-end gap-3">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSubmitting || calculations.total <= 0}>
-                {isSubmitting ? 'Saving...' : 'Save Changes'}
-              </Button>
-            </div>
-          </form>
-        </Form>
+            </form>
+          </Form>
+        )}
       </DialogContent>
     </Dialog>
   );
