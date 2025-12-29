@@ -34,7 +34,7 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { PrintableLabels } from './PrintableLabels';
-import { useGetOrCreateBatch } from '@/hooks/useCargoBatches';
+import { useGetOrCreateBatch, useCurrentBatch } from '@/hooks/useCargoBatches';
 import { Database } from '@/integrations/supabase/types';
 import { BillingPartyType } from '@/lib/billingParty';
 import { useAgentSettings } from '@/hooks/useAgents';
@@ -147,6 +147,7 @@ export function ShipmentUploadForm() {
   const { data: transitRoutes = [] } = useTransitRoutesByRegion(selectedRegion);
   const { data: agentSettings } = useAgentSettings();
   const getOrCreateBatch = useGetOrCreateBatch();
+  const { data: currentBatch, isLoading: batchLoading } = useCurrentBatch('air');
   
   // Check if agent can have consolidated cargo
   const canHaveConsolidatedCargo = agentSettings?.can_have_consolidated_cargo ?? false;
@@ -756,6 +757,26 @@ export function ShipmentUploadForm() {
           </div>
         </CardHeader>
       </Card>
+
+      {/* Current Batch Info */}
+      {currentBatch && (
+        <Card className="shadow-lg border-0 bg-primary/5 border-primary/20">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Package className="w-4 h-4 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">This shipment will be added to batch</p>
+                <p className="font-semibold text-primary">{currentBatch.batch_number}</p>
+              </div>
+              <Badge variant="outline" className="ml-auto">
+                {currentBatch.status === 'open' ? 'Open' : currentBatch.status}
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Pricing & Routing Card */}
       <Card className="shadow-lg border-0">
