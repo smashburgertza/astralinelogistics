@@ -25,6 +25,11 @@ export interface Agent {
     email: string;
     full_name: string | null;
     phone: string | null;
+    company_name: string | null;
+    company_address: string | null;
+    contact_person_name: string | null;
+    contact_person_email: string | null;
+    contact_person_phone: string | null;
   } | null;
 }
 
@@ -94,15 +99,21 @@ export function useCreateAgent() {
     mutationFn: async ({ 
       email, 
       password, 
-      fullName, 
-      phone,
+      companyName,
+      companyAddress,
+      contactPersonName,
+      contactPersonEmail,
+      contactPersonPhone,
       regions,
       canHaveConsolidatedCargo = false,
     }: { 
       email: string; 
       password: string; 
-      fullName: string;
-      phone?: string;
+      companyName: string;
+      companyAddress?: string;
+      contactPersonName: string;
+      contactPersonEmail: string;
+      contactPersonPhone?: string;
       regions: string[]; // Array of region codes
       canHaveConsolidatedCargo?: boolean;
     }) => {
@@ -116,7 +127,7 @@ export function useCreateAgent() {
         password,
         options: {
           data: {
-            full_name: fullName,
+            full_name: contactPersonName,
           },
         },
       });
@@ -144,15 +155,21 @@ export function useCreateAgent() {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
 
-      // Update the profile with phone if provided
-      if (phone) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({ phone, full_name: fullName })
-          .eq('id', userId);
+      // Update the profile with company and contact info
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ 
+          full_name: contactPersonName,
+          phone: contactPersonPhone,
+          company_name: companyName,
+          company_address: companyAddress,
+          contact_person_name: contactPersonName,
+          contact_person_email: contactPersonEmail,
+          contact_person_phone: contactPersonPhone,
+        })
+        .eq('id', userId);
 
-        if (profileError) console.error('Failed to update profile:', profileError);
-      }
+      if (profileError) console.error('Failed to update profile:', profileError);
 
       // Update the user_roles to set role as agent
       // Set the first region for backward compatibility

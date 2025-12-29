@@ -1554,7 +1554,11 @@ export type Database = {
       profiles: {
         Row: {
           address: string | null
+          company_address: string | null
           company_name: string | null
+          contact_person_email: string | null
+          contact_person_name: string | null
+          contact_person_phone: string | null
           created_at: string | null
           email: string
           full_name: string | null
@@ -1564,7 +1568,11 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          company_address?: string | null
           company_name?: string | null
+          contact_person_email?: string | null
+          contact_person_name?: string | null
+          contact_person_phone?: string | null
           created_at?: string | null
           email: string
           full_name?: string | null
@@ -1574,7 +1582,11 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          company_address?: string | null
           company_name?: string | null
+          contact_person_email?: string | null
+          contact_person_name?: string | null
+          contact_person_phone?: string | null
           created_at?: string | null
           email?: string
           full_name?: string | null
