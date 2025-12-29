@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -99,16 +99,19 @@ export function B2BInvoices() {
   const queryClient = useQueryClient();
   const { data: exchangeRates } = useExchangeRates();
   
-  // Build rate map for currency conversion
-  const rateMap = new Map<string, number>();
-  rateMap.set('TZS', 1);
-  exchangeRates?.forEach(r => rateMap.set(r.currency_code, r.rate_to_tzs));
+  // Build rate map for currency conversion - memoize to recalculate when rates load
+  const rateMap = useMemo(() => {
+    const map = new Map<string, number>();
+    map.set('TZS', 1);
+    exchangeRates?.forEach(r => map.set(r.currency_code, r.rate_to_tzs));
+    return map;
+  }, [exchangeRates]);
   
   // Helper to convert amount to platform base currency (TZS)
-  const convertToBaseCurrency = (amount: number, currency: string): number => {
+  const convertToBaseCurrency = useCallback((amount: number, currency: string): number => {
     const rate = rateMap.get(currency) || 1;
     return amount * rate;
-  };
+  }, [rateMap]);
   
   // Format TZS with thousands separator
   const formatTZS = (amount: number): string => {
