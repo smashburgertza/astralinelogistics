@@ -206,9 +206,23 @@ export function B2BInvoices() {
     mutationFn: async (invoiceId: string) => {
       const { error } = await supabase
         .from("invoices")
-        .update({ status: "paid", paid_at: new Date().toISOString() })
+        .update({ status: "paid", paid_at: new Date().toISOString(), amount_paid: null })
         .eq("id", invoiceId);
       if (error) throw error;
+
+      // Get the invoice to set amount_paid correctly
+      const { data: invoice } = await supabase
+        .from("invoices")
+        .select("amount")
+        .eq("id", invoiceId)
+        .single();
+
+      if (invoice) {
+        await supabase
+          .from("invoices")
+          .update({ amount_paid: invoice.amount })
+          .eq("id", invoiceId);
+      }
     },
     onSuccess: () => {
       toast.success("Invoice marked as paid");
@@ -216,6 +230,7 @@ export function B2BInvoices() {
       queryClient.invalidateQueries({ queryKey: ["agent-cargo-shipments"] });
       queryClient.invalidateQueries({ queryKey: ["agent-balance"] });
       queryClient.invalidateQueries({ queryKey: ["all-agent-balances"] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
     },
     onError: () => {
       toast.error("Failed to update invoice");

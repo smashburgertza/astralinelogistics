@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -218,7 +219,10 @@ export function CreateAgentCargoInvoiceDialog({
     onSuccess: () => {
       toast.success("Invoice created successfully");
       queryClient.invalidateQueries({ queryKey: ["agent-cargo-shipments"] });
+      queryClient.invalidateQueries({ queryKey: ["b2b-invoices"] });
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["agent-balance"] });
+      queryClient.invalidateQueries({ queryKey: ["all-agent-balances"] });
       onOpenChange(false);
       form.reset();
     },
@@ -252,6 +256,9 @@ export function CreateAgentCargoInvoiceDialog({
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create Agent Cargo Invoice</DialogTitle>
+          <DialogDescription>
+            Create an invoice to bill the agent for clearing their cargo.
+          </DialogDescription>
         </DialogHeader>
 
         {/* Shipment Info */}
@@ -339,13 +346,18 @@ export function CreateAgentCargoInvoiceDialog({
                     <div key={index} className="grid grid-cols-12 gap-2 items-end">
                       <div className="col-span-4">
                         <Select
-                          value={item.product_service_id || ""}
-                          onValueChange={(value) => handleProductSelect(index, value)}
+                          value={item.product_service_id || "custom"}
+                          onValueChange={(value) => {
+                            if (value !== "custom") {
+                              handleProductSelect(index, value);
+                            }
+                          }}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Select service..." />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="custom">Custom Item</SelectItem>
                             {productsServices?.filter(p => p.is_active).map((product) => (
                               <SelectItem key={product.id} value={product.id}>
                                 {product.name}

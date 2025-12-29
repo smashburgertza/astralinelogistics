@@ -84,7 +84,7 @@ export default function AgentDashboard() {
           </>
         ) : (
           <>
-            {/* Astraline Owes Agent */}
+            {/* Astraline Owes Agent (invoices FROM agent) */}
             <Card className="shadow-lg border-0 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 overflow-hidden relative">
               <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full -translate-y-1/2 translate-x-1/2" />
               <CardContent className="p-6 relative z-10">
@@ -92,10 +92,10 @@ export default function AgentDashboard() {
                   <div>
                     <p className="text-sm font-medium text-muted-foreground mb-1">Astraline Owes You</p>
                     <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">
-                      {formatCurrency(balance?.pending_to_agent || 0)}
+                      {formatCurrency(balance?.pending_from_agent || 0)}
                     </p>
                     <p className="text-xs text-muted-foreground mt-2">
-                      Paid: {formatCurrency(balance?.paid_to_agent || 0)}
+                      Paid: {formatCurrency(balance?.paid_from_agent || 0)}
                     </p>
                   </div>
                   <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center">
@@ -105,7 +105,7 @@ export default function AgentDashboard() {
               </CardContent>
             </Card>
 
-            {/* Agent Owes Astraline */}
+            {/* Agent Owes Astraline (invoices TO agent) */}
             <Card className="shadow-lg border-0 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 overflow-hidden relative">
               <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full -translate-y-1/2 translate-x-1/2" />
               <CardContent className="p-6 relative z-10">
@@ -113,10 +113,10 @@ export default function AgentDashboard() {
                   <div>
                     <p className="text-sm font-medium text-muted-foreground mb-1">You Owe Astraline</p>
                     <p className="text-3xl font-bold text-amber-600 dark:text-amber-400">
-                      {formatCurrency(balance?.pending_from_agent || 0)}
+                      {formatCurrency(balance?.pending_to_agent || 0)}
                     </p>
                     <p className="text-xs text-muted-foreground mt-2">
-                      Paid: {formatCurrency(balance?.paid_from_agent || 0)}
+                      Paid: {formatCurrency(balance?.paid_to_agent || 0)}
                     </p>
                   </div>
                   <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center">
