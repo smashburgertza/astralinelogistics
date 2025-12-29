@@ -84,11 +84,19 @@ export function InvoicesTabContent() {
     setInvoiceType('all');
   };
 
-  // Calculate totals in TZS from filtered invoices
-  const totalAmount = filteredInvoices.reduce((sum, inv) => sum + Number(inv.amount_in_tzs || inv.amount), 0);
-  const paidAmount = filteredInvoices.filter(i => i.status === 'paid').reduce((sum, inv) => sum + Number(inv.amount_in_tzs || inv.amount), 0);
-  const pendingAmount = filteredInvoices.filter(i => i.status === 'pending').reduce((sum, inv) => sum + Number(inv.amount_in_tzs || inv.amount), 0);
-  const overdueAmount = filteredInvoices.filter(i => i.status === 'overdue').reduce((sum, inv) => sum + Number(inv.amount_in_tzs || inv.amount), 0);
+  // Calculate totals in TZS from filtered invoices using proper currency conversion
+  const getAmountInTzs = (inv: typeof filteredInvoices[0]) => {
+    if (inv.amount_in_tzs) return Number(inv.amount_in_tzs);
+    if (exchangeRates) {
+      return convertToTZS(Number(inv.amount), inv.currency || 'USD', exchangeRates);
+    }
+    return Number(inv.amount);
+  };
+
+  const totalAmount = filteredInvoices.reduce((sum, inv) => sum + getAmountInTzs(inv), 0);
+  const paidAmount = filteredInvoices.filter(i => i.status === 'paid').reduce((sum, inv) => sum + getAmountInTzs(inv), 0);
+  const pendingAmount = filteredInvoices.filter(i => i.status === 'pending').reduce((sum, inv) => sum + getAmountInTzs(inv), 0);
+  const overdueAmount = filteredInvoices.filter(i => i.status === 'overdue').reduce((sum, inv) => sum + getAmountInTzs(inv), 0);
 
   return (
     <>
