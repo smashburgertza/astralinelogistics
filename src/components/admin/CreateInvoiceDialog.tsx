@@ -24,11 +24,12 @@ const lineItemSchema = z.object({
   product_service_id: z.string().optional(),
   account_id: z.string().optional(),
   description: z.string().min(1, 'Description is required'),
-  quantity: z.coerce.number().min(0.01, 'Quantity must be greater than 0'),
+  quantity: z.coerce.number().min(0, 'Quantity must be 0 or more'),
   unit_price: z.coerce.number().min(0, 'Price must be 0 or more'),
   shipment_id: z.string().optional(),
   weight_kg: z.coerce.number().optional(),
   tracking_number: z.string().optional(),
+  unit_type: z.string().optional(), // To track if this is a percentage-based item
 });
 
 const invoiceSchema = z.object({
@@ -96,7 +97,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
       tax_rate: 0,
       notes: '',
       line_items: [
-        { product_service_id: '', account_id: '', description: '', quantity: 1, unit_price: 0, shipment_id: '', weight_kg: 0, tracking_number: '' },
+        { product_service_id: '', account_id: '', description: '', quantity: 1, unit_price: 0, shipment_id: '', weight_kg: 0, tracking_number: '', unit_type: '' },
       ],
     },
   });
@@ -113,7 +114,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
         tax_rate: 0,
         notes: '',
         line_items: [
-          { product_service_id: '', account_id: '', description: '', quantity: 1, unit_price: 0, shipment_id: '', weight_kg: 0, tracking_number: '' },
+          { product_service_id: '', account_id: '', description: '', quantity: 1, unit_price: 0, shipment_id: '', weight_kg: 0, tracking_number: '', unit_type: '' },
         ],
       });
     }
@@ -168,6 +169,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
         shipment_id: shipment.id,
         weight_kg: shipment.total_weight_kg,
         tracking_number: shipment.tracking_number,
+        unit_type: 'kg',
       };
     }).filter((item): item is NonNullable<typeof item> => item !== null);
     
@@ -187,6 +189,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
       shipment_id: item.shipment_id || '',
       weight_kg: item.weight_kg || 0,
       tracking_number: item.tracking_number || '',
+      unit_type: item.unit_type || '',
     }));
     
     if (validNonShipmentItems.length > 0) {
@@ -195,17 +198,27 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
     
     // If we still have no items, add an empty one
     if (newLineItems.length === 0) {
-      newLineItems.push({ product_service_id: '', account_id: '', description: '', quantity: 1, unit_price: 0, shipment_id: '', weight_kg: 0, tracking_number: '' });
+      newLineItems.push({ product_service_id: '', account_id: '', description: '', quantity: 1, unit_price: 0, shipment_id: '', weight_kg: 0, tracking_number: '', unit_type: '' });
     }
     
     form.setValue('line_items', newLineItems);
   }, [watchShipmentIds, customerShipments, form]);
 
-  // Calculate totals
+  // Calculate totals - first pass for non-percentage items, then apply percentages
   const calculations = useMemo(() => {
-    const subtotal = watchLineItems.reduce((sum, item) => {
+    // First, calculate subtotal from non-percentage items only
+    const nonPercentageSubtotal = watchLineItems.reduce((sum, item) => {
+      if (item.unit_type === 'percent') return sum;
       return sum + (item.quantity * item.unit_price);
     }, 0);
+
+    // Then calculate percentage items based on the non-percentage subtotal
+    const percentageTotal = watchLineItems.reduce((sum, item) => {
+      if (item.unit_type !== 'percent') return sum;
+      return sum + (nonPercentageSubtotal * (item.unit_price / 100));
+    }, 0);
+
+    const subtotal = nonPercentageSubtotal + percentageTotal;
 
     let discountAmount = 0;
     if (watchDiscount) {
@@ -285,7 +298,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
   };
 
   const handleAddLineItem = () => {
-    append({ product_service_id: '', account_id: '', description: '', quantity: 1, unit_price: 0, shipment_id: '', weight_kg: 0, tracking_number: '' });
+    append({ product_service_id: '', account_id: '', description: '', quantity: 1, unit_price: 0, shipment_id: '', weight_kg: 0, tracking_number: '', unit_type: '' });
   };
 
   return (
@@ -455,7 +468,18 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
                 {fields.map((field, index) => {
                   const quantity = watchLineItems[index]?.quantity || 0;
                   const unitPrice = watchLineItems[index]?.unit_price || 0;
-                  const lineTotal = quantity * unitPrice;
+                  const unitType = watchLineItems[index]?.unit_type || '';
+                  const isPercentage = unitType === 'percent';
+                  
+                  // Calculate non-percentage subtotal for percentage-based items
+                  const nonPercentageSubtotal = watchLineItems.reduce((sum, item) => {
+                    if (item.unit_type === 'percent') return sum;
+                    return sum + ((item.quantity || 0) * (item.unit_price || 0));
+                  }, 0);
+                  
+                  const lineTotal = isPercentage 
+                    ? (nonPercentageSubtotal * (unitPrice / 100))
+                    : (quantity * unitPrice);
 
                   return (
                     <div key={field.id} className="grid grid-cols-12 gap-2 items-center">
@@ -468,16 +492,23 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
                               <Select 
                                 onValueChange={(val) => {
                                   psField.onChange(val === "none" ? "" : val);
-                                  // Auto-fill description, unit_price, and account_id from selected product/service
+                                  // Auto-fill description, unit_price, unit_type, and account_id from selected product/service
                                   if (val && val !== "none") {
                                     const selectedProduct = productsServices?.find(p => p.id === val);
                                     if (selectedProduct) {
                                       form.setValue(`line_items.${index}.description`, selectedProduct.name);
                                       form.setValue(`line_items.${index}.unit_price`, selectedProduct.unit_price);
+                                      form.setValue(`line_items.${index}.unit_type`, selectedProduct.unit || '');
+                                      // Set quantity to 1 for percentage items since it's not used
+                                      if (selectedProduct.unit === 'percent') {
+                                        form.setValue(`line_items.${index}.quantity`, 1);
+                                      }
                                       if (selectedProduct.account_id) {
                                         form.setValue(`line_items.${index}.account_id`, selectedProduct.account_id);
                                       }
                                     }
+                                  } else {
+                                    form.setValue(`line_items.${index}.unit_type`, '');
                                   }
                                 }} 
                                 value={psField.value || "none"}
@@ -501,7 +532,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
                                       </SelectLabel>
                                       {items.map((item) => (
                                         <SelectItem key={item.id} value={item.id} className="text-xs">
-                                          {item.name} - {CURRENCY_SYMBOLS[item.currency] || '$'}{item.unit_price}/{item.unit}
+                                          {item.name} - {item.unit === 'percent' ? `${item.unit_price}%` : `${CURRENCY_SYMBOLS[item.currency] || '$'}${item.unit_price}/${item.unit}`}
                                         </SelectItem>
                                       ))}
                                     </SelectGroup>
@@ -551,31 +582,37 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
                           )}
                         />
                       </div>
+                      {/* Quantity - hidden for percentage items */}
                       <div className="col-span-1">
-                        <FormField
-                          control={form.control}
-                          name={`line_items.${index}.quantity`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Input 
-                                  type="number" 
-                                  step="0.01"
-                                  min="0.01"
-                                  placeholder="kg"
-                                  className="text-center text-xs"
-                                  value={field.value}
-                                  onChange={(e) => field.onChange(Number(e.target.value) || 0)}
-                                  onBlur={field.onBlur}
-                                  name={field.name}
-                                  ref={field.ref}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                        {isPercentage ? (
+                          <div className="text-center text-xs text-muted-foreground">-</div>
+                        ) : (
+                          <FormField
+                            control={form.control}
+                            name={`line_items.${index}.quantity`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormControl>
+                                  <Input 
+                                    type="number" 
+                                    step="0.01"
+                                    min="0.01"
+                                    placeholder="kg"
+                                    className="text-center text-xs"
+                                    value={field.value}
+                                    onChange={(e) => field.onChange(Number(e.target.value) || 0)}
+                                    onBlur={field.onBlur}
+                                    name={field.name}
+                                    ref={field.ref}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        )}
                       </div>
+                      {/* Unit Price - show as percentage for percent items */}
                       <div className="col-span-2">
                         <FormField
                           control={form.control}
@@ -583,17 +620,23 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
                           render={({ field }) => (
                             <FormItem>
                               <FormControl>
-                                <Input 
-                                  type="number" 
-                                  step="0.01"
-                                  min="0"
-                                  className="text-right text-xs"
-                                  value={field.value}
-                                  onChange={(e) => field.onChange(Number(e.target.value) || 0)}
-                                  onBlur={field.onBlur}
-                                  name={field.name}
-                                  ref={field.ref}
-                                />
+                                <div className="relative">
+                                  <Input 
+                                    type="number" 
+                                    step="0.01"
+                                    min="0"
+                                    max={isPercentage ? 100 : undefined}
+                                    className={`text-right text-xs ${isPercentage ? 'pr-6' : ''}`}
+                                    value={field.value}
+                                    onChange={(e) => field.onChange(Number(e.target.value) || 0)}
+                                    onBlur={field.onBlur}
+                                    name={field.name}
+                                    ref={field.ref}
+                                  />
+                                  {isPercentage && (
+                                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                                  )}
+                                </div>
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -602,6 +645,9 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
                       </div>
                       <div className="col-span-2 text-right font-medium text-sm">
                         {currencySymbol}{lineTotal.toFixed(2)}
+                        {isPercentage && (
+                          <span className="block text-xs text-muted-foreground">({unitPrice}%)</span>
+                        )}
                       </div>
                       <div className="col-span-1 text-center">
                         <Button
