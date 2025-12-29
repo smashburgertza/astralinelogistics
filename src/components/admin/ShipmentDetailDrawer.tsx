@@ -51,6 +51,7 @@ export function ShipmentDetailDrawer({ shipment, open, onOpenChange }: ShipmentD
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [deleteExpenseId, setDeleteExpenseId] = useState<string | null>(null);
   const [printLabelsOpen, setPrintLabelsOpen] = useState(false);
+  const [printSingleParcel, setPrintSingleParcel] = useState<Parcel | null>(null);
   
   const { data: parcels, isLoading: parcelsLoading } = useParcels(shipment?.id ?? null);
   const { data: expenses, isLoading: expensesLoading } = useExpensesByShipment(shipment?.id ?? null);
@@ -284,6 +285,15 @@ export function ShipmentDetailDrawer({ shipment, open, onOpenChange }: ShipmentD
                               size="icon"
                               variant="ghost"
                               className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Print label"
+                              onClick={() => setPrintSingleParcel(parcel)}
+                            >
+                              <Printer className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
                               onClick={() => {
                                 setEditingParcel(parcel);
                                 setParcelDialogOpen(true);
@@ -489,6 +499,16 @@ export function ShipmentDetailDrawer({ shipment, open, onOpenChange }: ShipmentD
                 onOpenChange={setPrintLabelsOpen}
                 shipment={shipment}
                 parcels={parcels}
+              />
+            )}
+
+            {/* Single Parcel Print Dialog */}
+            {printSingleParcel && parcels && (
+              <PrintLabelsDialog
+                open={!!printSingleParcel}
+                onOpenChange={(open) => !open && setPrintSingleParcel(null)}
+                shipment={shipment}
+                parcels={[printSingleParcel]}
               />
             )}
           </>

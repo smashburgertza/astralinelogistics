@@ -66,7 +66,7 @@ export function PrintLabelsDialog({ open, onOpenChange, shipment, parcels }: Pri
                     }}
                     shipmentInfo={{
                       tracking_number: shipment.tracking_number,
-                      customer_name: shipment.customers?.name || 'Unknown Customer',
+                      customer_name: shipment.customers?.name || shipment.customer_name || 'Unknown Customer',
                       customer_phone: shipment.customers?.phone || undefined,
                       origin_region: shipment.origin_region,
                       created_at: shipment.created_at,
