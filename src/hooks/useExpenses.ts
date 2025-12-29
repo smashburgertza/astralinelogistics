@@ -148,12 +148,15 @@ export function useCreateExpense() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (expense: TablesInsert<'expenses'>) => {
+    mutationFn: async (expense: TablesInsert<'expenses'> & { assigned_to?: string }) => {
       const { data: userData } = await supabase.auth.getUser();
+      const { assigned_to, ...expenseData } = expense;
+      
       const { data, error } = await supabase
         .from('expenses')
         .insert({
-          ...expense,
+          ...expenseData,
+          assigned_to,
           status: 'pending',
           submitted_by: userData.user?.id,
         })
@@ -161,6 +164,19 @@ export function useCreateExpense() {
         .single();
 
       if (error) throw error;
+
+      // Send notification to the assigned approver
+      if (assigned_to) {
+        const amount = Number(expense.amount).toFixed(2);
+        const currency = expense.currency || 'USD';
+        await supabase.from('notifications').insert({
+          user_id: assigned_to,
+          title: 'Expense Awaiting Your Approval',
+          message: `A new expense of ${currency} ${amount} has been submitted for your approval.`,
+          type: 'info',
+        });
+      }
+
       return data;
     },
     onSuccess: (_, variables) => {

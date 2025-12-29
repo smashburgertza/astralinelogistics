@@ -833,6 +833,7 @@ export type Database = {
           amount: number
           approved_at: string | null
           approved_by: string | null
+          assigned_to: string | null
           category: string
           clarification_notes: string | null
           created_at: string | null
@@ -852,6 +853,7 @@ export type Database = {
           amount: number
           approved_at?: string | null
           approved_by?: string | null
+          assigned_to?: string | null
           category: string
           clarification_notes?: string | null
           created_at?: string | null
@@ -871,6 +873,7 @@ export type Database = {
           amount?: number
           approved_at?: string | null
           approved_by?: string | null
+          assigned_to?: string | null
           category?: string
           clarification_notes?: string | null
           created_at?: string | null

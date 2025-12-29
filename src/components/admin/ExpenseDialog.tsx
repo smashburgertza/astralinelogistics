@@ -26,8 +26,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Send } from 'lucide-react';
 import { Expense, EXPENSE_CATEGORIES, useCreateExpense, useUpdateExpense } from '@/hooks/useExpenses';
+import { useExpenseApprovers } from '@/hooks/useEmployees';
 
 const formSchema = z.object({
   category: z.string().min(1, 'Category is required'),
@@ -37,6 +38,7 @@ const formSchema = z.object({
     .max(1000000, 'Amount cannot exceed 1,000,000'),
   currency: z.string().default('USD'),
   description: z.string().optional(),
+  assigned_to: z.string().min(1, 'Please select an approver'),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -56,6 +58,7 @@ export function ExpenseDialog({
 }: ExpenseDialogProps) {
   const createExpense = useCreateExpense();
   const updateExpense = useUpdateExpense();
+  const { data: approvers = [], isLoading: approversLoading } = useExpenseApprovers();
   const isEditing = !!expense;
 
   const form = useForm<FormValues>({
@@ -65,6 +68,7 @@ export function ExpenseDialog({
       amount: 0,
       currency: 'USD',
       description: '',
+      assigned_to: '',
     },
   });
 
@@ -76,6 +80,7 @@ export function ExpenseDialog({
           amount: Number(expense.amount),
           currency: expense.currency || 'USD',
           description: expense.description || '',
+          assigned_to: (expense as any).assigned_to || '',
         });
       } else {
         form.reset({
@@ -83,6 +88,7 @@ export function ExpenseDialog({
           amount: 0,
           currency: 'USD',
           description: '',
+          assigned_to: '',
         });
       }
     }
@@ -110,6 +116,7 @@ export function ExpenseDialog({
           amount: data.amount,
           currency: data.currency,
           description: data.description || null,
+          assigned_to: data.assigned_to,
         },
         {
           onSuccess: () => onOpenChange(false),
@@ -221,6 +228,39 @@ export function ExpenseDialog({
               )}
             />
 
+            {/* Approver Selection - only show when creating new expense */}
+            {!isEditing && (
+              <FormField
+                control={form.control}
+                name="assigned_to"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Send for Approval To</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={approversLoading}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={approversLoading ? "Loading approvers..." : "Select an approver"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {approvers.map((approver) => (
+                          <SelectItem key={approver.id} value={approver.id}>
+                            {approver.full_name || approver.email}
+                          </SelectItem>
+                        ))}
+                        {approvers.length === 0 && !approversLoading && (
+                          <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                            No approvers available. Add employees with "Approve Expenses" permission.
+                          </div>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
             <div className="flex justify-end gap-3 pt-4">
               <Button
                 type="button"
@@ -229,9 +269,10 @@ export function ExpenseDialog({
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isPending}>
+              <Button type="submit" disabled={isPending || (!isEditing && approvers.length === 0)}>
                 {isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                {isEditing ? 'Save Changes' : 'Add Expense'}
+                {!isPending && !isEditing && <Send className="h-4 w-4 mr-2" />}
+                {isEditing ? 'Save Changes' : 'Send for Approval'}
               </Button>
             </div>
           </form>
