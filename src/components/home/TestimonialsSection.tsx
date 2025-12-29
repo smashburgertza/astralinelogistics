@@ -1,8 +1,9 @@
+import { useState, useEffect } from 'react';
 import { Star, Quote } from 'lucide-react';
 import { useScrollAnimation } from '@/hooks/useScrollAnimation';
 import { cn } from '@/lib/utils';
 import { usePageContent, PageContent } from '@/hooks/usePageContent';
-
+import { supabase } from '@/integrations/supabase/client';
 const defaultTestimonials = [
   {
     name: 'Sarah Mwangi',
@@ -41,6 +42,21 @@ const defaultTestimonials = [
 export function TestimonialsSection() {
   const { data } = usePageContent('testimonials');
   const content = data as PageContent | undefined;
+  const [dynamicStats, setDynamicStats] = useState({ customers: 0, deliveries: 0 });
+  
+  useEffect(() => {
+    const fetchStats = async () => {
+      const [customersRes, shipmentsRes] = await Promise.all([
+        supabase.from('customers').select('*', { count: 'exact', head: true }),
+        supabase.from('shipments').select('*', { count: 'exact', head: true }),
+      ]);
+      setDynamicStats({
+        customers: customersRes.count || 0,
+        deliveries: shipmentsRes.count || 0,
+      });
+    };
+    fetchStats();
+  }, []);
   
   const testimonials = content?.content?.testimonials?.length 
     ? content.content.testimonials.map((t: any) => ({
@@ -51,12 +67,15 @@ export function TestimonialsSection() {
       }))
     : defaultTestimonials;
 
-  const stats = content?.content?.stats || [
-    { value: '4.9', label: 'Average Rating' },
-    { value: '2,500+', label: 'Happy Customers' },
-    { value: '98%', label: 'Satisfaction Rate' },
-    { value: '10K+', label: 'Deliveries Made' },
-  ];
+  // Use CMS stats if available, otherwise use dynamic data
+  const stats = content?.content?.stats?.length 
+    ? content.content.stats
+    : [
+        { value: '4.9', label: 'Average Rating' },
+        { value: dynamicStats.customers > 0 ? `${dynamicStats.customers.toLocaleString()}+` : '2,500+', label: 'Happy Customers' },
+        { value: '98%', label: 'Satisfaction Rate' },
+        { value: dynamicStats.deliveries > 0 ? `${dynamicStats.deliveries.toLocaleString()}+` : '10K+', label: 'Deliveries Made' },
+      ];
   const { ref: headerRef, isVisible: headerVisible } = useScrollAnimation();
   const { ref: gridRef, isVisible: gridVisible } = useScrollAnimation();
 

@@ -4,15 +4,33 @@ import { MoveRight, Plane, Package, Globe, MapPin, ArrowDown } from 'lucide-reac
 import heroImage from '@/assets/hero-cargo.jpg';
 import { usePageContent, PageContent } from '@/hooks/usePageContent';
 
-const floatingRoutes = [
-  { from: 'UK', to: 'TZ', delay: '0s' },
-  { from: 'DE', to: 'TZ', delay: '2s' },
-  { from: 'CN', to: 'TZ', delay: '4s' },
-];
+import { useActiveRegions } from '@/hooks/useRegions';
+import { supabase } from '@/integrations/supabase/client';
+import { useState, useEffect } from 'react';
 
 export function HeroSection() {
   const { data } = usePageContent('hero');
   const content = data as PageContent | undefined;
+  const { data: regions = [] } = useActiveRegions();
+  const [shipmentCount, setShipmentCount] = useState<number>(0);
+
+  // Fetch active shipment count
+  useEffect(() => {
+    const fetchShipmentCount = async () => {
+      const { count } = await supabase
+        .from('shipments')
+        .select('*', { count: 'exact', head: true });
+      setShipmentCount(count || 0);
+    };
+    fetchShipmentCount();
+  }, []);
+
+  // Generate floating routes from active regions
+  const floatingRoutes = regions.slice(0, 3).map((region, index) => ({
+    from: region.code?.toUpperCase() || region.name.slice(0, 2).toUpperCase(),
+    to: 'TZ',
+    delay: `${index * 2}s`,
+  }));
   return (
     <section className="relative min-h-screen flex items-center overflow-hidden -mt-[120px] pt-[120px]">
       {/* Background Image with Parallax Effect */}
@@ -100,8 +118,8 @@ export function HeroSection() {
             {/* Stats Row */}
             <div className="flex flex-wrap gap-4 sm:gap-8 justify-center lg:justify-start opacity-0 animate-slide-up" style={{ animationDelay: '0.5s', animationFillMode: 'forwards' }}>
               {[
-                { icon: Globe, value: '6+', label: 'Countries' },
-                { icon: Package, value: '10K+', label: 'Delivered' },
+                { icon: Globe, value: `${regions.length || 6}+`, label: 'Countries' },
+                { icon: Package, value: shipmentCount > 0 ? `${Math.floor(shipmentCount / 1000)}K+` : '10K+', label: 'Delivered' },
                 { icon: Plane, value: '24/7', label: 'Support' },
               ].map((stat, index) => (
                 <div key={stat.label} className="flex items-center gap-2 sm:gap-3 group">
@@ -152,8 +170,8 @@ export function HeroSection() {
 
                 <div className="mt-6 pt-6 border-t border-white/10">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-white/60">Active shipments</span>
-                    <span className="text-primary font-semibold">2,847</span>
+                    <span className="text-white/60">Total shipments handled</span>
+                    <span className="text-primary font-semibold">{shipmentCount.toLocaleString()}</span>
                   </div>
                 </div>
               </div>
