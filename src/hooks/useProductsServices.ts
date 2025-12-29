@@ -33,6 +33,7 @@ export const UNIT_TYPES = [
   { value: 'shipment', label: 'Per Shipment' },
   { value: 'hour', label: 'Per Hour' },
   { value: 'cbm', label: 'Per Cubic Meter (CBM)' },
+  { value: 'percent', label: 'Percentage (%)' },
 ] as const;
 
 export function useProductsServices(filters?: { active?: boolean; serviceType?: string }) {
