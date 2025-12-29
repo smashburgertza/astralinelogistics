@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Separator } from '@/components/ui/separator';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Plus, Trash2, FileText } from 'lucide-react';
 import { useCreateInvoice } from '@/hooks/useInvoices';
 import { useCustomers, useShipments } from '@/hooks/useShipments';
@@ -27,7 +28,7 @@ const lineItemSchema = z.object({
 
 const invoiceSchema = z.object({
   customer_id: z.string().min(1, 'Customer is required'),
-  shipment_id: z.string().optional(),
+  shipment_ids: z.array(z.string()).optional(),
   currency: z.string().default('USD'),
   payment_terms: z.string().default('net_30'),
   discount: z.string().optional(),
@@ -71,7 +72,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
     resolver: zodResolver(invoiceSchema),
     defaultValues: {
       customer_id: '',
-      shipment_id: '',
+      shipment_ids: [],
       currency: 'USD',
       payment_terms: 'net_30',
       discount: '',
@@ -88,7 +89,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
     if (open) {
       form.reset({
         customer_id: '',
-        shipment_id: '',
+        shipment_ids: [],
         currency: 'USD',
         payment_terms: 'net_30',
         discount: '',
@@ -111,8 +112,20 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
   const watchTaxRate = useWatch({ control: form.control, name: 'tax_rate' });
   const watchCurrency = useWatch({ control: form.control, name: 'currency' });
   const watchCustomerId = useWatch({ control: form.control, name: 'customer_id' });
+  const watchShipmentIds = useWatch({ control: form.control, name: 'shipment_ids' });
 
   const selectedCustomer = customers?.find(c => c.id === watchCustomerId);
+
+  // Filter shipments by selected customer
+  const customerShipments = useMemo(() => {
+    if (!shipments || !watchCustomerId) return [];
+    return shipments.filter(s => s.customer_id === watchCustomerId);
+  }, [shipments, watchCustomerId]);
+
+  // Clear selected shipments when customer changes
+  useEffect(() => {
+    form.setValue('shipment_ids', []);
+  }, [watchCustomerId, form]);
 
   // Calculate totals
   const calculations = useMemo(() => {
@@ -178,10 +191,13 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + getDueDays(data.payment_terms));
 
+    // For now, use the first shipment_id if multiple are selected (invoices table only supports one)
+    const primaryShipmentId = data.shipment_ids && data.shipment_ids.length > 0 ? data.shipment_ids[0] : null;
+
     await createInvoice.mutateAsync({
       invoice_number: invoiceNumber || `INV-${Date.now()}`,
       customer_id: data.customer_id,
-      shipment_id: data.shipment_id || null,
+      shipment_id: primaryShipmentId,
       amount: calculations.total,
       currency: data.currency,
       amount_in_tzs: tzs,
@@ -289,32 +305,55 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
                 </div>
               </div>
 
-              {/* Optional Shipment Link */}
+              {/* Optional Shipment Links */}
               <div className="mt-4">
                 <FormField
                   control={form.control}
-                  name="shipment_id"
+                  name="shipment_ids"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-xs text-muted-foreground">Link to Shipment (optional)</FormLabel>
-                      <Select 
-                        onValueChange={(val) => field.onChange(val === "none" ? "" : val)} 
-                        value={field.value || "none"}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select shipment" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="none">No shipment</SelectItem>
-                          {shipments?.map((shipment) => (
-                            <SelectItem key={shipment.id} value={shipment.id}>
-                              {shipment.tracking_number} ({shipment.total_weight_kg} kg)
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormLabel className="text-xs text-muted-foreground">
+                        Link to Shipments (optional)
+                        {!watchCustomerId && <span className="ml-2 text-muted-foreground/70">- Select a customer first</span>}
+                      </FormLabel>
+                      {watchCustomerId && customerShipments.length > 0 ? (
+                        <div className="border rounded-md p-3 space-y-2 max-h-40 overflow-y-auto bg-muted/30">
+                          {customerShipments.map((shipment) => {
+                            const isChecked = field.value?.includes(shipment.id) ?? false;
+                            return (
+                              <div key={shipment.id} className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`shipment-${shipment.id}`}
+                                  checked={isChecked}
+                                  onCheckedChange={(checked) => {
+                                    const currentValues = field.value || [];
+                                    if (checked) {
+                                      field.onChange([...currentValues, shipment.id]);
+                                    } else {
+                                      field.onChange(currentValues.filter((id: string) => id !== shipment.id));
+                                    }
+                                  }}
+                                />
+                                <label
+                                  htmlFor={`shipment-${shipment.id}`}
+                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                                >
+                                  {shipment.tracking_number} ({shipment.total_weight_kg} kg)
+                                </label>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : watchCustomerId ? (
+                        <p className="text-sm text-muted-foreground py-2">No shipments found for this customer</p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground py-2">Select a customer to see their shipments</p>
+                      )}
+                      {field.value && field.value.length > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          {field.value.length} shipment(s) selected
+                        </p>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}
