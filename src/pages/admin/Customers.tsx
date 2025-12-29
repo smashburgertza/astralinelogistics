@@ -39,11 +39,12 @@ export default function AdminCustomersPage() {
         />
 
         {/* Stats Summary */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[
             { label: 'Total Customers', count: customers?.length || 0, color: 'text-primary' },
-            { label: 'With Company', count: customers?.filter(c => c.company_name).length || 0, color: 'text-blue-600' },
-            { label: 'With Email', count: customers?.filter(c => c.email).length || 0, color: 'text-emerald-600' },
+            { label: 'Corporate', count: customers?.filter(c => (c as any).customer_type === 'corporate').length || 0, color: 'text-blue-600' },
+            { label: 'Individual', count: customers?.filter(c => (c as any).customer_type !== 'corporate').length || 0, color: 'text-emerald-600' },
+            { label: 'With Portal Access', count: customers?.filter(c => c.user_id).length || 0, color: 'text-purple-600' },
           ].map((stat) => (
             <div key={stat.label} className="rounded-lg border bg-card p-4">
               <div className="text-sm text-muted-foreground">{stat.label}</div>
