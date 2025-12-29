@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { AgentLayout } from '@/components/layout/AgentLayout';
 import { StatCard } from '@/components/admin/StatCard';
 import { AgentShipmentFilters } from '@/components/agent/ShipmentFilters';
-import { AgentShipmentTable } from '@/components/agent/ShipmentTable';
+import { AgentBatchGroupedShipmentTable } from '@/components/agent/BatchGroupedShipmentTable';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -137,7 +137,7 @@ export default function AgentShipmentsPage() {
             onStatusChange={setStatus}
             onClear={clearFilters}
           />
-          <AgentShipmentTable shipments={shipments} isLoading={isLoading} />
+          <AgentBatchGroupedShipmentTable shipments={shipments} isLoading={isLoading} />
         </TabsContent>
 
         <TabsContent value="drafts">
