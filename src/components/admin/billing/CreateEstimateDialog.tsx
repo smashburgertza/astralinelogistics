@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { Plus, Trash2, FileText } from 'lucide-react';
 import { useCreateEstimate } from '@/hooks/useEstimates';
 import { useCustomers, useShipments } from '@/hooks/useShipments';
+import { useExchangeRates, convertToTZS } from '@/hooks/useExchangeRates';
 import { useChartOfAccounts } from '@/hooks/useAccounting';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 
@@ -52,6 +53,7 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
   const createEstimate = useCreateEstimate();
   const { data: customers } = useCustomers();
   const { data: shipments } = useShipments();
+  const { data: exchangeRates } = useExchangeRates();
   const { data: accounts } = useChartOfAccounts({ active: true });
 
   // Group accounts by type for the dropdown
@@ -118,8 +120,23 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
     const taxAmount = afterDiscount * (watchTaxRate / 100);
     const total = afterDiscount + taxAmount;
 
-    return { subtotal, discountAmount, taxAmount, total };
-  }, [watchLineItems, watchDiscount, watchTaxRate]);
+    // Calculate TZS equivalents
+    const tzsSubtotal = exchangeRates ? convertToTZS(subtotal, watchCurrency, exchangeRates) : null;
+    const tzsDiscount = exchangeRates ? convertToTZS(discountAmount, watchCurrency, exchangeRates) : null;
+    const tzsTax = exchangeRates ? convertToTZS(taxAmount, watchCurrency, exchangeRates) : null;
+    const tzsTotal = exchangeRates ? convertToTZS(total, watchCurrency, exchangeRates) : null;
+
+    return { 
+      subtotal, 
+      discountAmount, 
+      taxAmount, 
+      total,
+      tzsSubtotal,
+      tzsDiscount,
+      tzsTax,
+      tzsTotal,
+    };
+  }, [watchLineItems, watchDiscount, watchTaxRate, watchCurrency, exchangeRates]);
 
   const currencySymbol = CURRENCY_SYMBOLS[watchCurrency] || '$';
 
@@ -206,6 +223,11 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
                   <p className="font-bold text-lg text-primary">
                     {currencySymbol}{calculations.total.toFixed(2)}
                   </p>
+                  {watchCurrency !== 'TZS' && calculations.tzsTotal && (
+                    <p className="text-xs text-muted-foreground">
+                      ≈ TZS {calculations.tzsTotal.toLocaleString()}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -505,26 +527,46 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
 
               {/* Right Column - Summary */}
               <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
+                <div className="flex justify-between items-start">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span className="font-medium">{currencySymbol}{calculations.subtotal.toFixed(2)}</span>
+                  <div className="text-right">
+                    <span className="font-medium">{currencySymbol}{calculations.subtotal.toFixed(2)}</span>
+                    {watchCurrency !== 'TZS' && calculations.tzsSubtotal && (
+                      <p className="text-xs text-muted-foreground">≈ TZS {calculations.tzsSubtotal.toLocaleString()}</p>
+                    )}
+                  </div>
                 </div>
                 {calculations.discountAmount > 0 && (
-                  <div className="flex justify-between text-emerald-600">
+                  <div className="flex justify-between items-start text-emerald-600">
                     <span>Discount</span>
-                    <span>-{currencySymbol}{calculations.discountAmount.toFixed(2)}</span>
+                    <div className="text-right">
+                      <span>-{currencySymbol}{calculations.discountAmount.toFixed(2)}</span>
+                      {watchCurrency !== 'TZS' && calculations.tzsDiscount && (
+                        <p className="text-xs text-emerald-500">≈ TZS -{calculations.tzsDiscount.toLocaleString()}</p>
+                      )}
+                    </div>
                   </div>
                 )}
                 {watchTaxRate > 0 && (
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-start">
                     <span className="text-muted-foreground">Tax ({watchTaxRate}%)</span>
-                    <span>{currencySymbol}{calculations.taxAmount.toFixed(2)}</span>
+                    <div className="text-right">
+                      <span>{currencySymbol}{calculations.taxAmount.toFixed(2)}</span>
+                      {watchCurrency !== 'TZS' && calculations.tzsTax && (
+                        <p className="text-xs text-muted-foreground">≈ TZS {calculations.tzsTax.toLocaleString()}</p>
+                      )}
+                    </div>
                   </div>
                 )}
                 <Separator />
-                <div className="flex justify-between text-lg font-bold">
+                <div className="flex justify-between items-start text-lg font-bold">
                   <span>Total Amount</span>
-                  <span className="text-primary">{currencySymbol}{calculations.total.toFixed(2)}</span>
+                  <div className="text-right">
+                    <span className="text-primary">{currencySymbol}{calculations.total.toFixed(2)}</span>
+                    {watchCurrency !== 'TZS' && calculations.tzsTotal && (
+                      <p className="text-sm font-semibold text-muted-foreground">≈ TZS {calculations.tzsTotal.toLocaleString()}</p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
