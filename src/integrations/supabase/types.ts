@@ -648,39 +648,78 @@ export type Database = {
           assigned_employee_id: string | null
           company_name: string | null
           created_at: string | null
+          customer_code: string | null
+          customer_type: Database["public"]["Enums"]["customer_type"] | null
           email: string | null
           id: string
+          incharge_1_email: string | null
+          incharge_1_name: string | null
+          incharge_1_phone: string | null
+          incharge_2_email: string | null
+          incharge_2_name: string | null
+          incharge_2_phone: string | null
+          incharge_3_email: string | null
+          incharge_3_name: string | null
+          incharge_3_phone: string | null
           name: string
           notes: string | null
           phone: string | null
+          tin: string | null
           updated_at: string | null
           user_id: string | null
+          vrn: string | null
         }
         Insert: {
           address?: string | null
           assigned_employee_id?: string | null
           company_name?: string | null
           created_at?: string | null
+          customer_code?: string | null
+          customer_type?: Database["public"]["Enums"]["customer_type"] | null
           email?: string | null
           id?: string
+          incharge_1_email?: string | null
+          incharge_1_name?: string | null
+          incharge_1_phone?: string | null
+          incharge_2_email?: string | null
+          incharge_2_name?: string | null
+          incharge_2_phone?: string | null
+          incharge_3_email?: string | null
+          incharge_3_name?: string | null
+          incharge_3_phone?: string | null
           name: string
           notes?: string | null
           phone?: string | null
+          tin?: string | null
           updated_at?: string | null
           user_id?: string | null
+          vrn?: string | null
         }
         Update: {
           address?: string | null
           assigned_employee_id?: string | null
           company_name?: string | null
           created_at?: string | null
+          customer_code?: string | null
+          customer_type?: Database["public"]["Enums"]["customer_type"] | null
           email?: string | null
           id?: string
+          incharge_1_email?: string | null
+          incharge_1_name?: string | null
+          incharge_1_phone?: string | null
+          incharge_2_email?: string | null
+          incharge_2_name?: string | null
+          incharge_2_phone?: string | null
+          incharge_3_email?: string | null
+          incharge_3_name?: string | null
+          incharge_3_phone?: string | null
           name?: string
           notes?: string | null
           phone?: string | null
+          tin?: string | null
           updated_at?: string | null
           user_id?: string | null
+          vrn?: string | null
         }
         Relationships: []
       }
@@ -2340,6 +2379,7 @@ export type Database = {
     Functions: {
       allocate_batch_costs: { Args: { p_batch_id: string }; Returns: undefined }
       generate_batch_number: { Args: never; Returns: string }
+      generate_customer_code: { Args: never; Returns: string }
       generate_document_number: { Args: { prefix: string }; Returns: string }
       generate_journal_number: { Args: never; Returns: string }
       generate_settlement_number: { Args: never; Returns: string }
@@ -2379,6 +2419,7 @@ export type Database = {
         | "customer_direct"
         | "agent_collect"
         | "astraline_internal"
+      customer_type: "individual" | "corporate"
       invoice_direction_type: "to_agent" | "from_agent"
       shipment_owner_type: "astraline" | "agent"
       shipment_status: "collected" | "in_transit" | "arrived" | "delivered"
@@ -2517,6 +2558,7 @@ export const Constants = {
         "agent_collect",
         "astraline_internal",
       ],
+      customer_type: ["individual", "corporate"],
       invoice_direction_type: ["to_agent", "from_agent"],
       shipment_owner_type: ["astraline", "agent"],
       shipment_status: ["collected", "in_transit", "arrived", "delivered"],

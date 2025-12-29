@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { MoreHorizontal, Users, Eye, Pencil, Trash2, Mail, Phone, Building2 } from 'lucide-react';
+import { MoreHorizontal, Users, Eye, Pencil, Trash2, Mail, Phone, Building2, User } from 'lucide-react';
 import { Customer, useDeleteCustomer } from '@/hooks/useCustomers';
 import { CustomerDialog } from './CustomerDialog';
 import { CustomerDetailsDrawer } from './CustomerDetailsDrawer';
@@ -46,9 +47,10 @@ export function CustomerTable({ customers, isLoading }: CustomerTableProps) {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Customer ID</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Contact</TableHead>
-              <TableHead>Company</TableHead>
+              <TableHead>Type</TableHead>
               <TableHead>Created</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
@@ -56,9 +58,10 @@ export function CustomerTable({ customers, isLoading }: CustomerTableProps) {
           <TableBody>
             {[...Array(5)].map((_, i) => (
               <TableRow key={i}>
+                <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                 <TableCell><Skeleton className="h-8 w-8" /></TableCell>
               </TableRow>
@@ -85,54 +88,70 @@ export function CustomerTable({ customers, isLoading }: CustomerTableProps) {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Customer ID</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Contact</TableHead>
-              <TableHead>Company</TableHead>
+              <TableHead>Type</TableHead>
               <TableHead>Created</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {customers.map((customer) => (
-              <TableRow 
-                key={customer.id} 
-                className="cursor-pointer hover:bg-muted/50"
-                onClick={() => handleViewDetails(customer)}
-              >
-                <TableCell>
-                  <span className="font-medium">{customer.name}</span>
-                </TableCell>
-                <TableCell>
-                  <div className="space-y-1">
-                    {customer.email && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Mail className="h-3 w-3 text-muted-foreground" />
-                        <span className="text-muted-foreground">{customer.email}</span>
-                      </div>
-                    )}
-                    {customer.phone && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Phone className="h-3 w-3 text-muted-foreground" />
-                        <span className="text-muted-foreground">{customer.phone}</span>
-                      </div>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  {customer.company_name ? (
-                    <div className="flex items-center gap-2">
-                      <Building2 className="h-4 w-4 text-muted-foreground" />
-                      <span>{customer.company_name}</span>
+            {customers.map((customer) => {
+              const customerType = (customer as any).customer_type || 'individual';
+              const customerCode = (customer as any).customer_code;
+              
+              return (
+                <TableRow 
+                  key={customer.id} 
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => handleViewDetails(customer)}
+                >
+                  <TableCell>
+                    <span className="font-mono text-sm font-medium text-primary">{customerCode || '—'}</span>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col">
+                      <span className="font-medium">{customer.name}</span>
+                      {customer.company_name && customerType === 'corporate' && (
+                        <span className="text-xs text-muted-foreground">{customer.company_name}</span>
+                      )}
                     </div>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <span className="text-muted-foreground">
-                    {format(new Date(customer.created_at || new Date()), 'MMM dd, yyyy')}
-                  </span>
-                </TableCell>
+                  </TableCell>
+                  <TableCell>
+                    <div className="space-y-1">
+                      {customer.email && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Mail className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-muted-foreground">{customer.email}</span>
+                        </div>
+                      )}
+                      {customer.phone && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Phone className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-muted-foreground">{customer.phone}</span>
+                        </div>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {customerType === 'corporate' ? (
+                      <Badge variant="secondary" className="gap-1">
+                        <Building2 className="h-3 w-3" />
+                        Corporate
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="gap-1">
+                        <User className="h-3 w-3" />
+                        Individual
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-muted-foreground">
+                      {format(new Date(customer.created_at || new Date()), 'MMM dd, yyyy')}
+                    </span>
+                  </TableCell>
                 <TableCell onClick={(e) => e.stopPropagation()}>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -164,9 +183,10 @@ export function CustomerTable({ customers, isLoading }: CustomerTableProps) {
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>

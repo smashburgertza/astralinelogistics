@@ -8,7 +8,7 @@ import { CustomerDialog } from './CustomerDialog';
 import { SHIPMENT_STATUSES, CURRENCY_SYMBOLS } from '@/lib/constants';
 import { useRegions } from '@/hooks/useRegions';
 import { format } from 'date-fns';
-import { Mail, Phone, Building2, MapPin, FileText, Package, Pencil, Calendar } from 'lucide-react';
+import { Mail, Phone, Building2, MapPin, FileText, Package, Pencil, Calendar, User, UserPlus, Shield } from 'lucide-react';
 
 interface CustomerDetailsDrawerProps {
   customer: Customer | null;
@@ -23,15 +23,53 @@ export function CustomerDetailsDrawer({ customer, open, onOpenChange }: Customer
 
   if (!customer) return null;
 
+  const customerType = (customer as any).customer_type || 'individual';
+  const customerCode = (customer as any).customer_code;
+  const tin = (customer as any).tin;
+  const vrn = (customer as any).vrn;
+  const incharge1 = {
+    name: (customer as any).incharge_1_name,
+    phone: (customer as any).incharge_1_phone,
+    email: (customer as any).incharge_1_email,
+  };
+  const incharge2 = {
+    name: (customer as any).incharge_2_name,
+    phone: (customer as any).incharge_2_phone,
+    email: (customer as any).incharge_2_email,
+  };
+  const incharge3 = {
+    name: (customer as any).incharge_3_name,
+    phone: (customer as any).incharge_3_phone,
+    email: (customer as any).incharge_3_email,
+  };
+
+  const hasIncharge = (i: typeof incharge1) => i.name || i.phone || i.email;
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-[500px] overflow-y-auto">
         <SheetHeader>
           <div className="flex items-start justify-between pr-8">
             <div>
-              <SheetTitle className="text-xl">{customer.name}</SheetTitle>
+              <div className="flex items-center gap-2">
+                <SheetTitle className="text-xl">{customer.name}</SheetTitle>
+                {customerType === 'corporate' ? (
+                  <Badge variant="secondary" className="gap-1">
+                    <Building2 className="h-3 w-3" />
+                    Corporate
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="gap-1">
+                    <User className="h-3 w-3" />
+                    Individual
+                  </Badge>
+                )}
+              </div>
               {customer.company_name && (
                 <p className="text-muted-foreground mt-1">{customer.company_name}</p>
+              )}
+              {customerCode && (
+                <p className="font-mono text-sm text-primary font-medium mt-1">{customerCode}</p>
               )}
             </div>
             <CustomerDialog
@@ -67,12 +105,6 @@ export function CustomerDetailsDrawer({ customer, open, onOpenChange }: Customer
                   </a>
                 </div>
               )}
-              {customer.company_name && (
-                <div className="flex items-center gap-3">
-                  <Building2 className="h-4 w-4 text-muted-foreground" />
-                  <span>{customer.company_name}</span>
-                </div>
-              )}
               {customer.address && (
                 <div className="flex items-start gap-3">
                   <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
@@ -81,6 +113,67 @@ export function CustomerDetailsDrawer({ customer, open, onOpenChange }: Customer
               )}
             </div>
           </div>
+
+          {/* Corporate Details */}
+          {customerType === 'corporate' && (tin || vrn) && (
+            <>
+              <Separator />
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase flex items-center gap-2">
+                  <Shield className="h-4 w-4" />
+                  Tax Information
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  {tin && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">TIN</p>
+                      <p className="font-medium">{tin}</p>
+                    </div>
+                  )}
+                  {vrn && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">VRN</p>
+                      <p className="font-medium">{vrn}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Incharge Persons */}
+          {customerType === 'corporate' && (hasIncharge(incharge1) || hasIncharge(incharge2) || hasIncharge(incharge3)) && (
+            <>
+              <Separator />
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase flex items-center gap-2">
+                  <UserPlus className="h-4 w-4" />
+                  Incharge Persons
+                </h3>
+                <div className="space-y-3">
+                  {[incharge1, incharge2, incharge3].filter(hasIncharge).map((incharge, idx) => (
+                    <div key={idx} className="p-3 rounded-lg bg-muted/50 space-y-1">
+                      {incharge.name && <p className="font-medium">{incharge.name}</p>}
+                      <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                        {incharge.phone && (
+                          <a href={`tel:${incharge.phone}`} className="flex items-center gap-1 hover:text-foreground">
+                            <Phone className="h-3 w-3" />
+                            {incharge.phone}
+                          </a>
+                        )}
+                        {incharge.email && (
+                          <a href={`mailto:${incharge.email}`} className="flex items-center gap-1 hover:text-foreground">
+                            <Mail className="h-3 w-3" />
+                            {incharge.email}
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
 
           <Separator />
 
