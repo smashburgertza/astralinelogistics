@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -81,6 +81,25 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
       ],
     },
   });
+
+  // Reset form when dialog opens
+  useEffect(() => {
+    if (open) {
+      form.reset({
+        customer_id: '',
+        shipment_id: '',
+        origin_region: '',
+        currency: 'USD',
+        valid_days: 30,
+        discount: '',
+        tax_rate: 0,
+        notes: '',
+        line_items: [
+          { account_id: '', description: '', quantity: 1, unit_price: 0 },
+        ],
+      });
+    }
+  }, [open, form]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
