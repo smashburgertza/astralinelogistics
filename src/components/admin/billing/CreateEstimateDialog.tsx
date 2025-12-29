@@ -187,7 +187,7 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             {/* Header Info */}
             <div className="rounded-lg border bg-card p-4">
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-4 gap-4">
                 <div>
                   <FormField
                     control={form.control}
@@ -215,8 +215,56 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
                   />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground mb-2">Estimate Date</p>
-                  <p className="font-medium">{format(new Date(), 'MMMM dd, yyyy')}</p>
+                  <FormField
+                    control={form.control}
+                    name="origin_region"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs text-muted-foreground">Origin Region</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="font-medium">
+                              <SelectValue placeholder="Select region" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {regions.map((region) => (
+                              <SelectItem key={region.code} value={region.code}>
+                                {region.flag_emoji} {region.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div>
+                  <FormField
+                    control={form.control}
+                    name="currency"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs text-muted-foreground">Currency</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="font-medium">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="USD">USD ($)</SelectItem>
+                            <SelectItem value="GBP">GBP (£)</SelectItem>
+                            <SelectItem value="EUR">EUR (€)</SelectItem>
+                            <SelectItem value="AED">AED (د.إ)</SelectItem>
+                            <SelectItem value="TZS">TZS (TSh)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground mb-2">Grand Total</p>
@@ -231,32 +279,8 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
                 </div>
               </div>
 
-              {/* Region & Shipment */}
+              {/* Shipment & Date */}
               <div className="grid grid-cols-2 gap-4 mt-4">
-                <FormField
-                  control={form.control}
-                  name="origin_region"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs text-muted-foreground">Origin Region</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select region" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {regions.map((region) => (
-                            <SelectItem key={region.code} value={region.code}>
-                              {region.flag_emoji} {region.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
                 <FormField
                   control={form.control}
                   name="shipment_id"
@@ -285,6 +309,10 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
                     </FormItem>
                   )}
                 />
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Estimate Date</p>
+                  <p className="font-medium">{format(new Date(), 'MMMM dd, yyyy')}</p>
+                </div>
               </div>
             </div>
 
@@ -499,30 +527,6 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="currency"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Currency</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="USD">USD</SelectItem>
-                          <SelectItem value="GBP">GBP</SelectItem>
-                          <SelectItem value="EUR">EUR</SelectItem>
-                          <SelectItem value="AED">AED</SelectItem>
-                          <SelectItem value="TZS">TZS</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
               </div>
 
               {/* Right Column - Summary */}
