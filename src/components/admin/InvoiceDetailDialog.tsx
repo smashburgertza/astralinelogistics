@@ -10,8 +10,9 @@ import {
   Plus, 
   CreditCard, 
   Calendar, 
-  User, 
-  Package, 
+  User,
+  Building2,
+  Package,
   FileText,
   CheckCircle,
   Clock,
@@ -150,28 +151,49 @@ export function InvoiceDetailDialog({ invoice, open, onOpenChange }: InvoiceDeta
 
               <Separator />
 
-              {/* Customer & Shipment Info */}
+              {/* Customer or Agent & Shipment Info */}
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-4">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <User className="h-4 w-4" />
-                    <span className="text-sm font-medium">Customer</span>
-                  </div>
-                  <div className="pl-6">
-                    <p className="font-medium">{invoice.customers?.name || invoice.shipments?.customer_name || 'Unknown'}</p>
-                    {invoice.customers?.company_name && (
-                      <p className="text-sm text-muted-foreground">{invoice.customers.company_name}</p>
-                    )}
-                    {invoice.customers?.email && (
-                      <p className="text-sm text-muted-foreground">{invoice.customers.email}</p>
-                    )}
-                    {invoice.customers?.phone && (
-                      <p className="text-sm text-muted-foreground">{invoice.customers.phone}</p>
-                    )}
-                    {invoice.customers?.address && (
-                      <p className="text-sm text-muted-foreground mt-2">{invoice.customers.address}</p>
-                    )}
-                  </div>
+                  {/* Show Agent info for B2B invoices, Customer info otherwise */}
+                  {(invoice.invoice_direction === 'from_agent' || invoice.invoice_direction === 'to_agent') && (invoice as any).agent ? (
+                    <>
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Building2 className="h-4 w-4" />
+                        <span className="text-sm font-medium">Agent</span>
+                      </div>
+                      <div className="pl-6">
+                        <p className="font-medium">{(invoice as any).agent?.company_name || (invoice as any).agent?.full_name || 'Unknown Agent'}</p>
+                        {(invoice as any).agent?.company_name && (invoice as any).agent?.full_name && (
+                          <p className="text-sm text-muted-foreground">{(invoice as any).agent.full_name}</p>
+                        )}
+                        {(invoice as any).agent?.agent_code && (
+                          <p className="text-sm text-muted-foreground font-mono">{(invoice as any).agent.agent_code}</p>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <User className="h-4 w-4" />
+                        <span className="text-sm font-medium">Customer</span>
+                      </div>
+                      <div className="pl-6">
+                        <p className="font-medium">{invoice.customers?.name || invoice.shipments?.customer_name || 'Unknown'}</p>
+                        {invoice.customers?.company_name && (
+                          <p className="text-sm text-muted-foreground">{invoice.customers.company_name}</p>
+                        )}
+                        {invoice.customers?.email && (
+                          <p className="text-sm text-muted-foreground">{invoice.customers.email}</p>
+                        )}
+                        {invoice.customers?.phone && (
+                          <p className="text-sm text-muted-foreground">{invoice.customers.phone}</p>
+                        )}
+                        {invoice.customers?.address && (
+                          <p className="text-sm text-muted-foreground mt-2">{invoice.customers.address}</p>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {invoice.shipments && (
