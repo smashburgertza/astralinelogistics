@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Building2, Mail, Shield, Settings, Save, Loader2, Upload, Trash2, ImageIcon, RefreshCw, ShoppingBag, Calculator, Eye } from 'lucide-react';
+import { Building2, Mail, Shield, Settings, Save, Loader2, Upload, Trash2, ImageIcon, RefreshCw, ShoppingBag, Calculator, Eye, FileText } from 'lucide-react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -43,6 +43,7 @@ import { AirCargoPricingManagement } from '@/components/admin/AirCargoPricingMan
 import { ConversionAnalytics } from '@/components/admin/ConversionAnalytics';
 import { PricingCalculator } from '@/components/home/PricingCalculator';
 import { ShoppingAggregator } from '@/components/shopping/ShoppingAggregator';
+import { InvoiceEstimateSettings } from '@/components/admin/InvoiceEstimateSettings';
 import {
   Dialog,
   DialogContent,
@@ -387,6 +388,10 @@ export default function AdminSettingsPage() {
             <TabsTrigger value="system" className="gap-2">
               <Settings className="h-4 w-4 hidden sm:inline" />
               System
+            </TabsTrigger>
+            <TabsTrigger value="invoices" className="gap-2">
+              <FileText className="h-4 w-4 hidden sm:inline" />
+              Invoices
             </TabsTrigger>
           </TabsList>
         </div>
@@ -1046,6 +1051,11 @@ export default function AdminSettingsPage() {
               </Form>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Invoice/Estimate Settings */}
+        <TabsContent value="invoices">
+          <InvoiceEstimateSettings />
         </TabsContent>
       </Tabs>
     </AdminLayout>
