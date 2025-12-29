@@ -601,8 +601,9 @@ export function ShipmentUploadForm() {
       }
 
       // Create a separate shipment for agent's consolidated cargo if any
+      // Agent's own cargo is marked as shipment_owner='agent' and NO B2B invoice is created
+      // because the agent owns this cargo - there's no billing between Astraline and agent
       if (agentCargoWeight > 0) {
-        const agentCargoAmount = agentCargoWeight * ratePerKg + transitAdditionalCost;
         const agentTrackingNumber = generateTrackingNumber();
         
         const { data: agentShipment, error: agentShipmentError } = await supabase
@@ -620,38 +621,18 @@ export function ShipmentUploadForm() {
             tracking_number: agentTrackingNumber,
             batch_id: batchId,
             billing_party: 'agent_collect' as BillingPartyType,
+            shipment_owner: 'agent', // Agent owns this cargo - no B2B invoicing
             transit_point: transitPoint,
             rate_per_kg: ratePerKg,
-            total_revenue: agentCargoAmount,
+            total_revenue: 0, // No revenue for Astraline on agent-owned cargo
           })
           .select()
           .single();
 
         if (agentShipmentError) {
           console.error('Failed to create agent cargo shipment:', agentShipmentError);
-        } else {
-          // Create invoice FROM agent for their cargo (they collected from their customers)
-          const { error: agentInvoiceError } = await supabase
-            .from('invoices')
-            .insert({
-              shipment_id: agentShipment.id,
-              customer_id: null,
-              agent_id: user?.id,
-              invoice_number: '',
-              invoice_type: 'shipping',
-              amount: agentCargoAmount,
-              currency: currency,
-              status: 'pending',
-              created_by: user?.id,
-              invoice_direction: 'from_agent',
-              rate_per_kg: ratePerKg,
-              notes: `Agent consolidated cargo from ${currentRegionInfo?.region_name || selectedRegion}. Weight: ${agentCargoWeight}kg @ ${currencySymbol}${ratePerKg}/kg`,
-            });
-
-          if (agentInvoiceError) {
-            console.error('Failed to create agent cargo invoice:', agentInvoiceError);
-          }
         }
+        // NOTE: No invoice is created for agent's own cargo - they own it, no billing between parties
       }
 
       setCompletedShipments(createdShipments);

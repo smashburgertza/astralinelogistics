@@ -185,6 +185,7 @@ export function B2BInvoices() {
   });
 
   // Query for agent cargo shipments that need invoicing
+  // Only show shipments where shipment_owner is NOT 'agent' (agent's own cargo shouldn't be invoiced)
   const { data: agentCargoShipments, isLoading: isLoadingCargo } = useQuery({
     queryKey: ["agent-cargo-shipments"],
     queryFn: async () => {
@@ -197,9 +198,11 @@ export function B2BInvoices() {
           origin_region,
           created_at,
           agent_id,
-          batch_id
+          batch_id,
+          shipment_owner
         `)
         .gt("agent_cargo_weight_kg", 0)
+        .neq("shipment_owner", "agent") // Exclude agent-owned cargo - no B2B invoicing needed
         .order("created_at", { ascending: false });
 
       if (error) throw error;
