@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { format } from 'date-fns';
 import { 
   Plus, FileText, ArrowRight, Trash2, CheckCircle, XCircle, Clock,
-  Package, Truck
+  Package, Truck, MessageSquare, User, Send
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -85,9 +85,18 @@ const estimateSchema = z.object({
 
 const STATUS_CONFIG = {
   pending: { label: 'Pending', color: 'bg-amber-100 text-amber-800', icon: Clock },
+  sent: { label: 'Sent', color: 'bg-blue-100 text-blue-800', icon: Send },
   approved: { label: 'Approved', color: 'bg-green-100 text-green-800', icon: CheckCircle },
   rejected: { label: 'Rejected', color: 'bg-red-100 text-red-800', icon: XCircle },
-  converted: { label: 'Converted', color: 'bg-blue-100 text-blue-800', icon: FileText },
+  converted: { label: 'Converted', color: 'bg-purple-100 text-purple-800', icon: FileText },
+  closed: { label: 'Closed', color: 'bg-gray-100 text-gray-800', icon: FileText },
+  followed_up: { label: 'Followed Up', color: 'bg-cyan-100 text-cyan-800', icon: MessageSquare },
+};
+
+const CUSTOMER_RESPONSE_CONFIG = {
+  pending: { label: 'Awaiting', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
+  approved: { label: 'Approved', color: 'bg-green-100 text-green-800', icon: CheckCircle },
+  denied: { label: 'Declined', color: 'bg-red-100 text-red-800', icon: XCircle },
 };
 
 export function EstimatesTabContent() {
@@ -549,120 +558,129 @@ export function EstimatesTabContent() {
                 <TableHead>Type</TableHead>
                 <TableHead>Customer</TableHead>
                 <TableHead>Region</TableHead>
-                <TableHead>Weight</TableHead>
                 <TableHead>Total</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Customer Response</TableHead>
                 <TableHead>Valid Until</TableHead>
-                <TableHead className="w-[150px]">Actions</TableHead>
+                <TableHead className="w-[180px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredEstimates.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                     {estimates?.length === 0 ? 'No estimates yet. Create your first estimate.' : 'No estimates match the selected filter.'}
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredEstimates.map((estimate) => (
-                  <TableRow key={estimate.id}>
-                    <TableCell className="font-mono font-medium">
-                      {estimate.estimate_number}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={estimate.estimate_type === 'purchase_shipping' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'}>
-                        {estimate.estimate_type === 'purchase_shipping' ? (
-                          <><Package className="h-3 w-3 mr-1" /> Purchase</>
-                        ) : (
-                          <><Truck className="h-3 w-3 mr-1" /> Shipping</>
-                        )}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {estimate.customers?.name || '-'}
-                    </TableCell>
-                    <TableCell>
-                      {regionsMap[estimate.origin_region]?.name || estimate.origin_region}
-                    </TableCell>
-                    <TableCell>{estimate.weight_kg} kg</TableCell>
-                    <TableCell>
-                      <div>
-                        <span className="font-semibold">
-                          {CURRENCY_SYMBOLS[estimate.currency] || '$'}{estimate.total.toFixed(2)}
-                        </span>
-                        {estimate.currency !== 'TZS' && exchangeRates && (
-                          <p className="text-xs text-muted-foreground">
-                            ≈ TZS {convertToTZS(estimate.total, estimate.currency, exchangeRates).toLocaleString()}
-                          </p>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {getStatusBadge(estimate.status as keyof typeof STATUS_CONFIG)}
-                    </TableCell>
-                    <TableCell>
-                      {estimate.valid_until ? format(new Date(estimate.valid_until), 'MMM d, yyyy') : '-'}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        {estimate.status === 'pending' && (
-                          <>
+                filteredEstimates.map((estimate) => {
+                  const customerResponseConfig = CUSTOMER_RESPONSE_CONFIG[(estimate as any).customer_response as keyof typeof CUSTOMER_RESPONSE_CONFIG] || CUSTOMER_RESPONSE_CONFIG.pending;
+                  const ResponseIcon = customerResponseConfig.icon;
+                  
+                  return (
+                    <TableRow key={estimate.id}>
+                      <TableCell className="font-mono font-medium">
+                        {estimate.estimate_number}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={estimate.estimate_type === 'purchase_shipping' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'}>
+                          {estimate.estimate_type === 'purchase_shipping' ? (
+                            <><Package className="h-3 w-3 mr-1" /> Purchase</>
+                          ) : (
+                            <><Truck className="h-3 w-3 mr-1" /> Shipping</>
+                          )}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {estimate.customers?.name || '-'}
+                      </TableCell>
+                      <TableCell>
+                        {regionsMap[estimate.origin_region]?.name || estimate.origin_region}
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <span className="font-semibold">
+                            {CURRENCY_SYMBOLS[estimate.currency] || '$'}{estimate.total.toFixed(2)}
+                          </span>
+                          {estimate.currency !== 'TZS' && exchangeRates && (
+                            <p className="text-xs text-muted-foreground">
+                              ≈ TZS {convertToTZS(estimate.total, estimate.currency, exchangeRates).toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <Badge variant="outline" className={`${customerResponseConfig.color} gap-1`}>
+                            <ResponseIcon className="h-3 w-3" />
+                            {customerResponseConfig.label}
+                          </Badge>
+                          {(estimate as any).customer_comments && (
+                            <div className="flex items-start gap-1 text-xs text-muted-foreground max-w-[200px]">
+                              <MessageSquare className="h-3 w-3 mt-0.5 shrink-0" />
+                              <span className="truncate" title={(estimate as any).customer_comments}>
+                                {(estimate as any).customer_comments}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {estimate.valid_until ? format(new Date(estimate.valid_until), 'MMM d, yyyy') : '-'}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          {(estimate as any).customer_response === 'denied' && (
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => updateStatus.mutate({ id: estimate.id, status: 'approved' })}
+                              onClick={() => updateStatus.mutate({ id: estimate.id, status: 'followed_up' })}
+                              title="Mark as followed up"
                             >
-                              <CheckCircle className="h-4 w-4" />
+                              <MessageSquare className="h-4 w-4" />
                             </Button>
+                          )}
+                          {(estimate as any).customer_response === 'pending' && estimate.status !== 'converted' && (
                             <Button
                               size="sm"
-                              variant="outline"
-                              onClick={() => updateStatus.mutate({ id: estimate.id, status: 'rejected' })}
+                              onClick={() => convertToInvoice.mutate(estimate.id)}
+                              disabled={convertToInvoice.isPending}
+                              title="Convert to invoice"
                             >
-                              <XCircle className="h-4 w-4" />
+                              <ArrowRight className="h-4 w-4 mr-1" />
+                              Invoice
                             </Button>
-                          </>
-                        )}
-                        {(estimate.status === 'pending' || estimate.status === 'approved') && (
-                          <Button
-                            size="sm"
-                            onClick={() => convertToInvoice.mutate(estimate.id)}
-                            disabled={convertToInvoice.isPending}
-                          >
-                            <ArrowRight className="h-4 w-4 mr-1" />
-                            Invoice
-                          </Button>
-                        )}
-                        {estimate.status !== 'converted' && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button size="sm" variant="ghost" className="text-destructive">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Estimate?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => deleteEstimate.mutate(estimate.id)}
-                                  className="bg-destructive text-destructive-foreground"
-                                >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
+                          )}
+                          {estimate.status !== 'converted' && (estimate as any).customer_response !== 'approved' && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button size="sm" variant="ghost" className="text-destructive">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Estimate?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => deleteEstimate.mutate(estimate.id)}
+                                    className="bg-destructive text-destructive-foreground"
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>
