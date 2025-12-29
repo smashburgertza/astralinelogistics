@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { MoreHorizontal, Shield, ShieldCheck, Pencil, Zap } from 'lucide-react';
+import { MoreHorizontal, Shield, ShieldCheck, Pencil, Zap, Eye } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -43,6 +43,7 @@ import {
 } from '@/hooks/useEmployees';
 import { useCustomRoles } from '@/hooks/useCustomRoles';
 import { usePermissionTemplates } from '@/components/admin/PermissionTemplatesSection';
+import { EmployeeProfileDrawer } from '@/components/admin/EmployeeProfileDrawer';
 
 export function EmployeeTable() {
   const { data: employees, isLoading } = useEmployees();
@@ -52,6 +53,7 @@ export function EmployeeTable() {
   const { templates } = usePermissionTemplates();
   
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [viewingEmployeeId, setViewingEmployeeId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
     employeeRole: '',
     isSuperAdmin: false,
@@ -143,7 +145,11 @@ export function EmployeeTable() {
         </TableHeader>
         <TableBody>
           {employees?.map((employee) => (
-            <TableRow key={employee.user_id}>
+            <TableRow 
+              key={employee.user_id} 
+              className="cursor-pointer"
+              onClick={() => setViewingEmployeeId(employee.user_id)}
+            >
               <TableCell className="font-mono text-sm">
                 {employee.profile?.employee_code || '-'}
               </TableCell>
@@ -178,7 +184,7 @@ export function EmployeeTable() {
                   ? format(new Date(employee.created_at), 'MMM d, yyyy')
                   : 'N/A'}
               </TableCell>
-              <TableCell>
+              <TableCell onClick={(e) => e.stopPropagation()}>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon">
@@ -186,6 +192,10 @@ export function EmployeeTable() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setViewingEmployeeId(employee.user_id)}>
+                      <Eye className="mr-2 h-4 w-4" />
+                      View Profile
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => handleEdit(employee)}>
                       <Pencil className="mr-2 h-4 w-4" />
                       Edit Permissions
@@ -210,6 +220,12 @@ export function EmployeeTable() {
           )}
         </TableBody>
       </Table>
+
+      <EmployeeProfileDrawer
+        open={!!viewingEmployeeId}
+        onOpenChange={(open) => !open && setViewingEmployeeId(null)}
+        employeeId={viewingEmployeeId}
+      />
 
       <Dialog open={!!editingEmployee} onOpenChange={() => setEditingEmployee(null)}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">

@@ -9,10 +9,13 @@ import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   User, Mail, Phone, Calendar, FileText, DollarSign,
   Package, TrendingUp, Award, BarChart3, Clock, CheckCircle,
-  XCircle, AlertCircle, ArrowUpRight, ArrowDownRight, Trophy, Medal
+  XCircle, AlertCircle, ArrowUpRight, ArrowDownRight, Trophy, Medal,
+  ShieldCheck, Shield, History, Hash
 } from 'lucide-react';
 import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import {
@@ -22,6 +25,17 @@ import {
 import { MILESTONES } from '@/hooks/useEmployeeMilestones';
 import { useEmployeeBadges } from '@/hooks/useEmployeeBadges';
 import { BadgeShowcase } from '@/components/admin/EmployeeBadgesDisplay';
+import { PERMISSIONS } from '@/hooks/useEmployees';
+
+interface AuditLogEntry {
+  id: string;
+  action: string;
+  table_name: string | null;
+  old_data: unknown;
+  new_data: unknown;
+  created_at: string | null;
+  performed_by_email?: string;
+}
 
 interface EmployeeProfileDrawerProps {
   open: boolean;
@@ -34,7 +48,10 @@ interface EmployeeProfile {
   fullName: string;
   email: string;
   phone: string | null;
+  employeeCode: string | null;
   employeeRole: string | null;
+  isSuperAdmin: boolean;
+  permissions: Record<string, boolean> | null;
   createdAt: string | null;
 }
 
@@ -67,6 +84,7 @@ interface PerformanceMetrics {
 export function EmployeeProfileDrawer({ open, onOpenChange, employeeId }: EmployeeProfileDrawerProps) {
   const [profile, setProfile] = useState<EmployeeProfile | null>(null);
   const [metrics, setMetrics] = useState<PerformanceMetrics | null>(null);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [achievedMilestones, setAchievedMilestones] = useState<Array<{
     milestone_type: string;
@@ -90,13 +108,13 @@ export function EmployeeProfileDrawer({ open, onOpenChange, employeeId }: Employ
       // Fetch employee profile
       const { data: profileData } = await supabase
         .from('profiles')
-        .select('id, email, full_name, phone')
+        .select('id, email, full_name, phone, employee_code')
         .eq('id', employeeId)
         .maybeSingle();
 
       const { data: roleData } = await supabase
         .from('user_roles')
-        .select('employee_role, created_at')
+        .select('employee_role, role, permissions, created_at')
         .eq('user_id', employeeId)
         .maybeSingle();
 
@@ -106,7 +124,10 @@ export function EmployeeProfileDrawer({ open, onOpenChange, employeeId }: Employ
           fullName: profileData.full_name || 'Unknown',
           email: profileData.email,
           phone: profileData.phone,
+          employeeCode: profileData.employee_code,
           employeeRole: roleData?.employee_role || null,
+          isSuperAdmin: roleData?.role === 'super_admin',
+          permissions: (roleData?.permissions as Record<string, boolean>) || null,
           createdAt: roleData?.created_at || null,
         });
       }
@@ -235,6 +256,36 @@ export function EmployeeProfileDrawer({ open, onOpenChange, employeeId }: Employ
         .order('achieved_at', { ascending: false });
 
       setAchievedMilestones(milestones || []);
+
+      // Fetch audit logs for this employee
+      const { data: logs } = await supabase
+        .from('audit_logs')
+        .select('*')
+        .or(`user_id.eq.${employeeId},new_data->>user_id.eq.${employeeId},old_data->>user_id.eq.${employeeId}`)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (logs && logs.length > 0) {
+        // Fetch performer emails
+        const performerIds = [...new Set(logs.filter(l => l.user_id).map(l => l.user_id))];
+        let performerEmails: Record<string, string> = {};
+        if (performerIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, email')
+            .in('id', performerIds as string[]);
+          performerEmails = (profiles || []).reduce((acc, p) => {
+            acc[p.id] = p.email;
+            return acc;
+          }, {} as Record<string, string>);
+        }
+        setAuditLogs(logs.map(log => ({
+          ...log,
+          performed_by_email: log.user_id ? performerEmails[log.user_id] : undefined,
+        })));
+      } else {
+        setAuditLogs([]);
+      }
     } catch (error) {
       console.error('Error fetching employee data:', error);
     } finally {
@@ -330,15 +381,27 @@ export function EmployeeProfileDrawer({ open, onOpenChange, employeeId }: Employ
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <h3 className="text-xl font-semibold">{profile.fullName}</h3>
-                      {profile.employeeRole && (
+                      {profile.isSuperAdmin ? (
+                        <Badge variant="default" className="gap-1">
+                          <ShieldCheck className="h-3 w-3" />
+                          Super Admin
+                        </Badge>
+                      ) : profile.employeeRole && (
                         <Badge variant="outline" className={`capitalize ${getRoleBadgeColor(profile.employeeRole)}`}>
+                          <Shield className="h-3 w-3 mr-1" />
                           {profile.employeeRole.replace('_', ' ')}
                         </Badge>
                       )}
                     </div>
                     <div className="space-y-1 text-sm text-muted-foreground">
+                      {profile.employeeCode && (
+                        <p className="flex items-center gap-2 font-mono">
+                          <Hash className="w-4 h-4" />
+                          {profile.employeeCode}
+                        </p>
+                      )}
                       <p className="flex items-center gap-2">
                         <Mail className="w-4 h-4" />
                         {profile.email}
@@ -358,6 +421,30 @@ export function EmployeeProfileDrawer({ open, onOpenChange, employeeId }: Employ
                     </div>
                   </div>
                 </div>
+
+                {/* Permissions */}
+                {!profile.isSuperAdmin && profile.permissions && (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium flex items-center gap-2">
+                        <Shield className="w-4 h-4" />
+                        Permissions
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex flex-wrap gap-1.5">
+                        {PERMISSIONS.filter(p => profile.permissions?.[p.key]).map(p => (
+                          <Badge key={p.key} variant="secondary" className="text-xs">
+                            {p.label}
+                          </Badge>
+                        ))}
+                        {PERMISSIONS.filter(p => profile.permissions?.[p.key]).length === 0 && (
+                          <span className="text-sm text-muted-foreground">No permissions assigned</span>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Key Metrics */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -410,7 +497,7 @@ export function EmployeeProfileDrawer({ open, onOpenChange, employeeId }: Employ
 
                 {/* Tabs for Charts and Activity */}
                 <Tabs defaultValue="performance" className="w-full">
-                  <TabsList className="grid w-full grid-cols-5">
+                  <TabsList className="grid w-full grid-cols-6">
                     <TabsTrigger value="performance">Performance</TabsTrigger>
                     <TabsTrigger value="revenue">Revenue</TabsTrigger>
                     <TabsTrigger value="badges">
@@ -422,6 +509,10 @@ export function EmployeeProfileDrawer({ open, onOpenChange, employeeId }: Employ
                       Milestones
                     </TabsTrigger>
                     <TabsTrigger value="activity">Activity</TabsTrigger>
+                    <TabsTrigger value="audit">
+                      <History className="w-3.5 h-3.5 mr-1" />
+                      Audit Log
+                    </TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="performance" className="mt-4">
@@ -627,6 +718,66 @@ export function EmployeeProfileDrawer({ open, onOpenChange, employeeId }: Employ
                                   </p>
                                 </div>
                                 {activity.status && getStatusIcon(activity.status)}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  <TabsContent value="audit" className="mt-4">
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium flex items-center gap-2">
+                          <History className="w-4 h-4" />
+                          Audit Log
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {auditLogs.length === 0 ? (
+                          <div className="text-center py-6 text-muted-foreground">
+                            <History className="w-12 h-12 mx-auto mb-3 text-muted-foreground/30" />
+                            <p className="text-sm">No audit logs found</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                            {auditLogs.map((log) => (
+                              <div
+                                key={log.id}
+                                className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/50"
+                              >
+                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                                  log.action === 'INSERT' ? 'bg-emerald-500/10 text-emerald-600' :
+                                  log.action === 'UPDATE' ? 'bg-blue-500/10 text-blue-600' :
+                                  log.action === 'DELETE' ? 'bg-red-500/10 text-red-600' :
+                                  'bg-muted text-muted-foreground'
+                                }`}>
+                                  {log.action === 'INSERT' ? <CheckCircle className="w-4 h-4" /> :
+                                   log.action === 'UPDATE' ? <FileText className="w-4 h-4" /> :
+                                   log.action === 'DELETE' ? <XCircle className="w-4 h-4" /> :
+                                   <AlertCircle className="w-4 h-4" />}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-0.5">
+                                    <Badge variant={
+                                      log.action === 'INSERT' ? 'default' :
+                                      log.action === 'UPDATE' ? 'secondary' :
+                                      log.action === 'DELETE' ? 'destructive' : 'outline'
+                                    } className="text-xs">
+                                      {log.action === 'INSERT' ? 'Created' :
+                                       log.action === 'UPDATE' ? 'Updated' :
+                                       log.action === 'DELETE' ? 'Deleted' : log.action}
+                                    </Badge>
+                                    <span className="text-xs text-muted-foreground">
+                                      {log.table_name}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground">
+                                    {log.performed_by_email ? `By ${log.performed_by_email}` : 'By System'}
+                                    {log.created_at && ` • ${format(new Date(log.created_at), 'MMM d, yyyy HH:mm')}`}
+                                  </p>
+                                </div>
                               </div>
                             ))}
                           </div>
