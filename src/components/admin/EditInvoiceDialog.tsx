@@ -26,6 +26,7 @@ const lineItemSchema = z.object({
   quantity: z.coerce.number().min(0, 'Quantity must be 0 or more'),
   unit_price: z.coerce.number().min(0, 'Price must be 0 or more'),
   item_type: z.string().default('other'),
+  unit_type: z.string().optional(), // 'fixed', 'percent', 'kg'
 });
 
 const invoiceSchema = z.object({
@@ -62,7 +63,7 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange }: EditInvoiceDi
       currency: 'USD',
       due_date: '',
       notes: '',
-      line_items: [{ description: '', quantity: 1, unit_price: 0, item_type: 'other' }],
+      line_items: [{ description: '', quantity: 1, unit_price: 0, item_type: 'other', unit_type: 'fixed' }],
     },
   });
 
@@ -91,6 +92,7 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange }: EditInvoiceDi
           quantity: item.quantity,
           unit_price: item.unit_price,
           item_type: item.item_type,
+          unit_type: item.unit_type || 'fixed',
         }));
       } else if (invoice.amount && invoice.amount > 0) {
         // No items exist but invoice has an amount - create a default item from invoice data
@@ -120,10 +122,25 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange }: EditInvoiceDi
   const watchedCurrency = form.watch('currency');
 
   const calculations = useMemo(() => {
-    const subtotal = watchedItems.reduce((sum, item) => {
-      return sum + (Number(item.quantity) * Number(item.unit_price));
-    }, 0);
-    return { subtotal, total: subtotal };
+    // Calculate with cascading percentages - each % applies to all items above it
+    let runningTotal = 0;
+    const lineItemAmounts: number[] = [];
+
+    watchedItems.forEach((item) => {
+      if (item.unit_type === 'percent') {
+        // Apply percentage to the running total (everything above)
+        const percentageAmount = runningTotal * (Number(item.unit_price) / 100);
+        lineItemAmounts.push(percentageAmount);
+        runningTotal += percentageAmount;
+      } else {
+        // Regular item - add to running total
+        const itemAmount = Number(item.quantity) * Number(item.unit_price);
+        lineItemAmounts.push(itemAmount);
+        runningTotal += itemAmount;
+      }
+    });
+
+    return { subtotal: runningTotal, total: runningTotal, lineItemAmounts };
   }, [watchedItems]);
 
   const currencySymbol = CURRENCY_SYMBOLS[watchedCurrency] || watchedCurrency;
@@ -159,9 +176,19 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange }: EditInvoiceDi
         }
       }
 
-      // Update or create items
-      for (const item of data.line_items) {
-        const amount = Number(item.quantity) * Number(item.unit_price);
+      // Update or create items - calculate amounts with cascading percentages
+      let runningTotal = 0;
+      for (let i = 0; i < data.line_items.length; i++) {
+        const item = data.line_items[i];
+        let amount: number;
+        
+        if (item.unit_type === 'percent') {
+          amount = runningTotal * (Number(item.unit_price) / 100);
+        } else {
+          amount = Number(item.quantity) * Number(item.unit_price);
+        }
+        runningTotal += amount;
+
         if (item.id && existingIds.includes(item.id)) {
           // Update existing
           await updateInvoiceItem.mutateAsync({
@@ -183,6 +210,7 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange }: EditInvoiceDi
             item_type: (item.item_type || 'other') as 'freight' | 'customs' | 'handling' | 'insurance' | 'duty' | 'transit' | 'other',
             currency: data.currency,
             weight_kg: null,
+            unit_type: (item.unit_type || 'fixed') as 'fixed' | 'percent' | 'kg',
           });
         }
       }
@@ -323,7 +351,7 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange }: EditInvoiceDi
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => append({ description: '', quantity: 1, unit_price: 0, item_type: 'other' })}
+                    onClick={() => append({ description: '', quantity: 1, unit_price: 0, item_type: 'other', unit_type: 'fixed' })}
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Add Item
@@ -370,7 +398,9 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange }: EditInvoiceDi
                         name={`line_items.${index}.unit_price`}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-xs">Price</FormLabel>
+                            <FormLabel className="text-xs">
+                              {watchedItems[index]?.unit_type === 'percent' ? 'Rate (%)' : 'Price'}
+                            </FormLabel>
                             <FormControl>
                               <Input {...field} type="number" step="0.01" min="0" />
                             </FormControl>
@@ -382,7 +412,12 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange }: EditInvoiceDi
 
                     <div className="col-span-2 pt-6">
                       <p className="text-sm font-medium">
-                        {currencySymbol}{(Number(watchedItems[index]?.quantity || 0) * Number(watchedItems[index]?.unit_price || 0)).toFixed(2)}
+                        {currencySymbol}{(calculations.lineItemAmounts?.[index] ?? 0).toFixed(2)}
+                        {watchedItems[index]?.unit_type === 'percent' && (
+                          <span className="text-xs text-muted-foreground ml-1">
+                            ({watchedItems[index]?.unit_price}%)
+                          </span>
+                        )}
                       </p>
                     </div>
 
