@@ -33,6 +33,10 @@ import { toast } from "sonner";
 import { InvoiceStatusBadge } from "./InvoiceStatusBadge";
 import { CreateAgentCargoInvoiceDialog } from "./CreateAgentCargoInvoiceDialog";
 import { InvoiceDetailDialog } from "./InvoiceDetailDialog";
+import { useExchangeRates } from "@/hooks/useExchangeRates";
+
+// Platform base currency
+const PLATFORM_BASE_CURRENCY = "TZS";
 
 interface B2BInvoice {
   id: string;
@@ -84,6 +88,26 @@ export function B2BInvoices() {
   const [selectedInvoice, setSelectedInvoice] = useState<B2BInvoice | null>(null);
   const [invoiceDetailOpen, setInvoiceDetailOpen] = useState(false);
   const queryClient = useQueryClient();
+  const { data: exchangeRates } = useExchangeRates();
+  
+  // Build rate map for currency conversion
+  const rateMap = new Map<string, number>();
+  rateMap.set('TZS', 1);
+  exchangeRates?.forEach(r => rateMap.set(r.currency_code, r.rate_to_tzs));
+  
+  // Helper to convert amount to platform base currency (TZS)
+  const convertToBaseCurrency = (amount: number, currency: string): number => {
+    const rate = rateMap.get(currency) || 1;
+    return amount * rate;
+  };
+  
+  // Format TZS with thousands separator
+  const formatTZS = (amount: number): string => {
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
 
   const { data: invoices, isLoading } = useQuery({
     queryKey: ["b2b-invoices"],
@@ -252,8 +276,11 @@ export function B2BInvoices() {
   const pendingFromAgents = fromAgentInvoices.filter((i) => i.status === "pending");
   const pendingToAgents = toAgentInvoices.filter((i) => i.status === "pending");
 
-  const totalOwedToAgents = pendingFromAgents.reduce((sum, i) => sum + (i.amount || 0), 0);
-  const totalOwedByAgents = pendingToAgents.reduce((sum, i) => sum + (i.amount || 0), 0);
+  // Calculate totals in platform base currency (TZS)
+  const totalOwedToAgents = pendingFromAgents.reduce((sum, i) => 
+    sum + convertToBaseCurrency(i.amount || 0, i.currency || 'USD'), 0);
+  const totalOwedByAgents = pendingToAgents.reduce((sum, i) => 
+    sum + convertToBaseCurrency(i.amount || 0, i.currency || 'USD'), 0);
 
   const renderInvoiceTable = (invoiceList: B2BInvoice[]) => {
     if (invoiceList.length === 0) {
@@ -365,7 +392,7 @@ export function B2BInvoices() {
                   We Owe Agents
                 </p>
                 <p className="text-3xl font-bold text-red-600 dark:text-red-400">
-                  ${totalOwedToAgents.toFixed(2)}
+                  TZS {formatTZS(totalOwedToAgents)}
                 </p>
                 <p className="text-xs text-muted-foreground mt-2">
                   {pendingFromAgents.length} pending invoice{pendingFromAgents.length !== 1 ? "s" : ""}
@@ -386,7 +413,7 @@ export function B2BInvoices() {
                   Agents Owe Us
                 </p>
                 <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">
-                  ${totalOwedByAgents.toFixed(2)}
+                  TZS {formatTZS(totalOwedByAgents)}
                 </p>
                 <p className="text-xs text-muted-foreground mt-2">
                   {pendingToAgents.length} pending invoice{pendingToAgents.length !== 1 ? "s" : ""}
