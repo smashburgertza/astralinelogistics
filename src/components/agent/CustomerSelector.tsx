@@ -20,6 +20,7 @@ interface Customer {
   id: string;
   name: string;
   phone?: string | null;
+  customer_code?: string | null;
 }
 
 interface CustomerSelectorProps {
@@ -37,7 +38,7 @@ export function CustomerSelector({
   onChange, 
   customers, 
   isLoading,
-  placeholder = "Search or type name..."
+  placeholder = "Search customer..."
 }: CustomerSelectorProps) {
   const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
@@ -48,7 +49,8 @@ export function CustomerSelector({
     const searchLower = inputValue.toLowerCase();
     return customers.filter(c => 
       c.name.toLowerCase().includes(searchLower) ||
-      c.phone?.toLowerCase().includes(searchLower)
+      c.phone?.toLowerCase().includes(searchLower) ||
+      c.customer_code?.toLowerCase().includes(searchLower)
     ).slice(0, 20);
   }, [customers, inputValue]);
 
@@ -131,7 +133,14 @@ export function CustomerSelector({
                       )}
                     />
                     <div className="flex flex-col">
-                      <span className="font-medium">{customer.name}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{customer.name}</span>
+                        {customer.customer_code && (
+                          <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                            {customer.customer_code}
+                          </span>
+                        )}
+                      </div>
                       {customer.phone && (
                         <span className="text-xs text-muted-foreground">{customer.phone}</span>
                       )}
