@@ -22,8 +22,11 @@ import { supabase } from '@/integrations/supabase/client';
 const lineItemSchema = z.object({
   account_id: z.string().optional(),
   description: z.string().min(1, 'Description is required'),
-  quantity: z.coerce.number().min(1, 'Quantity must be at least 1'),
+  quantity: z.coerce.number().min(0.01, 'Quantity must be greater than 0'),
   unit_price: z.coerce.number().min(0, 'Price must be 0 or more'),
+  shipment_id: z.string().optional(),
+  weight_kg: z.coerce.number().optional(),
+  tracking_number: z.string().optional(),
 });
 
 const invoiceSchema = z.object({
@@ -79,7 +82,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
       tax_rate: 0,
       notes: '',
       line_items: [
-        { account_id: '', description: '', quantity: 1, unit_price: 0 },
+        { account_id: '', description: '', quantity: 1, unit_price: 0, shipment_id: '', weight_kg: 0, tracking_number: '' },
       ],
     },
   });
@@ -96,7 +99,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
         tax_rate: 0,
         notes: '',
         line_items: [
-          { account_id: '', description: '', quantity: 1, unit_price: 0 },
+          { account_id: '', description: '', quantity: 1, unit_price: 0, shipment_id: '', weight_kg: 0, tracking_number: '' },
         ],
       });
     }
@@ -126,6 +129,61 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
   useEffect(() => {
     form.setValue('shipment_ids', []);
   }, [watchCustomerId, form]);
+
+  // Add line items when shipments are selected
+  useEffect(() => {
+    if (!watchShipmentIds || watchShipmentIds.length === 0) return;
+    
+    // Get current line items that are NOT from shipments (no tracking_number means user-added)
+    const currentLineItems = form.getValues('line_items');
+    const nonShipmentItems = currentLineItems.filter(
+      (item) => !item.tracking_number || item.tracking_number === ''
+    );
+    
+    // Create line items from selected shipments
+    const shipmentLineItems = watchShipmentIds.map((shipmentId) => {
+      const shipment = customerShipments.find(s => s.id === shipmentId);
+      if (!shipment) return null;
+      
+      return {
+        account_id: '',
+        description: shipment.description || 'Cargo shipment',
+        quantity: shipment.total_weight_kg,
+        unit_price: shipment.rate_per_kg || 0,
+        shipment_id: shipment.id,
+        weight_kg: shipment.total_weight_kg,
+        tracking_number: shipment.tracking_number,
+      };
+    }).filter((item): item is NonNullable<typeof item> => item !== null);
+    
+    // Combine non-shipment items with shipment items
+    const newLineItems: typeof shipmentLineItems = [...shipmentLineItems];
+    
+    // If there are no items or only empty default items, just use shipment items
+    // Otherwise, keep the non-shipment items that have content
+    const validNonShipmentItems = nonShipmentItems.filter(
+      item => item.description && item.description.trim() !== ''
+    ).map(item => ({
+      account_id: item.account_id || '',
+      description: item.description || '',
+      quantity: item.quantity || 1,
+      unit_price: item.unit_price || 0,
+      shipment_id: item.shipment_id || '',
+      weight_kg: item.weight_kg || 0,
+      tracking_number: item.tracking_number || '',
+    }));
+    
+    if (validNonShipmentItems.length > 0) {
+      newLineItems.push(...validNonShipmentItems);
+    }
+    
+    // If we still have no items, add an empty one
+    if (newLineItems.length === 0) {
+      newLineItems.push({ account_id: '', description: '', quantity: 1, unit_price: 0, shipment_id: '', weight_kg: 0, tracking_number: '' });
+    }
+    
+    form.setValue('line_items', newLineItems);
+  }, [watchShipmentIds, customerShipments, form]);
 
   // Calculate totals
   const calculations = useMemo(() => {
@@ -211,7 +269,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
   };
 
   const handleAddLineItem = () => {
-    append({ account_id: '', description: '', quantity: 1, unit_price: 0 });
+    append({ account_id: '', description: '', quantity: 1, unit_price: 0, shipment_id: '', weight_kg: 0, tracking_number: '' });
   };
 
   return (
@@ -367,10 +425,11 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
               
               {/* Line Items Header */}
               <div className="grid grid-cols-12 gap-2 text-xs text-muted-foreground px-2">
-                <div className="col-span-3">Service</div>
+                <div className="col-span-2">Service</div>
                 <div className="col-span-3">Item Description</div>
-                <div className="col-span-1 text-center">Qty</div>
-                <div className="col-span-2 text-right">Unit Price</div>
+                <div className="col-span-2">Tracking #</div>
+                <div className="col-span-1 text-center">Weight</div>
+                <div className="col-span-1 text-right">Rate/kg</div>
                 <div className="col-span-2 text-right">Total</div>
                 <div className="col-span-1"></div>
               </div>
@@ -384,7 +443,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
 
                   return (
                     <div key={field.id} className="grid grid-cols-12 gap-2 items-center">
-                      <div className="col-span-3">
+                      <div className="col-span-2">
                         <FormField
                           control={form.control}
                           name={`line_items.${index}.account_id`}
@@ -446,6 +505,26 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
                           )}
                         />
                       </div>
+                      <div className="col-span-2">
+                        <FormField
+                          control={form.control}
+                          name={`line_items.${index}.tracking_number`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <Input 
+                                  placeholder="Tracking #" 
+                                  {...field} 
+                                  value={field.value || ''}
+                                  className="text-xs bg-muted/50"
+                                  readOnly={!!watchLineItems[index]?.shipment_id}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
                       <div className="col-span-1">
                         <FormField
                           control={form.control}
@@ -455,7 +534,9 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
                               <FormControl>
                                 <Input 
                                   type="number" 
-                                  min="1"
+                                  step="0.01"
+                                  min="0.01"
+                                  placeholder="kg"
                                   className="text-center text-xs"
                                   value={field.value}
                                   onChange={(e) => field.onChange(Number(e.target.value) || 0)}
@@ -469,7 +550,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
                           )}
                         />
                       </div>
-                      <div className="col-span-2">
+                      <div className="col-span-1">
                         <FormField
                           control={form.control}
                           name={`line_items.${index}.unit_price`}
