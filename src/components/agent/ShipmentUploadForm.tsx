@@ -488,7 +488,12 @@ export function ShipmentUploadForm() {
         console.error('Failed to create batch:', batchError);
       }
 
-      // Create each shipment and its invoice
+      // Track all shipment IDs for the consolidated agent invoice
+      const createdShipmentIds: string[] = [];
+      let totalWeight = 0;
+      let totalAmount = 0;
+
+      // Create each shipment (NO individual invoices - one consolidated invoice at the end)
       for (const line of validLines) {
         const parcelBarcode = generateBarcode();
         const trackingNumber = generateTrackingNumber();
@@ -508,7 +513,7 @@ export function ShipmentUploadForm() {
             agent_id: user?.id,
             tracking_number: trackingNumber,
             batch_id: batchId,
-            billing_party: 'customer_direct' as BillingPartyType, // Customer shipments always billed directly
+            billing_party: 'customer_direct' as BillingPartyType,
             transit_point: transitPoint,
             rate_per_kg: ratePerKg,
             total_revenue: lineAmount,
@@ -529,59 +534,9 @@ export function ShipmentUploadForm() {
 
         if (parcelError) throw parcelError;
 
-        // Create invoice FROM agent TO Astraline (what Astraline owes the agent)
-        // This is separate from customer invoices which admin creates manually
-        const { data: invoiceNumberData } = await supabase.rpc('generate_invoice_number');
-        const invoiceNumber = invoiceNumberData || `INV-${Date.now()}`;
-        const transitLabel = transitPoint !== 'direct' ? ` (${TRANSIT_POINT_LABELS[transitPoint]})` : '';
-        
-        const { data: invoice, error: invoiceError } = await supabase
-          .from('invoices')
-          .insert({
-            invoice_number: invoiceNumber,
-            customer_id: line.customer_id || null,
-            shipment_id: shipment.id,
-            amount: lineAmount,
-            currency: currency,
-            invoice_type: 'shipping',
-            status: 'pending',
-            created_by: user?.id,
-            agent_id: user?.id,
-            invoice_direction: 'from_agent', // Astraline owes agent
-            rate_per_kg: ratePerKg,
-            notes: `Agent invoice for customer shipment from ${currentRegionInfo?.region_name || selectedRegion}${transitLabel}. Weight: ${line.weight_kg}kg @ ${currencySymbol}${ratePerKg}/kg`,
-          })
-          .select()
-          .single();
-
-        // Create invoice line items
-        if (invoice) {
-          await supabase.from('invoice_items').insert([
-            {
-              invoice_id: invoice.id,
-              item_type: 'shipping',
-              description: `Shipping ${line.weight_kg}kg @ ${currencySymbol}${ratePerKg}/kg`,
-              quantity: line.weight_kg,
-              unit_price: ratePerKg,
-              weight_kg: line.weight_kg,
-              amount: line.weight_kg * ratePerKg,
-              currency: currency,
-            },
-            ...(transitAdditionalCost > 0 ? [{
-              invoice_id: invoice.id,
-              item_type: 'transit_fee',
-              description: `Transit via ${TRANSIT_POINT_LABELS[transitPoint]}`,
-              quantity: 1,
-              unit_price: transitAdditionalCost,
-              amount: transitAdditionalCost,
-              currency: currency,
-            }] : []),
-          ]);
-        }
-
-        if (invoiceError) {
-          console.error('Failed to create agent invoice:', invoiceError);
-        }
+        createdShipmentIds.push(shipment.id);
+        totalWeight += line.weight_kg;
+        totalAmount += lineAmount;
 
         createdShipments.push({
           tracking_number: shipment.tracking_number,
@@ -596,6 +551,67 @@ export function ShipmentUploadForm() {
             description: line.description
           }]
         });
+      }
+
+      // Create ONE consolidated invoice FROM agent TO Astraline for all customer shipments
+      if (createdShipmentIds.length > 0) {
+        const { data: invoiceNumberData } = await supabase.rpc('generate_invoice_number');
+        const invoiceNumber = invoiceNumberData || `INV-${Date.now()}`;
+        const transitLabel = transitPoint !== 'direct' ? ` (${TRANSIT_POINT_LABELS[transitPoint]})` : '';
+        
+        // Use the first shipment ID as reference (can link to batch instead if needed)
+        const { data: invoice, error: invoiceError } = await supabase
+          .from('invoices')
+          .insert({
+            invoice_number: invoiceNumber,
+            customer_id: null, // No single customer - this is agent's consolidated invoice
+            shipment_id: createdShipmentIds[0], // Reference first shipment
+            amount: totalAmount,
+            currency: currency,
+            invoice_type: 'shipping',
+            status: 'pending',
+            created_by: user?.id,
+            agent_id: user?.id,
+            invoice_direction: 'from_agent', // Astraline owes agent
+            rate_per_kg: ratePerKg,
+            notes: `Agent consolidated invoice for ${createdShipmentIds.length} shipment(s) from ${currentRegionInfo?.region_name || selectedRegion}${transitLabel}. Total: ${totalWeight}kg @ ${currencySymbol}${ratePerKg}/kg`,
+          })
+          .select()
+          .single();
+
+        // Create invoice line items - one per shipment
+        if (invoice) {
+          const lineItems = createdShipments.map((s, idx) => ({
+            invoice_id: invoice.id,
+            item_type: 'shipping',
+            description: `${s.customer_name || 'Customer'} - ${s.tracking_number} (${validLines[idx].weight_kg}kg)`,
+            quantity: validLines[idx].weight_kg,
+            unit_price: ratePerKg,
+            weight_kg: validLines[idx].weight_kg,
+            amount: calculateLineAmount(validLines[idx].weight_kg),
+            currency: currency,
+          }));
+
+          // Add transit fee if applicable (once for the whole batch)
+          if (transitAdditionalCost > 0) {
+            lineItems.push({
+              invoice_id: invoice.id,
+              item_type: 'transit_fee',
+              description: `Transit via ${TRANSIT_POINT_LABELS[transitPoint]}`,
+              quantity: 1,
+              unit_price: transitAdditionalCost * createdShipmentIds.length,
+              weight_kg: null as any,
+              amount: transitAdditionalCost * createdShipmentIds.length,
+              currency: currency,
+            });
+          }
+
+          await supabase.from('invoice_items').insert(lineItems);
+        }
+
+        if (invoiceError) {
+          console.error('Failed to create agent invoice:', invoiceError);
+        }
       }
 
       // Create a separate shipment for agent's consolidated cargo if any
