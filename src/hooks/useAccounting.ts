@@ -484,6 +484,167 @@ export function useCreateBankAccount() {
   });
 }
 
+export function useUpdateBankAccount() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<BankAccount> & { id: string }) => {
+      const { data, error } = await supabase
+        .from('bank_accounts')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
+      toast.success('Bank account updated');
+    },
+    onError: (error) => {
+      toast.error(`Failed to update bank account: ${error.message}`);
+    },
+  });
+}
+
+export function useDeleteBankAccount() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('bank_accounts')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
+      toast.success('Bank account deleted');
+    },
+    onError: (error) => {
+      toast.error(`Failed to delete bank account: ${error.message}`);
+    },
+  });
+}
+
+export function useDeleteAccount() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('chart_of_accounts')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['chart-of-accounts'] });
+      toast.success('Account deleted');
+    },
+    onError: (error) => {
+      toast.error(`Failed to delete account: ${error.message}`);
+    },
+  });
+}
+
+export function useDeleteJournalEntry() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      // First delete journal lines
+      const { error: linesError } = await supabase
+        .from('journal_lines')
+        .delete()
+        .eq('journal_entry_id', id);
+
+      if (linesError) throw linesError;
+
+      // Then delete the entry
+      const { error } = await supabase
+        .from('journal_entries')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
+      queryClient.invalidateQueries({ queryKey: ['accounting-summary'] });
+      toast.success('Journal entry deleted');
+    },
+    onError: (error) => {
+      toast.error(`Failed to delete journal entry: ${error.message}`);
+    },
+  });
+}
+
+export function useUpdateJournalEntry() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      entry,
+      lines,
+    }: {
+      id: string;
+      entry: Partial<JournalEntry>;
+      lines?: Omit<JournalLine, 'id' | 'journal_entry_id' | 'created_at' | 'account'>[];
+    }) => {
+      // Update entry
+      const { data: journalEntry, error: entryError } = await supabase
+        .from('journal_entries')
+        .update(entry)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (entryError) throw entryError;
+
+      // If lines provided, replace them
+      if (lines) {
+        // Delete existing lines
+        const { error: deleteError } = await supabase
+          .from('journal_lines')
+          .delete()
+          .eq('journal_entry_id', id);
+
+        if (deleteError) throw deleteError;
+
+        // Insert new lines
+        const linesWithEntryId = lines.map((line) => ({
+          ...line,
+          journal_entry_id: id,
+        }));
+
+        const { error: linesError } = await supabase
+          .from('journal_lines')
+          .insert(linesWithEntryId);
+
+        if (linesError) throw linesError;
+      }
+
+      return journalEntry;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
+      queryClient.invalidateQueries({ queryKey: ['journal-entry'] });
+      queryClient.invalidateQueries({ queryKey: ['accounting-summary'] });
+      toast.success('Journal entry updated');
+    },
+    onError: (error) => {
+      toast.error(`Failed to update journal entry: ${error.message}`);
+    },
+  });
+}
+
 // Financial Reports
 export function useTrialBalance(asOfDate?: string) {
   return useQuery({

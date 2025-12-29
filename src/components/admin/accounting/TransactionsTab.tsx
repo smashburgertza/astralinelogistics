@@ -5,11 +5,14 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, Eye, ArrowDownCircle, ArrowUpCircle, RefreshCw } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Plus, Search, Eye, ArrowDownCircle, ArrowUpCircle, RefreshCw, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
-import { useJournalEntries } from '@/hooks/useAccounting';
+import { useJournalEntries, useDeleteJournalEntry } from '@/hooks/useAccounting';
 import { SimpleTransactionDialog } from './SimpleTransactionDialog';
 import { JournalEntryDetailDialog } from './JournalEntryDetailDialog';
+import { EditTransactionDialog } from './EditTransactionDialog';
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat('en-US', {
@@ -24,17 +27,26 @@ export function TransactionsTab() {
   const [search, setSearch] = useState('');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
+  const [editEntryId, setEditEntryId] = useState<string | null>(null);
+  const [deleteEntryId, setDeleteEntryId] = useState<string | null>(null);
 
-  const { data: entries = [], isLoading } = useJournalEntries({ 
-    status: 'posted' // Only show posted entries
-  });
+  const { data: entries = [], isLoading } = useJournalEntries();
+  const deleteEntry = useDeleteJournalEntry();
 
   const filteredEntries = entries.filter(entry => {
     const matchesSearch = entry.description.toLowerCase().includes(search.toLowerCase()) ||
                          entry.entry_number.toLowerCase().includes(search.toLowerCase());
     const matchesType = typeFilter === 'all' || entry.reference_type === typeFilter;
     return matchesSearch && matchesType;
-  });
+  }).sort((a, b) => new Date(b.entry_date).getTime() - new Date(a.entry_date).getTime());
+
+  const handleDelete = () => {
+    if (deleteEntryId) {
+      deleteEntry.mutate(deleteEntryId, {
+        onSuccess: () => setDeleteEntryId(null),
+      });
+    }
+  };
 
   const getTypeIcon = (type: string | null) => {
     switch (type) {
@@ -111,7 +123,7 @@ export function TransactionsTab() {
                 <TableHead className="w-28">Date</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead className="w-28">Type</TableHead>
-                <TableHead className="w-32 text-right">Amount</TableHead>
+                <TableHead className="w-24">Status</TableHead>
                 <TableHead className="w-16"></TableHead>
               </TableRow>
             </TableHeader>
@@ -149,18 +161,41 @@ export function TransactionsTab() {
                       </div>
                     </TableCell>
                     <TableCell>{getTypeBadge(entry.reference_type)}</TableCell>
-                    <TableCell className="text-right font-medium">
-                      {/* Amount would need to be fetched from lines - showing placeholder */}
-                      —
+                    <TableCell>
+                      <Badge 
+                        variant={entry.status === 'posted' ? 'default' : entry.status === 'voided' ? 'destructive' : 'secondary'}
+                        className="text-xs"
+                      >
+                        {entry.status}
+                      </Badge>
                     </TableCell>
                     <TableCell>
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={() => setSelectedEntryId(entry.id)}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setSelectedEntryId(entry.id)}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setEditEntryId(entry.id)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          {entry.status === 'draft' && (
+                            <DropdownMenuItem 
+                              onClick={() => setDeleteEntryId(entry.id)}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))
@@ -182,6 +217,33 @@ export function TransactionsTab() {
           onOpenChange={(open) => !open && setSelectedEntryId(null)}
         />
       )}
+
+      <EditTransactionDialog
+        open={!!editEntryId}
+        onOpenChange={(open) => !open && setEditEntryId(null)}
+        entryId={editEntryId}
+      />
+
+      <AlertDialog open={!!deleteEntryId} onOpenChange={(open) => !open && setDeleteEntryId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Transaction?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this journal entry. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDelete} 
+              className="bg-destructive text-destructive-foreground"
+              disabled={deleteEntry.isPending}
+            >
+              {deleteEntry.isPending ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

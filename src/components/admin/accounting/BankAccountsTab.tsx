@@ -8,12 +8,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Building, Scale } from 'lucide-react';
-import { useBankAccounts, useCreateBankAccount, useChartOfAccounts } from '@/hooks/useAccounting';
+import { Plus, Building, Scale, Edit } from 'lucide-react';
+import { useBankAccounts, useCreateBankAccount, useChartOfAccounts, BankAccount } from '@/hooks/useAccounting';
 import { BankReconciliationTab } from './BankReconciliationTab';
+import { EditBankAccountDialog } from './EditBankAccountDialog';
 
 export function BankAccountsTab() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState<BankAccount | null>(null);
   const [activeTab, setActiveTab] = useState('accounts');
   const { data: bankAccounts = [], isLoading } = useBankAccounts();
   const { data: accounts = [] } = useChartOfAccounts({ type: 'asset' });
@@ -61,16 +64,17 @@ export function BankAccountsTab() {
                     <TableHead>Currency</TableHead>
                     <TableHead className="text-right">Current Balance</TableHead>
                     <TableHead className="w-24">Status</TableHead>
+                    <TableHead className="w-16"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8">Loading...</TableCell>
+                      <TableCell colSpan={7} className="text-center py-8">Loading...</TableCell>
                     </TableRow>
                   ) : bankAccounts.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         <Building className="h-8 w-8 mx-auto mb-2 opacity-50" />
                         No bank accounts configured
                       </TableCell>
@@ -90,6 +94,18 @@ export function BankAccountsTab() {
                             {account.is_active ? 'Active' : 'Inactive'}
                           </Badge>
                         </TableCell>
+                        <TableCell>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => {
+                              setSelectedAccount(account);
+                              setShowEditDialog(true);
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))
                   )}
@@ -101,6 +117,13 @@ export function BankAccountsTab() {
           <CreateBankAccountDialog 
             open={showCreateDialog} 
             onOpenChange={setShowCreateDialog}
+            chartAccounts={accounts}
+          />
+
+          <EditBankAccountDialog
+            open={showEditDialog}
+            onOpenChange={setShowEditDialog}
+            bankAccount={selectedAccount}
             chartAccounts={accounts}
           />
         </Card>
