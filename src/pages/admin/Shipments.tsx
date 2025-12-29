@@ -6,11 +6,12 @@ import { BulkActionsBar } from '@/components/admin/BulkActionsBar';
 import { CreateShipmentDialog } from '@/components/admin/CreateShipmentDialog';
 import { ParcelCheckout } from '@/components/admin/ParcelCheckout';
 import { BulkParcelScanner } from '@/components/admin/BulkParcelScanner';
+import { ParcelLookupScanner } from '@/components/admin/ParcelLookupScanner';
 import { useShipments } from '@/hooks/useShipments';
 import { useDebounce } from '@/hooks/useDebounce';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { PackageSearch, ScanLine, Scan } from 'lucide-react';
+import { PackageSearch, ScanLine, Scan, QrCode } from 'lucide-react';
 
 export default function AdminShipmentsPage() {
   const [search, setSearch] = useState('');
@@ -46,6 +47,10 @@ export default function AdminShipmentsPage() {
           <TabsTrigger value="shipments" className="flex items-center gap-2 data-[state=active]:bg-background">
             <PackageSearch className="h-4 w-4" />
             Shipments
+          </TabsTrigger>
+          <TabsTrigger value="lookup" className="flex items-center gap-2 data-[state=active]:bg-background">
+            <QrCode className="h-4 w-4" />
+            Parcel Lookup
           </TabsTrigger>
           <TabsTrigger value="checkout" className="flex items-center gap-2 data-[state=active]:bg-background">
             <ScanLine className="h-4 w-4" />
@@ -105,6 +110,10 @@ export default function AdminShipmentsPage() {
             selectedIds={selectedIds}
             onSelectionChange={setSelectedIds}
           />
+        </TabsContent>
+
+        <TabsContent value="lookup" className="mt-0">
+          <ParcelLookupScanner />
         </TabsContent>
 
         <TabsContent value="checkout" className="mt-0">
