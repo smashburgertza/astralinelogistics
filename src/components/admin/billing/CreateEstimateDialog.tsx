@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from 'date-fns';
@@ -106,11 +106,11 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
     name: 'line_items',
   });
 
-  const watchLineItems = form.watch('line_items');
-  const watchDiscount = form.watch('discount');
-  const watchTaxRate = form.watch('tax_rate');
-  const watchCurrency = form.watch('currency');
-  const watchCustomerId = form.watch('customer_id');
+  const watchLineItems = useWatch({ control: form.control, name: 'line_items' });
+  const watchDiscount = useWatch({ control: form.control, name: 'discount' });
+  const watchTaxRate = useWatch({ control: form.control, name: 'tax_rate' });
+  const watchCurrency = useWatch({ control: form.control, name: 'currency' });
+  const watchCustomerId = useWatch({ control: form.control, name: 'customer_id' });
 
   const selectedCustomer = customers?.find(c => c.id === watchCustomerId);
 
