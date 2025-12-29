@@ -2,7 +2,7 @@ import { ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, PackageSearch, MapPinned, FileStack, CreditCard,
-  LogOut, BellRing, ChevronDown, UserCircle2, Settings2, ShoppingBag, ClipboardList
+  LogOut, BellRing, ChevronDown, UserCircle2, Settings2, ShoppingBag, ClipboardList, FileText
 } from 'lucide-react';
 import astralineLogo from '@/assets/astraline-logo-horizontal.svg';
 import { Button } from '@/components/ui/button';
@@ -48,6 +48,7 @@ const mainNavItems = [
 ];
 
 const billingNavItems = [
+  { label: 'Estimates', href: '/customer/estimates', icon: FileText },
   { label: 'Invoices', href: '/customer/invoices', icon: FileStack },
   { label: 'Payments', href: '/customer/payments', icon: CreditCard },
 ];

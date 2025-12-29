@@ -749,10 +749,13 @@ export type Database = {
       }
       estimates: {
         Row: {
+          converted_to_invoice_id: string | null
           created_at: string | null
           created_by: string | null
           currency: string | null
+          customer_comments: string | null
           customer_id: string | null
+          customer_response: string | null
           estimate_number: string
           estimate_type: string
           handling_fee: number | null
@@ -762,6 +765,7 @@ export type Database = {
           product_cost: number | null
           purchase_fee: number | null
           rate_per_kg: number
+          responded_at: string | null
           shipment_id: string | null
           status: string | null
           subtotal: number
@@ -770,10 +774,13 @@ export type Database = {
           weight_kg: number
         }
         Insert: {
+          converted_to_invoice_id?: string | null
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
+          customer_comments?: string | null
           customer_id?: string | null
+          customer_response?: string | null
           estimate_number: string
           estimate_type?: string
           handling_fee?: number | null
@@ -783,6 +790,7 @@ export type Database = {
           product_cost?: number | null
           purchase_fee?: number | null
           rate_per_kg: number
+          responded_at?: string | null
           shipment_id?: string | null
           status?: string | null
           subtotal: number
@@ -791,10 +799,13 @@ export type Database = {
           weight_kg: number
         }
         Update: {
+          converted_to_invoice_id?: string | null
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
+          customer_comments?: string | null
           customer_id?: string | null
+          customer_response?: string | null
           estimate_number?: string
           estimate_type?: string
           handling_fee?: number | null
@@ -804,6 +815,7 @@ export type Database = {
           product_cost?: number | null
           purchase_fee?: number | null
           rate_per_kg?: number
+          responded_at?: string | null
           shipment_id?: string | null
           status?: string | null
           subtotal?: number
@@ -812,6 +824,13 @@ export type Database = {
           weight_kg?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "estimates_converted_to_invoice_id_fkey"
+            columns: ["converted_to_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "estimates_customer_id_fkey"
             columns: ["customer_id"]

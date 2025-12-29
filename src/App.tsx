@@ -24,6 +24,7 @@ import NotFound from "./pages/NotFound";
 const CustomerDashboard = lazy(() => import("./pages/customer/Dashboard"));
 const CustomerShipmentsPage = lazy(() => import("./pages/customer/Shipments"));
 const CustomerInvoicesPage = lazy(() => import("./pages/customer/Invoices"));
+const CustomerEstimatesPage = lazy(() => import("./pages/customer/Estimates"));
 const CustomerTrackPage = lazy(() => import("./pages/customer/Track"));
 const CustomerOrdersPage = lazy(() => import("./pages/customer/Orders"));
 const CustomerSettingsPage = lazy(() => import("./pages/customer/Settings"));
@@ -102,6 +103,7 @@ const App = () => (
             <Route path="/customer" element={<Suspense fallback={<PageLoader />}><CustomerDashboard /></Suspense>} />
             <Route path="/customer/shipments" element={<Suspense fallback={<PageLoader />}><CustomerShipmentsPage /></Suspense>} />
             <Route path="/customer/invoices" element={<Suspense fallback={<PageLoader />}><CustomerInvoicesPage /></Suspense>} />
+            <Route path="/customer/estimates" element={<Suspense fallback={<PageLoader />}><CustomerEstimatesPage /></Suspense>} />
             <Route path="/customer/track" element={<Suspense fallback={<PageLoader />}><CustomerTrackPage /></Suspense>} />
             <Route path="/customer/orders" element={<Suspense fallback={<PageLoader />}><CustomerOrdersPage /></Suspense>} />
             <Route path="/customer/settings" element={<Suspense fallback={<PageLoader />}><CustomerSettingsPage /></Suspense>} />
