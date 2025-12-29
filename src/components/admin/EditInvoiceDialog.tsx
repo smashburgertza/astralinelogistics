@@ -10,7 +10,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Separator } from '@/components/ui/separator';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Package } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Invoice, useUpdateInvoice } from '@/hooks/useInvoices';
 import { useInvoiceItems, useCreateInvoiceItem, useUpdateInvoiceItem, useDeleteInvoiceItem } from '@/hooks/useInvoiceItems';
 import { useCustomers } from '@/hooks/useShipments';
@@ -209,6 +210,43 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange }: EditInvoiceDi
         ) : (
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              {/* Linked Shipment Details */}
+              {invoice.shipments && (
+                <div className="rounded-lg border bg-muted/30 p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Package className="h-4 w-4 text-primary" />
+                    <h3 className="font-medium text-sm">Linked Shipment</h3>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground text-xs">Tracking Number</p>
+                      <p className="font-mono font-medium">{invoice.shipments.tracking_number}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Origin</p>
+                      <Badge variant="outline" className="capitalize mt-1">
+                        {invoice.shipments.origin_region}
+                      </Badge>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Weight</p>
+                      <p className="font-medium">{invoice.shipments.total_weight_kg} kg</p>
+                    </div>
+                    {invoice.shipments.description && (
+                      <div>
+                        <p className="text-muted-foreground text-xs">Description</p>
+                        <p className="font-medium truncate">{invoice.shipments.description}</p>
+                      </div>
+                    )}
+                  </div>
+                  {invoice.shipments.customer_name && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Recipient: {invoice.shipments.customer_name}
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
