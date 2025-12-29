@@ -4,12 +4,13 @@ import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { MoreHorizontal, FileText, Download, Eye, CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react';
+import { MoreHorizontal, FileText, Download, Eye, CheckCircle, XCircle, Clock, AlertCircle, Pencil } from 'lucide-react';
 import { Invoice, useUpdateInvoiceStatus, useRecordPayment, RecordPaymentParams } from '@/hooks/useInvoices';
 import { InvoiceStatusBadge } from './InvoiceStatusBadge';
 import { InvoicePDFPreview } from './InvoicePDFPreview';
 import { InvoiceDetailDialog } from './InvoiceDetailDialog';
 import { RecordPaymentDialog, PaymentDetails } from './RecordPaymentDialog';
+import { EditInvoiceDialog } from './EditInvoiceDialog';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 import { useRegions } from '@/hooks/useRegions';
 import { format } from 'date-fns';
@@ -23,12 +24,19 @@ interface InvoiceTableProps {
 export function InvoiceTable({ invoices, isLoading }: InvoiceTableProps) {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [invoiceToEdit, setInvoiceToEdit] = useState<Invoice | null>(null);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [invoiceForPayment, setInvoiceForPayment] = useState<Invoice | null>(null);
   const updateStatus = useUpdateInvoiceStatus();
   const recordPayment = useRecordPayment();
   const printRef = useRef<HTMLDivElement>(null);
   const { data: regions = [] } = useRegions();
+
+  const handleEditInvoice = (invoice: Invoice) => {
+    setInvoiceToEdit(invoice);
+    setEditOpen(true);
+  };
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
@@ -205,6 +213,15 @@ export function InvoiceTable({ invoices, isLoading }: InvoiceTableProps) {
                           <Download className="h-4 w-4 mr-2" />
                           Download PDF
                         </DropdownMenuItem>
+                        {invoice.status !== 'paid' && invoice.status !== 'cancelled' && (
+                          <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditInvoice(invoice);
+                          }}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Edit Invoice
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuSeparator />
                         {invoice.status !== 'paid' && (
                           <DropdownMenuItem onClick={(e) => {
@@ -292,6 +309,18 @@ export function InvoiceTable({ invoices, isLoading }: InvoiceTableProps) {
           });
         }}
       />
+
+      {/* Edit Invoice Dialog */}
+      {invoiceToEdit && (
+        <EditInvoiceDialog
+          invoice={invoiceToEdit}
+          open={editOpen}
+          onOpenChange={(open) => {
+            setEditOpen(open);
+            if (!open) setInvoiceToEdit(null);
+          }}
+        />
+      )}
     </>
   );
 }
