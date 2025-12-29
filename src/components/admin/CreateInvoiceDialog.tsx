@@ -221,14 +221,17 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-xs text-muted-foreground">Link to Shipment (optional)</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select 
+                        onValueChange={(val) => field.onChange(val === "none" ? "" : val)} 
+                        value={field.value || "none"}
+                      >
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select shipment" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">No shipment</SelectItem>
+                          <SelectItem value="none">No shipment</SelectItem>
                           {shipments?.map((shipment) => (
                             <SelectItem key={shipment.id} value={shipment.id}>
                               {shipment.tracking_number} ({shipment.total_weight_kg} kg)
