@@ -9,6 +9,7 @@ export type InvoiceType = 'shipping' | 'purchase_shipping';
 export type Invoice = Tables<'invoices'> & {
   customers?: Pick<Tables<'customers'>, 'name' | 'email' | 'company_name' | 'address' | 'phone'> | null;
   shipments?: Pick<Tables<'shipments'>, 'tracking_number' | 'origin_region' | 'customer_name' | 'total_weight_kg' | 'description'> | null;
+  amount_paid?: number;
 };
 
 export const INVOICE_TYPES = {
@@ -169,15 +170,39 @@ export function useRecordPayment() {
 
   return useMutation({
     mutationFn: async (params: RecordPaymentParams) => {
-      // Update invoice status to paid
+      // First get the current invoice to check amount_paid
+      const { data: currentInvoice, error: fetchError } = await supabase
+        .from('invoices')
+        .select('amount, amount_paid, invoice_number, currency')
+        .eq('id', params.invoiceId)
+        .single();
+      
+      if (fetchError) throw fetchError;
+
+      const totalAmount = Number(currentInvoice.amount || 0);
+      const currentPaid = Number(currentInvoice.amount_paid || 0);
+      const newTotalPaid = currentPaid + params.amount;
+      const isFullyPaid = newTotalPaid >= totalAmount;
+
+      // Update invoice with new amount_paid and status
+      const updates: TablesUpdate<'invoices'> = {
+        amount_paid: newTotalPaid,
+        payment_method: params.paymentMethod,
+        payment_currency: params.paymentCurrency,
+      };
+
+      // Only mark as paid if fully paid
+      if (isFullyPaid) {
+        updates.status = 'paid';
+        updates.paid_at = params.paymentDate;
+      } else if (newTotalPaid > 0) {
+        // Optionally update status to reflect partial payment
+        // For now, keep existing status unless cancelled
+      }
+
       const { data, error } = await supabase
         .from('invoices')
-        .update({ 
-          status: 'paid',
-          paid_at: params.paymentDate,
-          payment_method: params.paymentMethod,
-          payment_currency: params.paymentCurrency,
-        })
+        .update(updates)
         .eq('id', params.invoiceId)
         .select()
         .single();
@@ -199,9 +224,9 @@ export function useRecordPayment() {
       try {
         await createInvoicePaymentJournalEntry({
           invoiceId: data.id,
-          invoiceNumber: data.invoice_number,
+          invoiceNumber: currentInvoice.invoice_number,
           amount: params.amount,
-          currency: data.currency || 'USD',
+          currency: currentInvoice.currency || 'USD',
           exchangeRate,
           paymentCurrency: params.paymentCurrency,
           depositAccountId: params.depositAccountId,
@@ -210,19 +235,21 @@ export function useRecordPayment() {
         console.error('Failed to create payment journal entry:', journalError);
       }
 
-      // Record in payments table as well
+      // Record in payments table
       await supabase.from('payments').insert({
         invoice_id: params.invoiceId,
         amount: params.amount,
         currency: params.paymentCurrency,
         payment_method: params.paymentMethod,
         paid_at: params.paymentDate,
+        stripe_payment_id: params.reference || null,
       });
 
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['invoice-payments'] });
       queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
       queryClient.invalidateQueries({ queryKey: ['accounting-summary'] });
       toast.success('Payment recorded successfully');

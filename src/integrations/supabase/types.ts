@@ -1019,6 +1019,7 @@ export type Database = {
           agent_id: string | null
           amount: number
           amount_in_tzs: number | null
+          amount_paid: number | null
           created_at: string | null
           created_by: string | null
           currency: string | null
@@ -1046,6 +1047,7 @@ export type Database = {
           agent_id?: string | null
           amount: number
           amount_in_tzs?: number | null
+          amount_paid?: number | null
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
@@ -1073,6 +1075,7 @@ export type Database = {
           agent_id?: string | null
           amount?: number
           amount_in_tzs?: number | null
+          amount_paid?: number | null
           created_at?: string | null
           created_by?: string | null
           currency?: string | null

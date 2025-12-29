@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useChartOfAccounts } from '@/hooks/useAccounting';
+import { useBankAccounts } from '@/hooks/useAccounting';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { Invoice } from '@/hooks/useInvoices';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
@@ -17,6 +17,7 @@ interface RecordPaymentDialogProps {
   onOpenChange: (open: boolean) => void;
   onRecordPayment: (paymentDetails: PaymentDetails) => void;
   isLoading?: boolean;
+  remainingBalance?: number;
 }
 
 export interface PaymentDetails {
@@ -42,35 +43,39 @@ export function RecordPaymentDialog({
   open, 
   onOpenChange, 
   onRecordPayment,
-  isLoading 
+  isLoading,
+  remainingBalance
 }: RecordPaymentDialogProps) {
   const [paymentMethod, setPaymentMethod] = useState('bank_transfer');
   const [depositAccountId, setDepositAccountId] = useState('');
   const [paymentCurrency, setPaymentCurrency] = useState(invoice?.currency || 'USD');
-  const [amount, setAmount] = useState(invoice?.amount?.toString() || '');
+  const [amount, setAmount] = useState('');
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
   const [reference, setReference] = useState('');
   const [notes, setNotes] = useState('');
 
-  // Get all active asset accounts (cash, bank, mobile money accounts)
-  const { data: accounts = [] } = useChartOfAccounts({ active: true });
+  // Get bank accounts for deposit selection
+  const { data: bankAccounts = [] } = useBankAccounts();
   const { data: exchangeRates = [] } = useExchangeRates();
 
-  // Filter to cash/bank type accounts
-  const depositAccounts = accounts.filter(a => 
-    a.account_type === 'asset' && 
-    (a.account_subtype?.toLowerCase().includes('cash') || 
-     a.account_subtype?.toLowerCase().includes('bank') ||
-     a.account_code.startsWith('11')) // Cash and bank accounts typically start with 11
-  );
+  // Filter to active bank accounts
+  const activeBankAccounts = bankAccounts.filter(a => a.is_active);
 
-  // Reset form when invoice changes
-  useState(() => {
-    if (invoice) {
-      setAmount(invoice.amount?.toString() || '');
+  // Reset form when invoice changes or dialog opens
+  useEffect(() => {
+    if (invoice && open) {
+      // Use remaining balance if provided, otherwise use full invoice amount
+      const defaultAmount = remainingBalance !== undefined 
+        ? remainingBalance 
+        : Number(invoice.amount) - Number(invoice.amount_paid || 0);
+      setAmount(defaultAmount > 0 ? defaultAmount.toString() : invoice.amount?.toString() || '');
       setPaymentCurrency(invoice.currency || 'USD');
+      setPaymentDate(new Date().toISOString().split('T')[0]);
+      setReference('');
+      setNotes('');
+      setDepositAccountId('');
     }
-  });
+  }, [invoice, open, remainingBalance]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,6 +95,9 @@ export function RecordPaymentDialog({
   };
 
   const currencySymbol = CURRENCY_SYMBOLS[invoice?.currency || 'USD'] || '$';
+  const invoiceAmount = Number(invoice?.amount || 0);
+  const amountPaid = Number(invoice?.amount_paid || 0);
+  const balance = remainingBalance !== undefined ? remainingBalance : invoiceAmount - amountPaid;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -103,11 +111,25 @@ export function RecordPaymentDialog({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Invoice Summary */}
-          <div className="bg-muted/50 rounded-lg p-4 space-y-1">
+          <div className="bg-muted/50 rounded-lg p-4 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Invoice Amount:</span>
               <span className="font-medium">
-                {currencySymbol}{Number(invoice?.amount || 0).toFixed(2)} {invoice?.currency}
+                {currencySymbol}{invoiceAmount.toFixed(2)} {invoice?.currency}
+              </span>
+            </div>
+            {amountPaid > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Already Paid:</span>
+                <span className="font-medium text-emerald-600">
+                  {currencySymbol}{amountPaid.toFixed(2)}
+                </span>
+              </div>
+            )}
+            <div className="flex justify-between text-sm font-medium border-t pt-2">
+              <span className="text-muted-foreground">Balance Due:</span>
+              <span className={balance > 0 ? 'text-amber-600' : 'text-emerald-600'}>
+                {currencySymbol}{balance.toFixed(2)}
               </span>
             </div>
             <div className="flex justify-between text-sm">
@@ -140,21 +162,26 @@ export function RecordPaymentDialog({
             </div>
           </div>
 
-          {/* Deposit Account Selection - Always show */}
+          {/* Deposit Account Selection */}
           <div className="space-y-2">
             <Label>Deposit To Account</Label>
             <Select value={depositAccountId} onValueChange={setDepositAccountId}>
               <SelectTrigger>
-                <SelectValue placeholder="Select account" />
+                <SelectValue placeholder="Select bank account" />
               </SelectTrigger>
               <SelectContent>
-                {depositAccounts.map((account) => (
+                {activeBankAccounts.map((account) => (
                   <SelectItem key={account.id} value={account.id}>
-                    {account.account_code} - {account.account_name}
+                    {account.bank_name} - {account.account_name} ({account.currency})
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {activeBankAccounts.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                No bank accounts configured. Add bank accounts in Accounting settings.
+              </p>
+            )}
           </div>
 
           {/* Amount and Currency */}
@@ -164,11 +191,15 @@ export function RecordPaymentDialog({
               <Input
                 type="number"
                 min="0"
+                max={balance}
                 step="0.01"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 required
               />
+              {parseFloat(amount) < balance && parseFloat(amount) > 0 && (
+                <p className="text-xs text-blue-600">This will be a partial payment</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Currency</Label>
@@ -225,7 +256,7 @@ export function RecordPaymentDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading}>
+            <Button type="submit" disabled={isLoading || parseFloat(amount) <= 0}>
               {isLoading ? 'Recording...' : 'Record Payment'}
             </Button>
           </div>

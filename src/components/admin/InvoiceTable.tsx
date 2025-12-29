@@ -2,12 +2,13 @@ import { useState, useRef } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import { MoreHorizontal, FileText, Download, Eye, CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react';
 import { Invoice, useUpdateInvoiceStatus, useRecordPayment, RecordPaymentParams } from '@/hooks/useInvoices';
 import { InvoiceStatusBadge } from './InvoiceStatusBadge';
 import { InvoicePDFPreview } from './InvoicePDFPreview';
+import { InvoiceDetailDialog } from './InvoiceDetailDialog';
 import { RecordPaymentDialog, PaymentDetails } from './RecordPaymentDialog';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 import { useRegions } from '@/hooks/useRegions';
@@ -21,7 +22,7 @@ interface InvoiceTableProps {
 
 export function InvoiceTable({ invoices, isLoading }: InvoiceTableProps) {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
-  const [previewOpen, setPreviewOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [invoiceForPayment, setInvoiceForPayment] = useState<Invoice | null>(null);
   const updateStatus = useUpdateInvoiceStatus();
@@ -36,7 +37,7 @@ export function InvoiceTable({ invoices, isLoading }: InvoiceTableProps) {
 
   const handleViewInvoice = (invoice: Invoice) => {
     setSelectedInvoice(invoice);
-    setPreviewOpen(true);
+    setDetailOpen(true);
   };
 
   const handleDownloadPDF = (invoice: Invoice) => {
@@ -56,6 +57,7 @@ export function InvoiceTable({ invoices, isLoading }: InvoiceTableProps) {
               <TableHead>Customer</TableHead>
               <TableHead>Shipment</TableHead>
               <TableHead>Amount</TableHead>
+              <TableHead>Paid</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Due Date</TableHead>
               <TableHead className="w-[50px]"></TableHead>
@@ -67,6 +69,7 @@ export function InvoiceTable({ invoices, isLoading }: InvoiceTableProps) {
                 <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                 <TableCell><Skeleton className="h-6 w-20" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-24" /></TableCell>
@@ -99,6 +102,7 @@ export function InvoiceTable({ invoices, isLoading }: InvoiceTableProps) {
               <TableHead>Customer</TableHead>
               <TableHead>Shipment</TableHead>
               <TableHead>Amount</TableHead>
+              <TableHead>Paid</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Due Date</TableHead>
               <TableHead className="w-[50px]"></TableHead>
@@ -110,9 +114,16 @@ export function InvoiceTable({ invoices, isLoading }: InvoiceTableProps) {
               const regionInfo = invoice.shipments?.origin_region
                 ? regions.find(r => r.code === invoice.shipments?.origin_region)
                 : null;
+              const totalAmount = Number(invoice.amount || 0);
+              const amountPaid = Number(invoice.amount_paid || 0);
+              const isPartiallyPaid = amountPaid > 0 && amountPaid < totalAmount;
 
               return (
-                <TableRow key={invoice.id}>
+                <TableRow 
+                  key={invoice.id} 
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => handleViewInvoice(invoice)}
+                >
                   <TableCell>
                     <span className="font-mono font-medium">{invoice.invoice_number}</span>
                   </TableCell>
@@ -139,17 +150,24 @@ export function InvoiceTable({ invoices, isLoading }: InvoiceTableProps) {
                   <TableCell>
                     <div>
                       <span className="font-medium">
-                        {currencySymbol}{Number(invoice.amount).toFixed(2)}
+                        {currencySymbol}{totalAmount.toFixed(2)}
                       </span>
                       {invoice.rate_per_kg && (
                         <p className="text-xs text-muted-foreground">
                           @ {currencySymbol}{Number(invoice.rate_per_kg).toFixed(2)}/kg
                         </p>
                       )}
-                      {invoice.currency !== 'TZS' && invoice.amount_in_tzs && (
-                        <p className="text-xs text-muted-foreground">
-                          ≈ TZS {Number(invoice.amount_in_tzs).toLocaleString()}
-                        </p>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div>
+                      <span className={amountPaid > 0 ? 'font-medium text-emerald-600' : 'text-muted-foreground'}>
+                        {currencySymbol}{amountPaid.toFixed(2)}
+                      </span>
+                      {isPartiallyPaid && (
+                        <Badge variant="outline" className="ml-2 text-xs bg-blue-50 text-blue-700 border-blue-200">
+                          Partial
+                        </Badge>
                       )}
                     </div>
                   </TableCell>
@@ -167,23 +185,30 @@ export function InvoiceTable({ invoices, isLoading }: InvoiceTableProps) {
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
+                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                         <Button variant="ghost" size="icon">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleViewInvoice(invoice)}>
+                        <DropdownMenuItem onClick={(e) => {
+                          e.stopPropagation();
+                          handleViewInvoice(invoice);
+                        }}>
                           <Eye className="h-4 w-4 mr-2" />
-                          View Invoice
+                          View Details
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDownloadPDF(invoice)}>
+                        <DropdownMenuItem onClick={(e) => {
+                          e.stopPropagation();
+                          handleDownloadPDF(invoice);
+                        }}>
                           <Download className="h-4 w-4 mr-2" />
                           Download PDF
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         {invoice.status !== 'paid' && (
-                          <DropdownMenuItem onClick={() => {
+                          <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation();
                             setInvoiceForPayment(invoice);
                             setPaymentDialogOpen(true);
                           }}>
@@ -192,20 +217,29 @@ export function InvoiceTable({ invoices, isLoading }: InvoiceTableProps) {
                           </DropdownMenuItem>
                         )}
                         {invoice.status !== 'pending' && invoice.status !== 'paid' && (
-                          <DropdownMenuItem onClick={() => updateStatus.mutate({ id: invoice.id, status: 'pending' })}>
+                          <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation();
+                            updateStatus.mutate({ id: invoice.id, status: 'pending' });
+                          }}>
                             <Clock className="h-4 w-4 mr-2" />
                             Mark as Pending
                           </DropdownMenuItem>
                         )}
                         {invoice.status !== 'overdue' && invoice.status !== 'paid' && (
-                          <DropdownMenuItem onClick={() => updateStatus.mutate({ id: invoice.id, status: 'overdue' })}>
+                          <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation();
+                            updateStatus.mutate({ id: invoice.id, status: 'overdue' });
+                          }}>
                             <AlertCircle className="h-4 w-4 mr-2" />
                             Mark as Overdue
                           </DropdownMenuItem>
                         )}
                         {invoice.status !== 'cancelled' && (
                           <DropdownMenuItem 
-                            onClick={() => updateStatus.mutate({ id: invoice.id, status: 'cancelled' })}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              updateStatus.mutate({ id: invoice.id, status: 'cancelled' });
+                            }}
                             className="text-destructive"
                           >
                             <XCircle className="h-4 w-4 mr-2" />
@@ -222,21 +256,12 @@ export function InvoiceTable({ invoices, isLoading }: InvoiceTableProps) {
         </Table>
       </div>
 
-      {/* PDF Preview Dialog */}
-      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <span>Invoice Preview</span>
-              <Button onClick={handlePrint} className="gap-2">
-                <Download className="h-4 w-4" />
-                Download PDF
-              </Button>
-            </DialogTitle>
-          </DialogHeader>
-          {selectedInvoice && <InvoicePDFPreview ref={printRef} invoice={selectedInvoice} />}
-        </DialogContent>
-      </Dialog>
+      {/* Invoice Detail Dialog */}
+      <InvoiceDetailDialog
+        invoice={selectedInvoice}
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+      />
 
       {/* Hidden print container */}
       <div className="hidden">
