@@ -306,14 +306,21 @@ export function InvoiceDetailDialog({ invoice, open, onOpenChange }: InvoiceDeta
       </div>
 
       {/* Record Payment Dialog - pass remaining balance as the pre-filled amount */}
-      <RecordPaymentDialog
-        invoice={invoice}
-        open={paymentDialogOpen}
-        onOpenChange={setPaymentDialogOpen}
-        isLoading={recordPayment.isPending}
-        remainingBalance={remainingBalance}
-        onRecordPayment={handleRecordPayment}
-      />
+      {(() => {
+        const isB2BAgentPayment = invoice?.invoice_direction === 'from_agent' && invoice?.agent_id;
+        return (
+          <RecordPaymentDialog
+            invoice={invoice}
+            open={paymentDialogOpen}
+            onOpenChange={setPaymentDialogOpen}
+            isLoading={recordPayment.isPending}
+            remainingBalance={remainingBalance}
+            onRecordPayment={handleRecordPayment}
+            isOutgoingPayment={!!isB2BAgentPayment}
+            payeeName={isB2BAgentPayment ? 'Agent' : undefined}
+          />
+        );
+      })()}
     </>
   );
 }
