@@ -51,37 +51,24 @@ export function ParcelLabel({ parcel, shipmentInfo }: ParcelLabelProps) {
         <p className="text-2xl font-mono font-bold tracking-wider">{shipmentInfo.tracking_number}</p>
       </div>
 
-      {/* QR Code and Barcode Section */}
+      {/* QR Code Section */}
       <div className="border-2 border-dashed border-gray-400 p-4 mb-3">
         <div className="flex items-center gap-4">
           {/* QR Code */}
           <div className="flex flex-col items-center">
-            <span className="text-xs font-semibold mb-2">SCAN QR</span>
             <QRCodeSVG 
               value={qrData}
-              size={80}
+              size={100}
               level="M"
               includeMargin={false}
             />
           </div>
           
-          {/* Barcode */}
-          <div className="flex-1 text-center">
-            <span className="text-xs font-semibold mb-2 block">PARCEL BARCODE</span>
-            {/* Simple barcode representation - vertical lines pattern */}
-            <div className="flex items-center justify-center gap-[2px] h-12 mb-2">
-              {parcel.barcode.split('').map((char, i) => (
-                <div 
-                  key={i}
-                  className="bg-black h-full"
-                  style={{ 
-                    width: (char.charCodeAt(0) % 3) + 2 + 'px',
-                    marginRight: (char.charCodeAt(0) % 2) + 1 + 'px'
-                  }}
-                />
-              ))}
-            </div>
-            <p className="font-mono text-sm font-bold tracking-widest">{parcel.barcode}</p>
+          {/* Parcel ID */}
+          <div className="flex-1">
+            <span className="text-xs font-semibold text-gray-600 block mb-1">PARCEL ID</span>
+            <p className="font-mono text-xl font-bold tracking-wider">{parcel.barcode}</p>
+            <p className="text-xs text-gray-500 mt-2">Scan QR for full details</p>
           </div>
         </div>
       </div>
