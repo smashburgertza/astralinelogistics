@@ -38,7 +38,7 @@ export function InvoiceDetailDialog({ invoice, open, onOpenChange }: InvoiceDeta
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
   const { data: regions } = useRegions();
-  const { data: payments = [], isLoading: paymentsLoading } = useInvoicePayments(invoice?.id || '');
+  const { data: payments = [], isLoading: paymentsLoading, refetch: refetchPayments } = useInvoicePayments(invoice?.id || '');
   const recordPayment = useRecordPayment();
 
   const handlePrint = useReactToPrint({
@@ -53,9 +53,11 @@ export function InvoiceDetailDialog({ invoice, open, onOpenChange }: InvoiceDeta
     ? regions?.find(r => r.code === invoice.shipments?.origin_region)
     : null;
 
-  const totalPaid = Number(invoice.amount_paid || 0);
+  // Calculate paid amount from payments if invoice.amount_paid isn't updated yet
+  const paidFromPayments = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+  const totalPaid = Math.max(Number(invoice.amount_paid || 0), paidFromPayments);
   const totalAmount = Number(invoice.amount || 0);
-  const remainingBalance = totalAmount - totalPaid;
+  const remainingBalance = Math.max(0, totalAmount - totalPaid);
   const isPaid = invoice.status === 'paid' || remainingBalance <= 0;
   const isPartiallyPaid = totalPaid > 0 && remainingBalance > 0;
 
@@ -72,6 +74,7 @@ export function InvoiceDetailDialog({ invoice, open, onOpenChange }: InvoiceDeta
     }, {
       onSuccess: () => {
         setPaymentDialogOpen(false);
+        refetchPayments();
       },
     });
   };
