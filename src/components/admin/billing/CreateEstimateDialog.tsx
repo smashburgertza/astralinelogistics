@@ -431,7 +431,11 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
                                   type="number" 
                                   min="1"
                                   className="text-center text-xs"
-                                  {...field} 
+                                  value={field.value}
+                                  onChange={(e) => field.onChange(Number(e.target.value) || 0)}
+                                  onBlur={field.onBlur}
+                                  name={field.name}
+                                  ref={field.ref}
                                 />
                               </FormControl>
                               <FormMessage />
@@ -451,7 +455,11 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
                                   step="0.01"
                                   min="0"
                                   className="text-right text-xs"
-                                  {...field} 
+                                  value={field.value}
+                                  onChange={(e) => field.onChange(Number(e.target.value) || 0)}
+                                  onBlur={field.onBlur}
+                                  name={field.name}
+                                  ref={field.ref}
                                 />
                               </FormControl>
                               <FormMessage />
