@@ -44,6 +44,7 @@ import { ConversionAnalytics } from '@/components/admin/ConversionAnalytics';
 import { PricingCalculator } from '@/components/home/PricingCalculator';
 import { ShoppingAggregator } from '@/components/shopping/ShoppingAggregator';
 import { InvoiceEstimateSettings } from '@/components/admin/InvoiceEstimateSettings';
+import { PushNotificationSettings } from '@/components/admin/PushNotificationSettings';
 import {
   Dialog,
   DialogContent,
@@ -726,11 +727,15 @@ export default function AdminSettingsPage() {
         </TabsContent>
 
         {/* Notification Settings */}
-        <TabsContent value="notifications">
+        <TabsContent value="notifications" className="space-y-6">
+          {/* Push Notifications */}
+          <PushNotificationSettings />
+          
+          {/* Email Notifications */}
           <Card>
             <CardHeader>
-              <CardTitle>Email & Notifications</CardTitle>
-              <CardDescription>Configure email and notification preferences</CardDescription>
+              <CardTitle>Email Notifications</CardTitle>
+              <CardDescription>Configure email notification preferences</CardDescription>
             </CardHeader>
             <CardContent>
               <Form {...notificationForm}>

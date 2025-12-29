@@ -31,10 +31,13 @@ import {
   SidebarTrigger,
   SidebarInset,
 } from '@/components/ui/sidebar';
+import { Badge } from '@/components/ui/badge';
 import { useAuth, PermissionKey } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { NotificationDropdown } from '@/components/admin/NotificationDropdown';
 import { GlobalSearch } from '@/components/admin/GlobalSearch';
+import { useSidebarCounts } from '@/hooks/useSidebarCounts';
+import { useRealtimeNotifications } from '@/hooks/usePushNotifications';
 import { LucideIcon } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -47,24 +50,25 @@ interface NavItem {
   label: string;
   href: string;
   icon: LucideIcon;
-  permission?: PermissionKey; // If undefined, accessible to all admin/employees
+  permission?: PermissionKey;
+  countKey?: keyof ReturnType<typeof useSidebarCounts>['data'];
 }
 
 const mainNavItems: NavItem[] = [
   { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
   { label: 'My Dashboard', href: '/admin/my-dashboard', icon: User },
-  { label: 'Shipments', href: '/admin/shipments', icon: PackageSearch, permission: 'manage_shipments' },
-  { label: 'Customers', href: '/admin/customers', icon: UsersRound, permission: 'manage_customers' },
-  { label: 'Billing', href: '/admin/billing', icon: FileStack, permission: 'manage_invoices' },
-  { label: 'Shop Orders', href: '/admin/orders', icon: ShoppingCart, permission: 'manage_shipments' },
+  { label: 'Shipments', href: '/admin/shipments', icon: PackageSearch, permission: 'manage_shipments', countKey: 'shipments' },
+  { label: 'Customers', href: '/admin/customers', icon: UsersRound, permission: 'manage_customers', countKey: 'customers' },
+  { label: 'Billing', href: '/admin/billing', icon: FileStack, permission: 'manage_invoices', countKey: 'invoices' },
+  { label: 'Shop Orders', href: '/admin/orders', icon: ShoppingCart, permission: 'manage_shipments', countKey: 'orders' },
 ];
 
 const financeNavItems: NavItem[] = [
   { label: 'Accounting', href: '/admin/accounting', icon: Calculator, permission: 'view_reports' },
   { label: 'Financial Summary', href: '/admin/financial-summary', icon: PiggyBank, permission: 'view_reports' },
   { label: 'Batch Profitability', href: '/admin/batches', icon: Container, permission: 'view_reports' },
-  { label: 'Settlements', href: '/admin/settlements', icon: TrendingUp, permission: 'manage_invoices' },
-  { label: 'Expenses', href: '/admin/expenses', icon: Wallet, permission: 'manage_expenses' },
+  { label: 'Settlements', href: '/admin/settlements', icon: TrendingUp, permission: 'manage_invoices', countKey: 'settlements' },
+  { label: 'Expenses', href: '/admin/expenses', icon: Wallet, permission: 'manage_expenses', countKey: 'expenses' },
   { label: 'Commissions', href: '/admin/commissions', icon: TrendingUp, permission: 'view_reports' },
   { label: 'Reports', href: '/admin/reports', icon: ChartSpline, permission: 'view_reports' },
   { label: 'Analytics', href: '/admin/analytics', icon: BarChart3, permission: 'view_reports' },
@@ -81,13 +85,15 @@ export function AdminLayout({ children, title, subtitle }: AdminLayoutProps) {
   const { profile, signOut, hasRole, hasPermission } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const { data: counts } = useSidebarCounts();
+  
+  // Enable realtime push notifications
+  useRealtimeNotifications();
 
   // Filter navigation items based on user permissions
   const filterNavItems = (items: NavItem[]) => {
     return items.filter(item => {
-      // If no permission required, show to all admin/employees
       if (!item.permission) return true;
-      // Otherwise check if user has the required permission
       return hasPermission(item.permission);
     });
   };
@@ -95,6 +101,11 @@ export function AdminLayout({ children, title, subtitle }: AdminLayoutProps) {
   const filteredMainNav = useMemo(() => filterNavItems(mainNavItems), [hasPermission]);
   const filteredFinanceNav = useMemo(() => filterNavItems(financeNavItems), [hasPermission]);
   const filteredManagementNav = useMemo(() => filterNavItems(managementNavItems), [hasPermission]);
+
+  const getCount = (countKey?: keyof NonNullable<typeof counts>) => {
+    if (!countKey || !counts) return 0;
+    return counts[countKey] || 0;
+  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -131,26 +142,36 @@ export function AdminLayout({ children, title, subtitle }: AdminLayoutProps) {
               </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu className="space-y-1 group-data-[collapsible=icon]:space-y-2">
-                  {filteredMainNav.map((item) => (
-                    <SidebarMenuItem key={item.href}>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={isActive(item.href)}
-                        tooltip={item.label}
-                        className={cn(
-                          "transition-all duration-300 rounded-lg font-medium",
-                          isActive(item.href) 
-                            ? "bg-accent text-accent-foreground shadow-sm" 
-                            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                        )}
-                      >
-                        <Link to={item.href}>
-                          <item.icon className="w-5 h-5 shrink-0" />
-                          <span className="transition-all duration-300 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0">{item.label}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
+                  {filteredMainNav.map((item) => {
+                    const count = getCount(item.countKey);
+                    return (
+                      <SidebarMenuItem key={item.href}>
+                        <SidebarMenuButton
+                          asChild
+                          isActive={isActive(item.href)}
+                          tooltip={item.label}
+                          className={cn(
+                            "transition-all duration-300 rounded-lg font-medium",
+                            isActive(item.href) 
+                              ? "bg-accent text-accent-foreground shadow-sm" 
+                              : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                          )}
+                        >
+                          <Link to={item.href} className="flex items-center justify-between w-full">
+                            <div className="flex items-center gap-2">
+                              <item.icon className="w-5 h-5 shrink-0" />
+                              <span className="transition-all duration-300 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0">{item.label}</span>
+                            </div>
+                            {count > 0 && (
+                              <Badge variant="destructive" className="h-5 min-w-5 text-xs px-1.5 group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:top-0 group-data-[collapsible=icon]:right-0 group-data-[collapsible=icon]:scale-75">
+                                {count > 99 ? '99+' : count}
+                              </Badge>
+                            )}
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
@@ -162,26 +183,36 @@ export function AdminLayout({ children, title, subtitle }: AdminLayoutProps) {
               </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu className="space-y-1 group-data-[collapsible=icon]:space-y-2">
-                  {filteredFinanceNav.map((item) => (
-                    <SidebarMenuItem key={item.href}>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={isActive(item.href)}
-                        tooltip={item.label}
-                        className={cn(
-                          "transition-all duration-300 rounded-lg font-medium",
-                          isActive(item.href) 
-                            ? "bg-accent text-accent-foreground shadow-sm" 
-                            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                        )}
-                      >
-                        <Link to={item.href}>
-                          <item.icon className="w-5 h-5 shrink-0" />
-                          <span className="transition-all duration-300 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0">{item.label}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
+                  {filteredFinanceNav.map((item) => {
+                    const count = getCount(item.countKey);
+                    return (
+                      <SidebarMenuItem key={item.href}>
+                        <SidebarMenuButton
+                          asChild
+                          isActive={isActive(item.href)}
+                          tooltip={item.label}
+                          className={cn(
+                            "transition-all duration-300 rounded-lg font-medium",
+                            isActive(item.href) 
+                              ? "bg-accent text-accent-foreground shadow-sm" 
+                              : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                          )}
+                        >
+                          <Link to={item.href} className="flex items-center justify-between w-full">
+                            <div className="flex items-center gap-2">
+                              <item.icon className="w-5 h-5 shrink-0" />
+                              <span className="transition-all duration-300 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0">{item.label}</span>
+                            </div>
+                            {count > 0 && (
+                              <Badge variant="destructive" className="h-5 min-w-5 text-xs px-1.5 group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:top-0 group-data-[collapsible=icon]:right-0 group-data-[collapsible=icon]:scale-75">
+                                {count > 99 ? '99+' : count}
+                              </Badge>
+                            )}
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
