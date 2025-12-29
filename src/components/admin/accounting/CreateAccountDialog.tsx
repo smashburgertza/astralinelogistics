@@ -36,7 +36,7 @@ export function CreateAccountDialog({ open, onOpenChange, accounts }: CreateAcco
       account_name: accountName,
       account_type: accountType as any,
       account_subtype: accountSubtype || null,
-      parent_id: parentId || null,
+      parent_id: parentId && parentId !== 'none' ? parentId : null,
       description: description || null,
       is_active: isActive,
       normal_balance: selectedType?.normalBalance as 'debit' | 'credit' || 'debit',
@@ -126,7 +126,7 @@ export function CreateAccountDialog({ open, onOpenChange, accounts }: CreateAcco
                   <SelectValue placeholder="None (root level)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None (root level)</SelectItem>
+                  <SelectItem value="none">None (root level)</SelectItem>
                   {accounts.map((account) => (
                     <SelectItem key={account.id} value={account.id}>
                       {account.account_code} - {account.account_name}
