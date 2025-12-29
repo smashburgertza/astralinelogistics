@@ -2,8 +2,9 @@ import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
 import { 
   Plus, ArrowRight, Trash2, CheckCircle, XCircle, Clock,
-  Package, Truck, MessageSquare
+  Package, Truck, MessageSquare, Pencil
 } from 'lucide-react';
+import { Estimate } from '@/hooks/useEstimates';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -45,7 +46,7 @@ import { useExchangeRates, convertToTZS } from '@/hooks/useExchangeRates';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 import { useActiveRegions, regionsToMap } from '@/hooks/useRegions';
 import { CreateEstimateDialog } from './CreateEstimateDialog';
-
+import { EditEstimateDialog } from './EditEstimateDialog';
 const CUSTOMER_RESPONSE_CONFIG = {
   pending: { label: 'Awaiting', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
   approved: { label: 'Approved', color: 'bg-green-100 text-green-800', icon: CheckCircle },
@@ -54,6 +55,8 @@ const CUSTOMER_RESPONSE_CONFIG = {
 
 export function EstimatesTabContent() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [estimateToEdit, setEstimateToEdit] = useState<Estimate | null>(null);
   const [typeFilter, setTypeFilter] = useState<'all' | EstimateType>('all');
   const { data: estimates, isLoading } = useEstimates();
   const { data: exchangeRates } = useExchangeRates();
@@ -62,6 +65,11 @@ export function EstimatesTabContent() {
   const updateStatus = useUpdateEstimateStatus();
   const convertToInvoice = useConvertEstimateToInvoice();
   const deleteEstimate = useDeleteEstimate();
+
+  const handleEditEstimate = (estimate: Estimate) => {
+    setEstimateToEdit(estimate);
+    setEditOpen(true);
+  };
 
   const filteredEstimates = useMemo(() => {
     if (!estimates) return [];
@@ -200,6 +208,16 @@ export function EstimatesTabContent() {
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
+                          {estimate.status !== 'converted' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEditEstimate(estimate)}
+                              title="Edit estimate"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          )}
                           {(estimate as any).customer_response === 'denied' && (
                             <Button
                               size="sm"
@@ -257,6 +275,18 @@ export function EstimatesTabContent() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Edit Estimate Dialog */}
+      {estimateToEdit && (
+        <EditEstimateDialog
+          estimate={estimateToEdit}
+          open={editOpen}
+          onOpenChange={(open) => {
+            setEditOpen(open);
+            if (!open) setEstimateToEdit(null);
+          }}
+        />
+      )}
     </>
   );
 }
