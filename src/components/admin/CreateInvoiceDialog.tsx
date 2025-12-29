@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Plus, Trash2, FileText, Package } from 'lucide-react';
 import { useCreateInvoice } from '@/hooks/useInvoices';
+import { useCreateInvoiceItems } from '@/hooks/useInvoiceItems';
 import { useCustomers, useShipments } from '@/hooks/useShipments';
 import { useExchangeRates, convertToTZS } from '@/hooks/useExchangeRates';
 import { useChartOfAccounts } from '@/hooks/useAccounting';
@@ -60,6 +61,7 @@ interface CreateInvoiceDialogProps {
 export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
   const [open, setOpen] = useState(false);
   const createInvoice = useCreateInvoice();
+  const createInvoiceItems = useCreateInvoiceItems();
   const { data: customers } = useCustomers();
   const { data: shipments } = useShipments();
   const { data: exchangeRates } = useExchangeRates();
@@ -288,7 +290,8 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
     // For now, use the first shipment_id if multiple are selected (invoices table only supports one)
     const primaryShipmentId = data.shipment_ids && data.shipment_ids.length > 0 ? data.shipment_ids[0] : null;
 
-    await createInvoice.mutateAsync({
+    // Create the invoice first
+    const invoice = await createInvoice.mutateAsync({
       invoice_number: invoiceNumber || `INV-${Date.now()}`,
       customer_id: data.customer_id,
       shipment_id: primaryShipmentId,
@@ -300,6 +303,26 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
       status: 'pending',
       invoice_direction: null, // Customer invoice - not B2B agent invoice
     });
+
+    // Save line items if invoice was created successfully
+    if (invoice && invoice.id && data.line_items.length > 0) {
+      const lineItemsToInsert = data.line_items.map((item, index) => {
+        // Use calculated amounts from the calculations object
+        const amount = calculations.lineItemAmounts?.[index] ?? (Number(item.quantity) * Number(item.unit_price));
+        return {
+          invoice_id: invoice.id,
+          item_type: 'freight' as const, // Default type
+          description: item.description,
+          quantity: Number(item.quantity),
+          unit_price: Number(item.unit_price),
+          amount,
+          currency: data.currency,
+          weight_kg: item.weight_kg ? Number(item.weight_kg) : null,
+        };
+      });
+
+      await createInvoiceItems.mutateAsync(lineItemsToInsert);
+    }
 
     form.reset();
     setOpen(false);
