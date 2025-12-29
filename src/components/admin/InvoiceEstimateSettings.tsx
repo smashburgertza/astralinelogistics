@@ -326,6 +326,7 @@ export function InvoiceEstimateSettings() {
     await updateSettings.mutateAsync({
       key: 'invoice_settings',
       value: settings as unknown as Record<string, unknown>,
+      category: 'billing',
     });
     toast.success('Invoice/Estimate settings saved');
   };
