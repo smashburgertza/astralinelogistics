@@ -590,21 +590,29 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
             />
 
             {/* Action Buttons */}
-            <div className="flex justify-center gap-4 pt-4">
+            <div className="flex justify-end gap-3 pt-4 border-t">
               <Button 
                 type="button" 
                 variant="outline" 
                 onClick={() => setOpen(false)}
                 className="px-6"
               >
-                Save Draft / Cancel
+                Cancel
+              </Button>
+              <Button 
+                type="submit" 
+                variant="secondary"
+                disabled={createInvoice.isPending || calculations.total <= 0}
+                className="px-6"
+              >
+                {createInvoice.isPending ? 'Saving...' : 'Save'}
               </Button>
               <Button 
                 type="submit" 
                 disabled={createInvoice.isPending || calculations.total <= 0}
-                className="px-6 bg-amber-500 hover:bg-amber-600 text-white"
+                className="px-6 bg-primary hover:bg-primary/90"
               >
-                {createInvoice.isPending ? 'Creating...' : 'Finalize & Send Invoice'}
+                {createInvoice.isPending ? 'Saving...' : 'Save & Send'}
               </Button>
             </div>
           </form>
