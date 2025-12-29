@@ -4,7 +4,9 @@ import { StatCard } from '@/components/admin/StatCard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Package, Upload, TrendingUp, ArrowRight, Plus, Clock, CloudUpload, Sparkles, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Package, Upload, TrendingUp, ArrowRight, Plus, Clock, CloudUpload, Sparkles, ArrowDownLeft, ArrowUpRight, CreditCard, Receipt } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { useAgentShipments, useAgentShipmentStats } from '@/hooks/useAgentShipments';
@@ -12,8 +14,14 @@ import { useAgentAssignedRegions } from '@/hooks/useAgentRegions';
 import { ShipmentStatusBadge } from '@/components/admin/ShipmentStatusBadge';
 import { BatchFreightCostCard } from '@/components/agent/BatchFreightCostCard';
 import { useAgentBalance } from '@/hooks/useAgentBalance';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { CURRENCY_SYMBOLS } from '@/lib/constants';
 
 export default function AgentDashboard() {
+  const { user } = useAuth();
+  
   // Get assigned regions first - single source of truth
   const { data: assignedRegions = [] } = useAgentAssignedRegions();
   const regionCodes = useMemo(() => assignedRegions.map(r => r.region_code), [assignedRegions]);
@@ -22,6 +30,43 @@ export default function AgentDashboard() {
   const { data: stats, isLoading: statsLoading } = useAgentShipmentStats(regionCodes);
   const { data: shipments, isLoading: shipmentsLoading } = useAgentShipments(regionCodes);
   const { data: balance, isLoading: balanceLoading } = useAgentBalance();
+  
+  // Fetch payments received from Astraline (for from_agent invoices)
+  const { data: paymentsReceived = [], isLoading: paymentsLoading } = useQuery({
+    queryKey: ['agent-payments-received', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      
+      // Get all payments for invoices where this agent is the agent_id and direction is from_agent
+      const { data: invoices, error: invoicesError } = await supabase
+        .from('invoices')
+        .select('id, invoice_number, currency')
+        .eq('agent_id', user.id)
+        .eq('invoice_direction', 'from_agent');
+      
+      if (invoicesError) throw invoicesError;
+      if (!invoices || invoices.length === 0) return [];
+      
+      const invoiceIds = invoices.map(i => i.id);
+      const invoiceMap = new Map(invoices.map(i => [i.id, i]));
+      
+      const { data: payments, error: paymentsError } = await supabase
+        .from('payments')
+        .select('*')
+        .in('invoice_id', invoiceIds)
+        .order('paid_at', { ascending: false })
+        .limit(10);
+      
+      if (paymentsError) throw paymentsError;
+      
+      return payments?.map(p => ({
+        ...p,
+        invoice_number: invoiceMap.get(p.invoice_id)?.invoice_number,
+        invoice_currency: invoiceMap.get(p.invoice_id)?.currency,
+      })) || [];
+    },
+    enabled: !!user?.id,
+  });
   
   const recentShipments = shipments?.slice(0, 5) || [];
 
@@ -129,6 +174,82 @@ export default function AgentDashboard() {
           </>
         )}
       </div>
+
+      {/* Payment History from Astraline */}
+      <Card className="shadow-xl border-0 bg-card/80 backdrop-blur-sm mb-8">
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center">
+                  <CreditCard className="w-4 h-4 text-white" />
+                </div>
+                Payment History
+              </CardTitle>
+              <CardDescription className="mt-1">Payments received from Astraline</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {paymentsLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
+          ) : paymentsReceived.length > 0 ? (
+            <div className="rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead>Date</TableHead>
+                    <TableHead>Invoice</TableHead>
+                    <TableHead>Method</TableHead>
+                    <TableHead>Reference</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paymentsReceived.map((payment: any) => {
+                    const currencySymbol = CURRENCY_SYMBOLS[payment.currency || 'USD'] || '$';
+                    return (
+                      <TableRow key={payment.id}>
+                        <TableCell className="text-sm">
+                          {payment.paid_at ? format(new Date(payment.paid_at), 'MMM d, yyyy') : '-'}
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {payment.invoice_number || '-'}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="capitalize">
+                            {payment.payment_method?.replace('_', ' ') || '-'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-mono text-sm text-muted-foreground">
+                          {payment.stripe_payment_id || '-'}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold text-emerald-600">
+                          {currencySymbol}{Number(payment.amount).toFixed(2)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-4">
+                <Receipt className="w-8 h-8 text-muted-foreground/40" />
+              </div>
+              <p className="text-muted-foreground font-medium">No payments received yet</p>
+              <p className="text-sm text-muted-foreground/70 mt-1">
+                Payments from Astraline will appear here
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Batch Freight Costs */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
