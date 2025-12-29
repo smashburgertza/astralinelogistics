@@ -28,6 +28,7 @@ import {
   Plus,
   Package,
   Pencil,
+  CreditCard,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -35,7 +36,10 @@ import { InvoiceStatusBadge } from "./InvoiceStatusBadge";
 import { CreateAgentCargoInvoiceDialog } from "./CreateAgentCargoInvoiceDialog";
 import { InvoiceDetailDialog } from "./InvoiceDetailDialog";
 import { EditB2BInvoiceDialog } from "./EditB2BInvoiceDialog";
+import { RecordPaymentDialog, PaymentDetails } from "./RecordPaymentDialog";
 import { useExchangeRates } from "@/hooks/useExchangeRates";
+import { useRecordPayment } from "@/hooks/useInvoices";
+import { useInvoicePayments } from "@/hooks/useInvoicePayments";
 
 // Platform base currency
 const PLATFORM_BASE_CURRENCY = "TZS";
@@ -100,8 +104,19 @@ export function B2BInvoices() {
   const [invoiceDetailOpen, setInvoiceDetailOpen] = useState(false);
   const [editInvoiceOpen, setEditInvoiceOpen] = useState(false);
   const [invoiceToEdit, setInvoiceToEdit] = useState<B2BInvoice | null>(null);
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [invoiceForPayment, setInvoiceForPayment] = useState<B2BInvoice | null>(null);
   const queryClient = useQueryClient();
   const { data: exchangeRates } = useExchangeRates();
+  const recordPayment = useRecordPayment();
+  
+  // Fetch payments for the invoice being paid
+  const { data: invoicePayments = [] } = useInvoicePayments(invoiceForPayment?.id || '');
+  
+  // Calculate remaining balance for the payment dialog
+  const invoiceForPaymentAmount = Number(invoiceForPayment?.amount || 0);
+  const invoiceForPaymentPaid = invoicePayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+  const invoiceForPaymentBalance = Math.max(0, invoiceForPaymentAmount - invoiceForPaymentPaid);
   
   // Build rate map for currency conversion - memoize to recalculate when rates load
   const rateMap = useMemo(() => {
@@ -299,6 +314,24 @@ export function B2BInvoices() {
     setInvoiceDialogOpen(true);
   };
 
+  const handleOpenPaymentDialog = (invoice: B2BInvoice) => {
+    setInvoiceForPayment(invoice);
+    setPaymentDialogOpen(true);
+  };
+
+  const handleRecordPayment = (details: PaymentDetails) => {
+    recordPayment.mutate(details, {
+      onSuccess: () => {
+        setPaymentDialogOpen(false);
+        setInvoiceForPayment(null);
+        queryClient.invalidateQueries({ queryKey: ["b2b-invoices"] });
+        queryClient.invalidateQueries({ queryKey: ["agent-cargo-shipments"] });
+        queryClient.invalidateQueries({ queryKey: ["agent-balance"] });
+        queryClient.invalidateQueries({ queryKey: ["all-agent-balances"] });
+      },
+    });
+  };
+
   const fromAgentInvoices = invoices?.filter((i) => i.invoice_direction === "from_agent") || [];
   const toAgentInvoices = invoices?.filter((i) => i.invoice_direction === "to_agent") || [];
   const unbilledCargoShipments = agentCargoShipments?.filter(s => !s.invoiced) || [];
@@ -403,12 +436,21 @@ export function B2BInvoices() {
                           <Pencil className="h-4 w-4 mr-2" />
                           Edit Invoice
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => markAsPaidMutation.mutate(invoice.id)}
-                        >
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          Mark as Paid
-                        </DropdownMenuItem>
+                        {invoice.invoice_direction === "from_agent" ? (
+                          <DropdownMenuItem
+                            onClick={() => handleOpenPaymentDialog(invoice)}
+                          >
+                            <CreditCard className="h-4 w-4 mr-2" />
+                            Record Payment
+                          </DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuItem
+                            onClick={() => markAsPaidMutation.mutate(invoice.id)}
+                          >
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            Mark as Paid
+                          </DropdownMenuItem>
+                        )}
                       </>
                     )}
                   </DropdownMenuContent>
@@ -622,6 +664,21 @@ export function B2BInvoices() {
           }}
         />
       )}
+
+      {/* Record Payment Dialog for From Agent invoices */}
+      <RecordPaymentDialog
+        invoice={invoiceForPayment as any}
+        open={paymentDialogOpen}
+        onOpenChange={(open) => {
+          setPaymentDialogOpen(open);
+          if (!open) setInvoiceForPayment(null);
+        }}
+        onRecordPayment={handleRecordPayment}
+        isLoading={recordPayment.isPending}
+        remainingBalance={invoiceForPaymentBalance}
+        isOutgoingPayment={true}
+        payeeName={invoiceForPayment?.company_name || invoiceForPayment?.agent_name || 'Agent'}
+      />
     </div>
   );
 }
