@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { Invoice, useRecordPayment, RecordPaymentParams } from '@/hooks/useInvoices';
 import { useInvoicePayments } from '@/hooks/useInvoicePayments';
+import { useInvoiceItems } from '@/hooks/useInvoiceItems';
 import { InvoiceStatusBadge } from './InvoiceStatusBadge';
 import { InvoicePDFPreview } from './InvoicePDFPreview';
 import { RecordPaymentDialog, PaymentDetails } from './RecordPaymentDialog';
@@ -40,7 +41,13 @@ export function InvoiceDetailDialog({ invoice, open, onOpenChange }: InvoiceDeta
   const printRef = useRef<HTMLDivElement>(null);
   const { data: regions } = useRegions();
   const { data: payments = [], isLoading: paymentsLoading, refetch: refetchPayments } = useInvoicePayments(invoice?.id || '');
+  const { data: invoiceItems = [] } = useInvoiceItems(invoice?.id || '');
   const recordPayment = useRecordPayment();
+
+  // Calculate total weight from invoice items (for B2B invoices which may have multiple shipments)
+  const totalBillableWeight = invoiceItems
+    .filter(item => item.unit_type === 'kg' && item.weight_kg)
+    .reduce((sum, item) => sum + Number(item.weight_kg || 0), 0);
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
@@ -209,11 +216,16 @@ export function InvoiceDetailDialog({ invoice, open, onOpenChange }: InvoiceDeta
                           {regionInfo.flag_emoji} {regionInfo.name}
                         </p>
                       )}
-                      {invoice.shipments.total_weight_kg && (
+                      {/* For B2B invoices, show total billable weight from invoice items; otherwise show shipment weight */}
+                      {(invoice.invoice_direction === 'from_agent' || invoice.invoice_direction === 'to_agent') && totalBillableWeight > 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          Total Weight: {totalBillableWeight.toFixed(2)} kg
+                        </p>
+                      ) : invoice.shipments.total_weight_kg ? (
                         <p className="text-sm text-muted-foreground">
                           Weight: {invoice.shipments.total_weight_kg} kg
                         </p>
-                      )}
+                      ) : null}
                       {invoice.rate_per_kg && (
                         <p className="text-sm text-muted-foreground">
                           Rate: {currencySymbol}{Number(invoice.rate_per_kg).toFixed(2)}/kg
