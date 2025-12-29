@@ -132,6 +132,7 @@ export function EmployeeTable() {
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead>Staff ID</TableHead>
             <TableHead>Name</TableHead>
             <TableHead>Email</TableHead>
             <TableHead>Role</TableHead>
@@ -143,6 +144,9 @@ export function EmployeeTable() {
         <TableBody>
           {employees?.map((employee) => (
             <TableRow key={employee.user_id}>
+              <TableCell className="font-mono text-sm">
+                {employee.profile?.employee_code || '-'}
+              </TableCell>
               <TableCell className="font-medium">
                 {employee.profile?.full_name || 'N/A'}
               </TableCell>
@@ -199,7 +203,7 @@ export function EmployeeTable() {
           ))}
           {employees?.length === 0 && (
             <TableRow>
-              <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                 No employees found
               </TableCell>
             </TableRow>

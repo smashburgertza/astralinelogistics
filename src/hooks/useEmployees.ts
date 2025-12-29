@@ -11,6 +11,7 @@ export interface Employee {
     email: string;
     full_name: string | null;
     phone: string | null;
+    employee_code: string | null;
   } | null;
   created_at: string | null;
 }
@@ -81,7 +82,7 @@ export function useEmployees() {
       const userIds = userRoles.map(r => r.user_id);
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('id, email, full_name, phone')
+        .select('id, email, full_name, phone, employee_code')
         .in('id', userIds);
 
       const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
@@ -142,12 +143,17 @@ export function useCreateEmployee() {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
 
+      // Generate employee code
+      const { data: employeeCodeResult } = await supabase.rpc('generate_employee_code');
+      const employeeCode = employeeCodeResult || `EMP${Date.now()}`;
+
       // Update profile
       const { error: profileError } = await supabase
         .from('profiles')
         .update({
           full_name: data.fullName,
           phone: data.phone || null,
+          employee_code: employeeCode,
         })
         .eq('id', authData.user.id);
 
