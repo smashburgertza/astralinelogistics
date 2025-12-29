@@ -601,8 +601,7 @@ export function ShipmentUploadForm() {
       }
 
       // Create a separate shipment for agent's consolidated cargo if any
-      // Agent's own cargo is marked as shipment_owner='agent' and NO B2B invoice is created
-      // because the agent owns this cargo - there's no billing between Astraline and agent
+      // Agent's own cargo: Astraline bills the agent for clearing/handling services (to_agent)
       if (agentCargoWeight > 0) {
         const agentTrackingNumber = generateTrackingNumber();
         
@@ -621,10 +620,10 @@ export function ShipmentUploadForm() {
             tracking_number: agentTrackingNumber,
             batch_id: batchId,
             billing_party: 'agent_collect' as BillingPartyType,
-            shipment_owner: 'agent', // Agent owns this cargo - no B2B invoicing
+            shipment_owner: 'agent', // Agent owns this cargo
             transit_point: transitPoint,
             rate_per_kg: ratePerKg,
-            total_revenue: 0, // No revenue for Astraline on agent-owned cargo
+            total_revenue: 0, // No customer revenue for agent-owned cargo
           })
           .select()
           .single();
@@ -632,7 +631,8 @@ export function ShipmentUploadForm() {
         if (agentShipmentError) {
           console.error('Failed to create agent cargo shipment:', agentShipmentError);
         }
-        // NOTE: No invoice is created for agent's own cargo - they own it, no billing between parties
+        // NOTE: Invoice will be created by admin via B2B Invoices page
+        // Admin creates "to_agent" invoice to bill agent for clearing services
       }
 
       setCompletedShipments(createdShipments);
