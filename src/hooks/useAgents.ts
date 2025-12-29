@@ -118,15 +118,21 @@ export function useCreateAgent() {
       regions: string[]; // Array of region codes
       canHaveConsolidatedCargo?: boolean;
     }) => {
-      // Store current admin session before creating new user
+      // Store current admin session tokens before creating new user
       const { data: currentSession } = await supabase.auth.getSession();
-      const adminSession = currentSession.session;
+      const adminAccessToken = currentSession.session?.access_token;
+      const adminRefreshToken = currentSession.session?.refresh_token;
 
-      // First, create the user via Supabase Auth
+      if (!adminAccessToken || !adminRefreshToken) {
+        throw new Error('Admin session not found');
+      }
+
+      // Create the user via Supabase Auth - this will automatically log in the new user
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
+          emailRedirectTo: `${window.location.origin}/`,
           data: {
             full_name: contactPersonName,
           },
@@ -135,26 +141,36 @@ export function useCreateAgent() {
 
       if (authError) {
         // Restore admin session if signup failed
-        if (adminSession) {
-          await supabase.auth.setSession(adminSession);
-        }
+        await supabase.auth.setSession({
+          access_token: adminAccessToken,
+          refresh_token: adminRefreshToken,
+        });
         throw authError;
       }
       if (!authData.user) {
-        if (adminSession) {
-          await supabase.auth.setSession(adminSession);
-        }
+        await supabase.auth.setSession({
+          access_token: adminAccessToken,
+          refresh_token: adminRefreshToken,
+        });
         throw new Error('Failed to create user');
       }
 
       const userId = authData.user.id;
 
-      // Restore admin session and wait for it to be ready
-      if (adminSession) {
-        await supabase.auth.setSession(adminSession);
-        // Small delay to ensure session is propagated
-        await new Promise(resolve => setTimeout(resolve, 100));
+      // Immediately restore admin session
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: adminAccessToken,
+        refresh_token: adminRefreshToken,
+      });
+
+      if (sessionError) {
+        console.error('Failed to restore admin session:', sessionError);
+        window.location.reload();
+        throw new Error('Session restoration failed. Please try again.');
       }
+
+      // Wait for session to be fully restored
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       // Generate agent code
       const { data: agentCodeResult } = await supabase

@@ -108,11 +108,16 @@ export function useCreateEmployee() {
       isSuperAdmin: boolean;
       permissions: Record<string, boolean>;
     }) => {
-      // Store current admin session before creating new user
+      // Store current admin session tokens before creating new user
       const { data: currentSession } = await supabase.auth.getSession();
-      const adminSession = currentSession.session;
+      const adminAccessToken = currentSession.session?.access_token;
+      const adminRefreshToken = currentSession.session?.refresh_token;
 
-      // Create user via auth
+      if (!adminAccessToken || !adminRefreshToken) {
+        throw new Error('Admin session not found');
+      }
+
+      // Create user via auth - this will automatically log in the new user
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
@@ -124,24 +129,37 @@ export function useCreateEmployee() {
 
       if (authError) {
         // Restore admin session if signup failed
-        if (adminSession) {
-          await supabase.auth.setSession(adminSession);
-        }
+        await supabase.auth.setSession({
+          access_token: adminAccessToken,
+          refresh_token: adminRefreshToken,
+        });
         throw authError;
       }
       if (!authData.user) {
-        if (adminSession) {
-          await supabase.auth.setSession(adminSession);
-        }
+        await supabase.auth.setSession({
+          access_token: adminAccessToken,
+          refresh_token: adminRefreshToken,
+        });
         throw new Error('Failed to create user');
       }
 
-      // Restore admin session and wait for it to be ready
-      if (adminSession) {
-        await supabase.auth.setSession(adminSession);
-        // Small delay to ensure session is propagated
-        await new Promise(resolve => setTimeout(resolve, 100));
+      const newUserId = authData.user.id;
+
+      // Immediately restore admin session
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: adminAccessToken,
+        refresh_token: adminRefreshToken,
+      });
+
+      if (sessionError) {
+        console.error('Failed to restore admin session:', sessionError);
+        // Force page reload to restore session from storage
+        window.location.reload();
+        throw new Error('Session restoration failed. Please try again.');
       }
+
+      // Wait for session to be fully restored
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       // Generate employee code
       const { data: employeeCodeResult } = await supabase.rpc('generate_employee_code');
@@ -155,7 +173,7 @@ export function useCreateEmployee() {
           phone: data.phone || null,
           employee_code: employeeCode,
         })
-        .eq('id', authData.user.id);
+        .eq('id', newUserId);
 
       if (profileError) throw profileError;
 
@@ -167,11 +185,11 @@ export function useCreateEmployee() {
           employee_role: data.employeeRole,
           permissions: data.permissions,
         })
-        .eq('user_id', authData.user.id);
+        .eq('user_id', newUserId);
 
       if (roleError) throw roleError;
 
-      return authData.user;
+      return { id: newUserId };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
