@@ -529,8 +529,8 @@ export function ShipmentUploadForm() {
 
         if (parcelError) throw parcelError;
 
-        // Customer shipments are always invoiced TO the customer (we bill them)
-        const invoiceDirection = 'to_agent'; // Invoice goes to agent for settlement with customer
+        // Customer shipments: Agent invoices Astraline (from_agent = Astraline owes agent)
+        const invoiceDirection = 'from_agent';
         
         // Create invoice
         const invoiceNumber = generateInvoiceNumber();
@@ -550,7 +550,7 @@ export function ShipmentUploadForm() {
             agent_id: user?.id,
             invoice_direction: invoiceDirection,
             rate_per_kg: ratePerKg,
-            notes: `Customer shipment from ${currentRegionInfo?.region_name || selectedRegion}${transitLabel}. Weight: ${line.weight_kg}kg @ ${currencySymbol}${ratePerKg}/kg`,
+            notes: `Agent invoice for customer shipment from ${currentRegionInfo?.region_name || selectedRegion}${transitLabel}. Weight: ${line.weight_kg}kg @ ${currencySymbol}${ratePerKg}/kg`,
           })
           .select()
           .single();

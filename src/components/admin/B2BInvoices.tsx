@@ -1,0 +1,330 @@
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  MoreHorizontal,
+  CheckCircle,
+  FileText,
+} from "lucide-react";
+import { format } from "date-fns";
+import { toast } from "sonner";
+import { InvoiceStatusBadge } from "./InvoiceStatusBadge";
+
+interface B2BInvoice {
+  id: string;
+  invoice_number: string;
+  amount: number;
+  currency: string;
+  status: string;
+  invoice_direction: "from_agent" | "to_agent";
+  created_at: string;
+  due_date: string | null;
+  paid_at: string | null;
+  agent_id: string;
+  agent_name: string | null;
+  agent_code: string | null;
+  company_name: string | null;
+  shipment_tracking: string | null;
+  shipment_weight: number | null;
+}
+
+export function B2BInvoices() {
+  const [activeTab, setActiveTab] = useState<"from_agents" | "to_agents">("from_agents");
+  const queryClient = useQueryClient();
+
+  const { data: invoices, isLoading } = useQuery({
+    queryKey: ["b2b-invoices"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("invoices")
+        .select(`
+          id,
+          invoice_number,
+          amount,
+          currency,
+          status,
+          invoice_direction,
+          created_at,
+          due_date,
+          paid_at,
+          agent_id,
+          shipment_id
+        `)
+        .not("agent_id", "is", null)
+        .in("invoice_direction", ["from_agent", "to_agent"])
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      // Get agent profiles and shipment info
+      const agentIds = [...new Set(data?.map((i) => i.agent_id).filter(Boolean))];
+      const shipmentIds = [...new Set(data?.map((i) => i.shipment_id).filter(Boolean))];
+
+      const [profilesRes, shipmentsRes] = await Promise.all([
+        agentIds.length > 0
+          ? supabase.from("profiles").select("id, full_name, agent_code, company_name").in("id", agentIds)
+          : { data: [] },
+        shipmentIds.length > 0
+          ? supabase.from("shipments").select("id, tracking_number, total_weight_kg").in("id", shipmentIds)
+          : { data: [] },
+      ]);
+
+      const profilesMap = new Map((profilesRes.data || []).map((p) => [p.id, p]));
+      const shipmentsMap = new Map((shipmentsRes.data || []).map((s) => [s.id, s]));
+
+      return data?.map((inv) => {
+        const profile = profilesMap.get(inv.agent_id);
+        const shipment = shipmentsMap.get(inv.shipment_id);
+        return {
+          ...inv,
+          agent_name: profile?.full_name || null,
+          agent_code: profile?.agent_code || null,
+          company_name: profile?.company_name || null,
+          shipment_tracking: shipment?.tracking_number || null,
+          shipment_weight: shipment?.total_weight_kg || null,
+        } as B2BInvoice;
+      }) || [];
+    },
+  });
+
+  const markAsPaidMutation = useMutation({
+    mutationFn: async (invoiceId: string) => {
+      const { error } = await supabase
+        .from("invoices")
+        .update({ status: "paid", paid_at: new Date().toISOString() })
+        .eq("id", invoiceId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Invoice marked as paid");
+      queryClient.invalidateQueries({ queryKey: ["b2b-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["agent-balance"] });
+      queryClient.invalidateQueries({ queryKey: ["all-agent-balances"] });
+    },
+    onError: () => {
+      toast.error("Failed to update invoice");
+    },
+  });
+
+  const fromAgentInvoices = invoices?.filter((i) => i.invoice_direction === "from_agent") || [];
+  const toAgentInvoices = invoices?.filter((i) => i.invoice_direction === "to_agent") || [];
+
+  const pendingFromAgents = fromAgentInvoices.filter((i) => i.status === "pending");
+  const pendingToAgents = toAgentInvoices.filter((i) => i.status === "pending");
+
+  const totalOwedToAgents = pendingFromAgents.reduce((sum, i) => sum + (i.amount || 0), 0);
+  const totalOwedByAgents = pendingToAgents.reduce((sum, i) => sum + (i.amount || 0), 0);
+
+  const renderInvoiceTable = (invoiceList: B2BInvoice[]) => {
+    if (invoiceList.length === 0) {
+      return (
+        <div className="text-center py-12 text-muted-foreground">
+          No invoices found
+        </div>
+      );
+    }
+
+    return (
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Invoice #</TableHead>
+            <TableHead>Agent</TableHead>
+            <TableHead>Shipment</TableHead>
+            <TableHead className="text-right">Amount</TableHead>
+            <TableHead>Date</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {invoiceList.map((invoice) => (
+            <TableRow key={invoice.id}>
+              <TableCell className="font-mono text-sm">
+                {invoice.invoice_number}
+              </TableCell>
+              <TableCell>
+                <div>
+                  <div className="font-medium">
+                    {invoice.company_name || invoice.agent_name || "Unknown"}
+                  </div>
+                  {invoice.agent_code && (
+                    <div className="text-xs text-muted-foreground">
+                      {invoice.agent_code}
+                    </div>
+                  )}
+                </div>
+              </TableCell>
+              <TableCell>
+                {invoice.shipment_tracking ? (
+                  <div>
+                    <div className="font-mono text-sm">{invoice.shipment_tracking}</div>
+                    {invoice.shipment_weight && (
+                      <div className="text-xs text-muted-foreground">
+                        {invoice.shipment_weight} kg
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground">-</span>
+                )}
+              </TableCell>
+              <TableCell className="text-right font-medium">
+                {invoice.currency} {invoice.amount?.toFixed(2)}
+              </TableCell>
+              <TableCell className="text-sm text-muted-foreground">
+                {format(new Date(invoice.created_at), "dd MMM yyyy")}
+              </TableCell>
+              <TableCell>
+                <InvoiceStatusBadge status={invoice.status} />
+              </TableCell>
+              <TableCell className="text-right">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem>
+                      <FileText className="h-4 w-4 mr-2" />
+                      View Details
+                    </DropdownMenuItem>
+                    {invoice.status === "pending" && (
+                      <DropdownMenuItem
+                        onClick={() => markAsPaidMutation.mutate(invoice.id)}
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Mark as Paid
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-950/30 dark:to-orange-950/30">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-1">
+                  We Owe Agents
+                </p>
+                <p className="text-3xl font-bold text-red-600 dark:text-red-400">
+                  ${totalOwedToAgents.toFixed(2)}
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {pendingFromAgents.length} pending invoice{pendingFromAgents.length !== 1 ? "s" : ""}
+                </p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-red-500/20 flex items-center justify-center">
+                <ArrowUpRight className="w-6 h-6 text-red-600 dark:text-red-400" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-1">
+                  Agents Owe Us
+                </p>
+                <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">
+                  ${totalOwedByAgents.toFixed(2)}
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {pendingToAgents.length} pending invoice{pendingToAgents.length !== 1 ? "s" : ""}
+                </p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                <ArrowDownLeft className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Invoices Tabs */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            B2B Agent Invoices
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "from_agents" | "to_agents")}>
+            <TabsList className="grid w-full max-w-md grid-cols-2">
+              <TabsTrigger value="from_agents" className="gap-2">
+                <ArrowDownLeft className="h-4 w-4" />
+                From Agents ({fromAgentInvoices.length})
+              </TabsTrigger>
+              <TabsTrigger value="to_agents" className="gap-2">
+                <ArrowUpRight className="h-4 w-4" />
+                To Agents ({toAgentInvoices.length})
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="from_agents" className="mt-4">
+              <div className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
+                <p className="text-sm text-red-800 dark:text-red-200">
+                  <strong>Invoices FROM Agents:</strong> Auto-generated when agents upload customer shipments. 
+                  Astraline owes agents for shipping their customers' cargo.
+                </p>
+              </div>
+              {isLoading ? (
+                <div className="text-center py-8 text-muted-foreground">Loading...</div>
+              ) : (
+                renderInvoiceTable(fromAgentInvoices)
+              )}
+            </TabsContent>
+
+            <TabsContent value="to_agents" className="mt-4">
+              <div className="mb-4 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
+                <p className="text-sm text-emerald-800 dark:text-emerald-200">
+                  <strong>Invoices TO Agents:</strong> For agent cargo clearing. 
+                  Agents owe Astraline for clearing their own cargo.
+                </p>
+              </div>
+              {isLoading ? (
+                <div className="text-center py-8 text-muted-foreground">Loading...</div>
+              ) : (
+                renderInvoiceTable(toAgentInvoices)
+              )}
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
