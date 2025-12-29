@@ -80,13 +80,15 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
 
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'route'; id: string } | null>(null);
   const [consolidatedCargoEnabled, setConsolidatedCargoEnabled] = useState(false);
+  const [baseCurrency, setBaseCurrency] = useState('USD');
 
   // Sync local state with agent settings when agent changes
   useEffect(() => {
     if (agent) {
       setConsolidatedCargoEnabled(agent.settings?.can_have_consolidated_cargo ?? false);
+      setBaseCurrency(agent.settings?.base_currency ?? 'USD');
     }
-  }, [agent, agent?.settings?.can_have_consolidated_cargo]);
+  }, [agent, agent?.settings?.can_have_consolidated_cargo, agent?.settings?.base_currency]);
 
   if (!agent) return null;
 
@@ -347,7 +349,7 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">Account Balance</CardTitle>
                   <CardDescription>
-                    Summary of invoices between agent and Astraline
+                    Summary of invoices between agent and Astraline (in {agentBalance?.base_currency || 'USD'})
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -363,7 +365,7 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
                               ? 'text-green-600' 
                               : ''
                         }`}>
-                          ${Math.abs(agentBalance.net_balance).toFixed(2)}
+                          {CURRENCY_SYMBOLS[agentBalance.base_currency] || agentBalance.base_currency}{Math.abs(agentBalance.net_balance).toFixed(2)}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
                           {agentBalance.net_balance > 0 
@@ -383,11 +385,11 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
                           <div className="space-y-1">
                             <div className="flex justify-between text-sm">
                               <span>Paid</span>
-                              <span className="font-medium">${agentBalance.paid_to_agent.toFixed(2)}</span>
+                              <span className="font-medium">{CURRENCY_SYMBOLS[agentBalance.base_currency] || ''}{agentBalance.paid_to_agent.toFixed(2)}</span>
                             </div>
                             <div className="flex justify-between text-sm">
                               <span>Pending</span>
-                              <span className="font-medium text-amber-600">${agentBalance.pending_to_agent.toFixed(2)}</span>
+                              <span className="font-medium text-amber-600">{CURRENCY_SYMBOLS[agentBalance.base_currency] || ''}{agentBalance.pending_to_agent.toFixed(2)}</span>
                             </div>
                           </div>
                         </div>
@@ -397,11 +399,11 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
                           <div className="space-y-1">
                             <div className="flex justify-between text-sm">
                               <span>Paid</span>
-                              <span className="font-medium">${agentBalance.paid_from_agent.toFixed(2)}</span>
+                              <span className="font-medium">{CURRENCY_SYMBOLS[agentBalance.base_currency] || ''}{agentBalance.paid_from_agent.toFixed(2)}</span>
                             </div>
                             <div className="flex justify-between text-sm">
                               <span>Pending</span>
-                              <span className="font-medium text-amber-600">${agentBalance.pending_from_agent.toFixed(2)}</span>
+                              <span className="font-medium text-amber-600">{CURRENCY_SYMBOLS[agentBalance.base_currency] || ''}{agentBalance.pending_from_agent.toFixed(2)}</span>
                             </div>
                           </div>
                         </div>
@@ -488,7 +490,7 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
                     Configure cargo handling options for this agent
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <Label className="text-sm font-medium">Consolidated Cargo</Label>
@@ -507,6 +509,38 @@ export function AgentConfigDrawer({ agent, open, onOpenChange }: AgentConfigDraw
                       }}
                       disabled={updateAgentSettings.isPending}
                     />
+                  </div>
+                  
+                  <Separator />
+                  
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Base Currency</Label>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Currency used to display agent balances
+                    </p>
+                    <Select
+                      value={baseCurrency}
+                      onValueChange={(value) => {
+                        setBaseCurrency(value);
+                        updateAgentSettings.mutate({
+                          userId: agent.user_id,
+                          baseCurrency: value,
+                        });
+                      }}
+                      disabled={updateAgentSettings.isPending}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="USD">USD - US Dollar</SelectItem>
+                        <SelectItem value="EUR">EUR - Euro</SelectItem>
+                        <SelectItem value="GBP">GBP - British Pound</SelectItem>
+                        <SelectItem value="CNY">CNY - Chinese Yuan</SelectItem>
+                        <SelectItem value="AED">AED - UAE Dirham</SelectItem>
+                        <SelectItem value="TZS">TZS - Tanzanian Shilling</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </CardContent>
               </Card>

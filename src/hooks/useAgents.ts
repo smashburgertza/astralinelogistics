@@ -10,6 +10,7 @@ export interface AgentRegion {
 
 export interface AgentSettings {
   can_have_consolidated_cargo: boolean;
+  base_currency: string;
 }
 
 export interface Agent {
@@ -82,6 +83,7 @@ export function useAgents() {
             })),
           settings: settings ? {
             can_have_consolidated_cargo: settings.can_have_consolidated_cargo,
+            base_currency: settings.base_currency || 'USD',
           } : null,
           created_at: role.created_at || '',
           profile: profiles.find(p => p.id === role.user_id) || null,
@@ -377,18 +379,29 @@ export function useUpdateAgentSettings() {
     mutationFn: async ({
       userId,
       canHaveConsolidatedCargo,
+      baseCurrency,
     }: {
       userId: string;
-      canHaveConsolidatedCargo: boolean;
+      canHaveConsolidatedCargo?: boolean;
+      baseCurrency?: string;
     }) => {
+      // Build update object
+      const updateData: Record<string, any> = {
+        user_id: userId,
+        updated_at: new Date().toISOString(),
+      };
+      
+      if (canHaveConsolidatedCargo !== undefined) {
+        updateData.can_have_consolidated_cargo = canHaveConsolidatedCargo;
+      }
+      if (baseCurrency !== undefined) {
+        updateData.base_currency = baseCurrency;
+      }
+
       // Upsert the settings
       const { error } = await supabase
         .from('agent_settings')
-        .upsert({
-          user_id: userId,
-          can_have_consolidated_cargo: canHaveConsolidatedCargo,
-          updated_at: new Date().toISOString(),
-        }, {
+        .upsert(updateData as any, {
           onConflict: 'user_id',
         });
 
@@ -398,6 +411,7 @@ export function useUpdateAgentSettings() {
       queryClient.invalidateQueries({ queryKey: ['agents'] });
       queryClient.invalidateQueries({ queryKey: ['agent-settings'] });
       queryClient.invalidateQueries({ queryKey: ['agent-full-config'] });
+      queryClient.invalidateQueries({ queryKey: ['agent-balance'] });
       toast.success('Agent settings updated');
     },
     onError: (error: any) => {

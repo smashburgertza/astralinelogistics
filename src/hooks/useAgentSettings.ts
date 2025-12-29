@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 
 interface AgentSettings {
   can_have_consolidated_cargo: boolean;
+  base_currency: string;
 }
 
 interface AgentRegionInfo {
@@ -30,7 +31,7 @@ export function useAgentFullConfig() {
       // Fetch agent settings
       const { data: settingsData } = await supabase
         .from('agent_settings')
-        .select('can_have_consolidated_cargo')
+        .select('can_have_consolidated_cargo, base_currency')
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -55,6 +56,7 @@ export function useAgentFullConfig() {
       return {
         settings: settingsData ? {
           can_have_consolidated_cargo: settingsData.can_have_consolidated_cargo,
+          base_currency: (settingsData as any).base_currency || 'USD',
         } : null,
         regions,
       };
