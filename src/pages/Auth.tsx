@@ -1,22 +1,43 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { Plane, Mail, Lock, User, ArrowRight } from 'lucide-react';
+import { Plane, Lock, User, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function AuthPage() {
   const [searchParams] = useSearchParams();
   const [isSignUp, setIsSignUp] = useState(searchParams.get('mode') === 'signup');
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
+
+  const resolveEmailFromIdentifier = async (input: string): Promise<string> => {
+    // If it looks like an email, return as-is
+    if (input.includes('@')) {
+      return input;
+    }
+    
+    // Otherwise, try to find email by customer_code in customers table
+    const { data: customer } = await supabase
+      .from('customers')
+      .select('email')
+      .ilike('customer_code', input)
+      .maybeSingle();
+    
+    if (customer?.email) {
+      return customer.email;
+    }
+    
+    throw new Error('No account found with that ID. Please check and try again.');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,11 +45,16 @@ export default function AuthPage() {
 
     try {
       if (isSignUp) {
-        const { error } = await signUp(email, password, fullName);
+        // For signup, identifier must be an email
+        if (!identifier.includes('@')) {
+          throw new Error('Please use your email address to sign up.');
+        }
+        const { error } = await signUp(identifier, password, fullName);
         if (error) throw error;
         toast.success('Account created! You can now sign in.');
         setIsSignUp(false);
       } else {
+        const email = await resolveEmailFromIdentifier(identifier);
         const { error } = await signIn(email, password);
         if (error) throw error;
         toast.success('Welcome back!');
@@ -52,7 +78,7 @@ export default function AuthPage() {
           </Link>
           <CardTitle className="text-2xl">{isSignUp ? 'Create Account' : 'Welcome Back'}</CardTitle>
           <CardDescription>
-            {isSignUp ? 'Sign up to track your shipments' : 'Sign in to your account'}
+            {isSignUp ? 'Sign up to track your shipments' : 'Sign in with your Customer ID or email'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -74,16 +100,16 @@ export default function AuthPage() {
             )}
             
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="identifier">{isSignUp ? 'Email' : 'Customer ID or Email'}</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
+                  id="identifier"
+                  type={isSignUp ? 'email' : 'text'}
+                  placeholder={isSignUp ? 'you@example.com' : 'CUST001 or you@example.com'}
                   className="pl-10"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
                   required
                 />
               </div>

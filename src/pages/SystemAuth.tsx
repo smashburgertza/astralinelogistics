@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Mail, Lock, ArrowRight, Shield, Truck } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Shield, Truck, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,18 +12,39 @@ import { supabase } from '@/integrations/supabase/client';
 import astralineLogo from '@/assets/astraline-logo.svg';
 
 export default function SystemAuthPage() {
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'admin' | 'agent'>('admin');
+  const [activeTab, setActiveTab] = useState<'employee' | 'agent'>('employee');
   const { signIn } = useAuth();
   const navigate = useNavigate();
+
+  const resolveEmailFromIdentifier = async (input: string): Promise<string> => {
+    // If it looks like an email, return as-is
+    if (input.includes('@')) {
+      return input;
+    }
+    
+    // Otherwise, try to find email by employee_code or agent_code
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('email')
+      .or(`employee_code.ilike.${input},agent_code.ilike.${input}`)
+      .maybeSingle();
+    
+    if (profile?.email) {
+      return profile.email;
+    }
+    
+    throw new Error('No account found with that ID. Please check and try again.');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      const email = await resolveEmailFromIdentifier(identifier);
       const { error } = await signIn(email, password);
       if (error) throw error;
 
@@ -43,13 +64,13 @@ export default function SystemAuthPage() {
 
       const userRole = roles[0];
 
-      if (activeTab === 'admin') {
+      if (activeTab === 'employee') {
         if (userRole.role === 'super_admin' || userRole.role === 'employee') {
-          toast.success('Welcome to Admin Portal!');
+          toast.success('Welcome to Employee Portal!');
           navigate('/admin');
         } else {
           await supabase.auth.signOut();
-          throw new Error('You do not have admin access. Please use the agent login.');
+          throw new Error('You do not have employee access. Please use the agent login.');
         }
       } else {
         if (userRole.role === 'agent') {
@@ -57,7 +78,7 @@ export default function SystemAuthPage() {
           navigate('/agent');
         } else {
           await supabase.auth.signOut();
-          throw new Error('You do not have agent access. Please use the admin login.');
+          throw new Error('You do not have agent access. Please use the employee login.');
         }
       }
     } catch (error: any) {
@@ -88,15 +109,15 @@ export default function SystemAuthPage() {
           <CardHeader className="text-center pb-2">
             <CardTitle className="text-2xl font-bold text-slate-800">System Access</CardTitle>
             <CardDescription className="text-slate-600">
-              Login to Admin or Agent portal
+              Login to Employee or Agent portal
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'admin' | 'agent')} className="w-full">
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'employee' | 'agent')} className="w-full">
               <TabsList className="grid w-full grid-cols-2 mb-6">
-                <TabsTrigger value="admin" className="flex items-center gap-2">
+                <TabsTrigger value="employee" className="flex items-center gap-2">
                   <Shield className="w-4 h-4" />
-                  Admin
+                  Employee
                 </TabsTrigger>
                 <TabsTrigger value="agent" className="flex items-center gap-2">
                   <Truck className="w-4 h-4" />
@@ -104,30 +125,30 @@ export default function SystemAuthPage() {
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="admin" className="mt-0">
+              <TabsContent value="employee" className="mt-0">
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="admin-email">Email</Label>
+                    <Label htmlFor="employee-identifier">Staff ID or Email</Label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
-                        id="admin-email"
-                        type="email"
-                        placeholder="admin@company.com"
+                        id="employee-identifier"
+                        type="text"
+                        placeholder="EMP001 or email@company.com"
                         className="pl-10"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        value={identifier}
+                        onChange={(e) => setIdentifier(e.target.value)}
                         required
                       />
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="admin-password">Password</Label>
+                    <Label htmlFor="employee-password">Password</Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
-                        id="admin-password"
+                        id="employee-password"
                         type="password"
                         placeholder="••••••••"
                         className="pl-10"
@@ -145,7 +166,7 @@ export default function SystemAuthPage() {
                     size="lg" 
                     disabled={loading}
                   >
-                    {loading ? 'Signing in...' : 'Access Admin Portal'}
+                    {loading ? 'Signing in...' : 'Access Employee Portal'}
                     <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                 </form>
@@ -154,16 +175,16 @@ export default function SystemAuthPage() {
               <TabsContent value="agent" className="mt-0">
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="agent-email">Email</Label>
+                    <Label htmlFor="agent-identifier">Agent ID or Email</Label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
-                        id="agent-email"
-                        type="email"
-                        placeholder="agent@region.com"
+                        id="agent-identifier"
+                        type="text"
+                        placeholder="AGT001 or email@region.com"
                         className="pl-10"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        value={identifier}
+                        onChange={(e) => setIdentifier(e.target.value)}
                         required
                       />
                     </div>
