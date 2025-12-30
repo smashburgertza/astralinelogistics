@@ -397,6 +397,7 @@ export async function createAgentPaymentJournalEntry({
   exchangeRate = 1,
   paymentCurrency,
   sourceAccountId,
+  amountInTzs,
 }: {
   invoiceId: string;
   invoiceNumber: string;
@@ -405,9 +406,11 @@ export async function createAgentPaymentJournalEntry({
   exchangeRate?: number;
   paymentCurrency?: string;
   sourceAccountId?: string;
+  amountInTzs?: number;
 }) {
   const effectiveCurrency = paymentCurrency || currency;
-  const effectiveRate = paymentCurrency === 'TZS' ? 1 : exchangeRate;
+  // Use the provided exchange rate or calculate from amountInTzs
+  const effectiveRate = amountInTzs && amount ? (amountInTzs / amount) : (effectiveCurrency === 'TZS' ? 1 : exchangeRate);
 
   // If a specific source account was selected, use it directly
   if (sourceAccountId) {
