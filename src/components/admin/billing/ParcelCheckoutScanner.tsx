@@ -12,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useRecordPayment, Invoice } from '@/hooks/useInvoices';
 import { useInvoicePayments } from '@/hooks/useInvoicePayments';
+import { useInvoiceItems } from '@/hooks/useInvoiceItems';
 import { InvoiceStatusBadge } from '@/components/admin/InvoiceStatusBadge';
 import { InvoicePDFPreview } from '@/components/admin/InvoicePDFPreview';
 import { RecordPaymentDialog, PaymentDetails } from '@/components/admin/RecordPaymentDialog';
@@ -61,6 +62,7 @@ export function ParcelCheckoutScanner() {
   const recordPayment = useRecordPayment();
   
   const { data: payments = [], refetch: refetchPayments } = useInvoicePayments(parcelData?.invoice?.id || '');
+  const { data: invoiceItems = [] } = useInvoiceItems(parcelData?.invoice?.id || '');
 
   // Auto-focus input on mount
   useEffect(() => {
@@ -484,6 +486,97 @@ export function ParcelCheckoutScanner() {
                     <InvoiceStatusBadge status={invoice.status || 'pending'} />
                   </div>
 
+                  {/* Invoice Details */}
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Invoice Date</p>
+                      <p className="font-medium">{invoice.created_at ? format(new Date(invoice.created_at), 'MMM dd, yyyy') : '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Due Date</p>
+                      <p className="font-medium">{invoice.due_date ? format(new Date(invoice.due_date), 'MMM dd, yyyy') : '-'}</p>
+                    </div>
+                    {invoice.shipments?.origin_region && (
+                      <div>
+                        <p className="text-muted-foreground">Origin</p>
+                        <p className="font-medium capitalize">{invoice.shipments.origin_region}</p>
+                      </div>
+                    )}
+                    {invoice.rate_per_kg && (
+                      <div>
+                        <p className="text-muted-foreground">Rate per kg</p>
+                        <p className="font-medium">{currencySymbol}{Number(invoice.rate_per_kg).toFixed(2)}/kg</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Invoice Line Items */}
+                  <div className="rounded-lg border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50">
+                          <TableHead>Description</TableHead>
+                          <TableHead className="text-center">Qty</TableHead>
+                          <TableHead className="text-right">Unit Price</TableHead>
+                          <TableHead className="text-right">Amount</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {invoiceItems.length > 0 ? (
+                          invoiceItems.map((item) => (
+                            <TableRow key={item.id}>
+                              <TableCell>
+                                <div>
+                                  <p className="font-medium capitalize">{item.item_type.replace('_', ' ')}</p>
+                                  {item.description && (
+                                    <p className="text-sm text-muted-foreground">{item.description}</p>
+                                  )}
+                                  {item.weight_kg && (
+                                    <p className="text-xs text-muted-foreground">{item.weight_kg} kg</p>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-center">{item.quantity}</TableCell>
+                              <TableCell className="text-right">
+                                {CURRENCY_SYMBOLS[item.currency] || '$'}{Number(item.unit_price).toFixed(2)}
+                                {item.unit_type === 'kg' && '/kg'}
+                              </TableCell>
+                              <TableCell className="text-right font-medium">
+                                {CURRENCY_SYMBOLS[item.currency] || '$'}{Number(item.amount).toFixed(2)}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          // Fallback: show basic invoice info if no line items
+                          <TableRow>
+                            <TableCell>
+                              <div>
+                                <p className="font-medium">Shipping Charges</p>
+                                {invoice.shipments?.total_weight_kg && (
+                                  <p className="text-sm text-muted-foreground">{invoice.shipments.total_weight_kg} kg</p>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-center">1</TableCell>
+                            <TableCell className="text-right">
+                              {currencySymbol}{totalAmount.toFixed(2)}
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              {currencySymbol}{totalAmount.toFixed(2)}
+                            </TableCell>
+                          </TableRow>
+                        )}
+                        {/* Subtotal / Total row */}
+                        <TableRow className="bg-muted/30 font-semibold">
+                          <TableCell colSpan={3} className="text-right">Total</TableCell>
+                          <TableCell className="text-right">
+                            {currencySymbol}{totalAmount.toFixed(2)} {invoice.currency}
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+
                   {/* Amount Overview */}
                   <div className="grid grid-cols-3 gap-4">
                     <div className="bg-muted/50 rounded-lg p-4">
@@ -508,40 +601,54 @@ export function ParcelCheckoutScanner() {
                     </div>
                   </div>
 
+                  {/* Notes */}
+                  {invoice.notes && (
+                    <div className="p-3 rounded-lg bg-muted/50 border">
+                      <p className="text-sm text-muted-foreground mb-1">Notes</p>
+                      <p className="text-sm">{invoice.notes}</p>
+                    </div>
+                  )}
+
                   {/* Payment History */}
                   {payments.length > 0 && (
-                    <div className="rounded-lg border">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Date</TableHead>
-                            <TableHead>Method</TableHead>
-                            <TableHead>Reference</TableHead>
-                            <TableHead className="text-right">Amount</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {payments.map((payment) => (
-                            <TableRow key={payment.id}>
-                              <TableCell>
-                                {payment.paid_at 
-                                  ? format(new Date(payment.paid_at), 'MMM dd, yyyy')
-                                  : '—'
-                                }
-                              </TableCell>
-                              <TableCell className="capitalize">
-                                {payment.payment_method?.replace('_', ' ') || '—'}
-                              </TableCell>
-                              <TableCell className="font-mono text-sm">
-                                {payment.stripe_payment_id || '—'}
-                              </TableCell>
-                              <TableCell className="text-right font-medium">
-                                {CURRENCY_SYMBOLS[payment.currency || 'USD']}{Number(payment.amount).toFixed(2)}
-                              </TableCell>
+                    <div className="space-y-2">
+                      <h5 className="font-medium text-sm flex items-center gap-2">
+                        <CreditCard className="h-4 w-4 text-muted-foreground" />
+                        Payment History
+                      </h5>
+                      <div className="rounded-lg border">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Date</TableHead>
+                              <TableHead>Method</TableHead>
+                              <TableHead>Reference</TableHead>
+                              <TableHead className="text-right">Amount</TableHead>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                          </TableHeader>
+                          <TableBody>
+                            {payments.map((payment) => (
+                              <TableRow key={payment.id}>
+                                <TableCell>
+                                  {payment.paid_at 
+                                    ? format(new Date(payment.paid_at), 'MMM dd, yyyy')
+                                    : '—'
+                                  }
+                                </TableCell>
+                                <TableCell className="capitalize">
+                                  {payment.payment_method?.replace('_', ' ') || '—'}
+                                </TableCell>
+                                <TableCell className="font-mono text-sm">
+                                  {payment.stripe_payment_id || '—'}
+                                </TableCell>
+                                <TableCell className="text-right font-medium">
+                                  {CURRENCY_SYMBOLS[payment.currency || 'USD']}{Number(payment.amount).toFixed(2)}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
                     </div>
                   )}
                 </div>
