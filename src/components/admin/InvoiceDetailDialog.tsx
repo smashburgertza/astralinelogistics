@@ -109,289 +109,251 @@ export function InvoiceDetailDialog({ invoice, open, onOpenChange }: InvoiceDeta
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader className="flex-shrink-0">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {getStatusIcon(invoice.status || 'pending')}
-                <div>
-                  <DialogTitle className="text-xl">{invoice.invoice_number}</DialogTitle>
-                  <p className="text-sm text-muted-foreground">
-                    Created {format(new Date(invoice.created_at || new Date()), 'MMM dd, yyyy')}
-                  </p>
-                </div>
+        <DialogContent className="max-w-5xl max-h-[95vh] overflow-auto p-4">
+          {/* Top Section: Parcel | Customer | Totals */}
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            {/* Parcel/Shipment Info */}
+            <div className="border rounded-lg p-3">
+              <div className="flex items-center gap-1.5 text-muted-foreground mb-2">
+                <Package className="h-3.5 w-3.5" />
+                <span className="text-xs font-medium">Shipment</span>
               </div>
-              <div className="flex items-center gap-2">
-                <InvoiceStatusBadge status={invoice.status || 'pending'} />
-                {isPartiallyPaid && (
-                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                    Partial
-                  </Badge>
-                )}
-              </div>
-            </div>
-          </DialogHeader>
-
-          <ScrollArea className="flex-1 -mx-6 px-6">
-            <div className="space-y-5 py-4">
-              {/* Customer or Agent & Shipment Info */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-3">
-                  {/* Show Agent info for B2B invoices, Customer info otherwise */}
-                  {(invoice.invoice_direction === 'from_agent' || invoice.invoice_direction === 'to_agent') && (invoice as any).agent ? (
-                    <>
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Building2 className="h-4 w-4" />
-                        <span className="text-sm font-medium">Agent</span>
-                      </div>
-                      <div className="pl-6 text-sm">
-                        <p className="font-medium">{(invoice as any).agent?.company_name || (invoice as any).agent?.full_name || 'Unknown Agent'}</p>
-                        {(invoice as any).agent?.company_name && (invoice as any).agent?.full_name && (
-                          <p className="text-muted-foreground">{(invoice as any).agent.full_name}</p>
-                        )}
-                        {(invoice as any).agent?.agent_code && (
-                          <p className="text-muted-foreground font-mono">{(invoice as any).agent.agent_code}</p>
-                        )}
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <User className="h-4 w-4" />
-                        <span className="text-sm font-medium">Customer</span>
-                      </div>
-                      <div className="pl-6 text-sm">
-                        <p className="font-medium">{invoice.customers?.name || invoice.shipments?.customer_name || 'Unknown'}</p>
-                        {invoice.customers?.company_name && (
-                          <p className="text-muted-foreground">{invoice.customers.company_name}</p>
-                        )}
-                        {invoice.customers?.email && (
-                          <p className="text-muted-foreground">{invoice.customers.email}</p>
-                        )}
-                        {invoice.customers?.phone && (
-                          <p className="text-muted-foreground">{invoice.customers.phone}</p>
-                        )}
-                      </div>
-                    </>
+              {invoice.shipments ? (
+                <div className="text-sm space-y-0.5">
+                  {invoice.shipments.description && (
+                    <p><span className="text-muted-foreground text-xs">Desc:</span> {invoice.shipments.description}</p>
                   )}
-                </div>
-
-                {invoice.shipments && (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Package className="h-4 w-4" />
-                      <span className="text-sm font-medium">Shipment</span>
-                    </div>
-                    <div className="pl-6 text-sm">
-                      <p className="font-mono font-medium">{invoice.shipments.tracking_number}</p>
-                      {regionInfo && (
-                        <p className="text-muted-foreground">
-                          {regionInfo.flag_emoji} {regionInfo.name}
-                        </p>
-                      )}
-                      {(invoice.invoice_direction === 'from_agent' || invoice.invoice_direction === 'to_agent') && totalBillableWeight > 0 ? (
-                        <p className="text-muted-foreground">
-                          Total Weight: {totalBillableWeight.toFixed(2)} kg
-                        </p>
-                      ) : invoice.shipments.total_weight_kg ? (
-                        <p className="text-muted-foreground">
-                          Weight: {invoice.shipments.total_weight_kg} kg
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <Separator />
-
-              {/* Invoice Line Items */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <FileText className="h-4 w-4" />
-                  <span className="text-sm font-medium">Invoice Items</span>
-                </div>
-                <div className="rounded-lg border overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/50">
-                        <TableHead>Description</TableHead>
-                        <TableHead className="text-center w-20">Qty</TableHead>
-                        <TableHead className="text-right w-28">Unit Price</TableHead>
-                        <TableHead className="text-right w-28">Amount</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {invoiceItems.length > 0 ? (
-                        invoiceItems.map((item) => (
-                          <TableRow key={item.id}>
-                            <TableCell>
-                              <div>
-                                <p className="font-medium capitalize">{item.item_type.replace('_', ' ')}</p>
-                                {item.description && (
-                                  <p className="text-sm text-muted-foreground">{item.description}</p>
-                                )}
-                                {item.weight_kg && (
-                                  <p className="text-xs text-muted-foreground">{item.weight_kg} kg</p>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-center">{item.quantity}</TableCell>
-                            <TableCell className="text-right">
-                              {CURRENCY_SYMBOLS[item.currency] || '$'}{Number(item.unit_price).toFixed(2)}
-                              {item.unit_type === 'kg' && '/kg'}
-                            </TableCell>
-                            <TableCell className="text-right font-medium">
-                              {CURRENCY_SYMBOLS[item.currency] || '$'}{Number(item.amount).toFixed(2)}
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell>
-                            <div>
-                              <p className="font-medium">Shipping Charges</p>
-                              {invoice.shipments?.total_weight_kg && (
-                                <p className="text-sm text-muted-foreground">{invoice.shipments.total_weight_kg} kg @ {currencySymbol}{Number(invoice.rate_per_kg || 0).toFixed(2)}/kg</p>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-center">1</TableCell>
-                          <TableCell className="text-right">
-                            {currencySymbol}{totalAmount.toFixed(2)}
-                          </TableCell>
-                          <TableCell className="text-right font-medium">
-                            {currencySymbol}{totalAmount.toFixed(2)}
-                          </TableCell>
-                        </TableRow>
-                      )}
-                      <TableRow className="bg-muted/30 font-semibold">
-                        <TableCell colSpan={3} className="text-right">Total</TableCell>
-                        <TableCell className="text-right">
-                          {currencySymbol}{totalAmount.toFixed(2)} {invoice.currency}
-                        </TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-
-              {/* Amount Overview */}
-              <div className="grid grid-cols-3 gap-3">
-                <div className="bg-muted/50 rounded-lg p-3">
-                  <p className="text-xs text-muted-foreground">Total Amount</p>
-                  <p className="text-lg font-bold">
-                    {currencySymbol}{totalAmount.toFixed(2)}
-                  </p>
-                  {showTzsEquivalent && (
-                    <p className="text-xs text-muted-foreground">≈ TZS {totalAmountTzs.toLocaleString()}</p>
-                  )}
-                </div>
-                <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-lg p-3">
-                  <p className="text-xs text-emerald-600 dark:text-emerald-400">Amount Paid</p>
-                  <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">
-                    {currencySymbol}{totalPaid.toFixed(2)}
-                  </p>
-                  {showTzsEquivalent && (
-                    <p className="text-xs text-emerald-600 dark:text-emerald-400">≈ TZS {totalPaidTzs.toLocaleString()}</p>
-                  )}
-                </div>
-                <div className={`rounded-lg p-3 ${remainingBalance > 0 ? 'bg-amber-50 dark:bg-amber-950/30' : 'bg-emerald-50 dark:bg-emerald-950/30'}`}>
-                  <p className={`text-xs ${remainingBalance > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                    Balance Due
-                  </p>
-                  <p className={`text-lg font-bold ${remainingBalance > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-emerald-700 dark:text-emerald-300'}`}>
-                    {currencySymbol}{remainingBalance.toFixed(2)}
-                  </p>
-                  {showTzsEquivalent && (
-                    <p className={`text-xs ${remainingBalance > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                      ≈ TZS {remainingBalanceTzs.toLocaleString()}
+                  {((invoice.invoice_direction === 'from_agent' || invoice.invoice_direction === 'to_agent') && totalBillableWeight > 0) ? (
+                    <p><span className="text-muted-foreground text-xs">Weight:</span> {totalBillableWeight.toFixed(2)} kg</p>
+                  ) : invoice.shipments.total_weight_kg ? (
+                    <p><span className="text-muted-foreground text-xs">Weight:</span> {invoice.shipments.total_weight_kg} kg</p>
+                  ) : null}
+                  <p className="font-mono text-xs">{invoice.shipments.tracking_number}</p>
+                  {regionInfo && (
+                    <p className="text-xs text-muted-foreground">
+                      {regionInfo.flag_emoji} {regionInfo.name}
                     </p>
                   )}
                 </div>
-              </div>
-
-              {/* Notes */}
-              {invoice.notes && (
-                <div className="p-3 rounded-lg bg-muted/50 border">
-                  <p className="text-xs text-muted-foreground mb-1">Notes</p>
-                  <p className="text-sm">{invoice.notes}</p>
-                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No shipment linked</p>
               )}
+            </div>
 
-              {/* Payment History */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <CreditCard className="h-4 w-4" />
-                    <span className="text-sm font-medium">Payment History</span>
-                  </div>
-                  {!isPaid && (
-                    <Button size="sm" onClick={() => setPaymentDialogOpen(true)}>
-                      <Plus className="h-4 w-4 mr-1" />
-                      Record Payment
-                    </Button>
+            {/* Customer/Agent Info */}
+            <div className="border rounded-lg p-3">
+              <div className="flex items-center gap-1.5 text-muted-foreground mb-2">
+                <User className="h-3.5 w-3.5" />
+                <span className="text-xs font-medium">
+                  {(invoice.invoice_direction === 'from_agent' || invoice.invoice_direction === 'to_agent') && (invoice as any).agent ? 'Agent' : 'Customer'}
+                </span>
+              </div>
+              {(invoice.invoice_direction === 'from_agent' || invoice.invoice_direction === 'to_agent') && (invoice as any).agent ? (
+                <div className="text-sm space-y-0.5">
+                  <p className="font-medium">{(invoice as any).agent?.company_name || (invoice as any).agent?.full_name || 'Unknown Agent'}</p>
+                  {(invoice as any).agent?.agent_code && (
+                    <p className="font-mono text-xs">{(invoice as any).agent.agent_code}</p>
                   )}
                 </div>
+              ) : (
+                <div className="text-sm space-y-0.5">
+                  <p className="font-medium">{invoice.customers?.name || invoice.shipments?.customer_name || 'Unknown'}</p>
+                  {invoice.customers?.phone && (
+                    <p className="flex items-center gap-1 text-xs">
+                      <span className="text-muted-foreground">📞</span> {invoice.customers.phone}
+                    </p>
+                  )}
+                  {invoice.customers?.email && (
+                    <p className="flex items-center gap-1 text-xs">
+                      <span className="text-muted-foreground">✉</span> {invoice.customers.email}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
 
-                {paymentsLoading ? (
-                  <div className="text-sm text-muted-foreground">Loading payments...</div>
-                ) : payments.length === 0 ? (
-                  <div className="text-center py-6 text-muted-foreground border rounded-lg">
-                    <CreditCard className="h-6 w-6 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">No payments recorded yet</p>
-                  </div>
-                ) : (
-                  <div className="rounded-lg border overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-muted/50">
-                          <TableHead>Date</TableHead>
-                          <TableHead>Method</TableHead>
-                          <TableHead>Reference</TableHead>
-                          <TableHead className="text-right">Amount</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {payments.map((payment) => (
-                          <TableRow key={payment.id}>
-                            <TableCell className="text-sm">
-                              {payment.paid_at 
-                                ? format(new Date(payment.paid_at), 'MMM dd, yyyy')
-                                : '—'
-                              }
-                            </TableCell>
-                            <TableCell className="capitalize text-sm">
-                              {payment.payment_method?.replace('_', ' ') || '—'}
-                            </TableCell>
-                            <TableCell className="font-mono text-xs">
-                              {payment.stripe_payment_id || '—'}
-                            </TableCell>
-                            <TableCell className="text-right font-medium">
-                              {CURRENCY_SYMBOLS[payment.currency || 'USD']}{Number(payment.amount).toFixed(2)}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+            {/* Totals */}
+            <div className="space-y-2">
+              <div className="border rounded-lg p-3 text-center">
+                <p className="text-xs text-muted-foreground">Total</p>
+                <p className="text-xl font-bold">{currencySymbol}{totalAmount.toFixed(2)}</p>
+                {showTzsEquivalent && (
+                  <p className="text-xs text-muted-foreground">≈ TZS {totalAmountTzs.toLocaleString()}</p>
+                )}
+              </div>
+              <div className={`rounded-lg p-3 text-center ${remainingBalance > 0 ? 'bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900' : 'bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900'}`}>
+                <p className={`text-xs ${remainingBalance > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>Balance Due</p>
+                <p className={`text-lg font-bold ${remainingBalance > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-emerald-700 dark:text-emerald-300'}`}>
+                  {currencySymbol}{remainingBalance.toFixed(2)}
+                </p>
+                {showTzsEquivalent && (
+                  <p className={`text-xs ${remainingBalance > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                    ≈ TZS {remainingBalanceTzs.toLocaleString()}
+                  </p>
                 )}
               </div>
             </div>
-          </ScrollArea>
+          </div>
+
+          {/* Invoice Header */}
+          <div className="flex items-center justify-between border rounded-lg p-3 mb-3">
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium">Invoice {invoice.invoice_number}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">
+                {format(new Date(invoice.created_at || new Date()), 'MMM dd, yyyy')}
+              </span>
+              <InvoiceStatusBadge status={invoice.status || 'pending'} />
+              {isPartiallyPaid && (
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                  Partial
+                </Badge>
+              )}
+            </div>
+          </div>
+
+          {/* Invoice Line Items Table */}
+          <div className="rounded-lg border overflow-hidden mb-3">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead className="text-xs py-2">Description</TableHead>
+                  <TableHead className="text-center w-16 text-xs py-2">Qty</TableHead>
+                  <TableHead className="text-right w-24 text-xs py-2">Rate</TableHead>
+                  <TableHead className="text-right w-24 text-xs py-2">Amount</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {invoiceItems.length > 0 ? (
+                  invoiceItems.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell className="py-2">
+                        <span className="font-medium capitalize text-sm">{item.item_type.replace('_', ' ')}</span>
+                        {item.description && (
+                          <span className="text-muted-foreground text-xs"> - {item.description}</span>
+                        )}
+                        {item.weight_kg && (
+                          <span className="text-muted-foreground text-xs"> ({item.weight_kg} kg)</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center text-sm py-2">{item.quantity}</TableCell>
+                      <TableCell className="text-right text-sm py-2">
+                        {CURRENCY_SYMBOLS[item.currency] || '$'}{Number(item.unit_price).toFixed(2)}
+                        {item.unit_type === 'kg' && '/kg'}
+                      </TableCell>
+                      <TableCell className="text-right font-medium text-sm py-2">
+                        {CURRENCY_SYMBOLS[item.currency] || '$'}{Number(item.amount).toFixed(2)}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell className="py-2">
+                      <span className="font-medium text-sm">Shipping Charges</span>
+                      {invoice.shipments?.total_weight_kg && (
+                        <span className="text-muted-foreground text-xs"> - {invoice.shipments.total_weight_kg} kg</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center text-sm py-2">1</TableCell>
+                    <TableCell className="text-right text-sm py-2">
+                      {currencySymbol}{totalAmount.toFixed(2)}
+                    </TableCell>
+                    <TableCell className="text-right font-medium text-sm py-2">
+                      {currencySymbol}{totalAmount.toFixed(2)}
+                    </TableCell>
+                  </TableRow>
+                )}
+                <TableRow className="bg-muted/30 font-semibold">
+                  <TableCell colSpan={3} className="text-right py-2">Total</TableCell>
+                  <TableCell className="text-right py-2">
+                    {currencySymbol}{totalAmount.toFixed(2)} {invoice.currency}
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Notes */}
+          {invoice.notes && (
+            <div className="p-3 rounded-lg bg-muted/50 border mb-3">
+              <p className="text-xs text-muted-foreground mb-1">Notes</p>
+              <p className="text-sm">{invoice.notes}</p>
+            </div>
+          )}
+
+          {/* Payment History */}
+          <div className="space-y-2 mb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <CreditCard className="h-3.5 w-3.5" />
+                <span className="text-xs font-medium">Payment History</span>
+              </div>
+              {!isPaid && (
+                <Button size="sm" variant="outline" onClick={() => setPaymentDialogOpen(true)}>
+                  <Plus className="h-3 w-3 mr-1" />
+                  Record Payment
+                </Button>
+              )}
+            </div>
+
+            {paymentsLoading ? (
+              <div className="text-sm text-muted-foreground">Loading payments...</div>
+            ) : payments.length === 0 ? (
+              <div className="text-center py-4 text-muted-foreground border rounded-lg">
+                <CreditCard className="h-5 w-5 mx-auto mb-1 opacity-50" />
+                <p className="text-xs">No payments recorded</p>
+              </div>
+            ) : (
+              <div className="rounded-lg border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="text-xs py-2">Date</TableHead>
+                      <TableHead className="text-xs py-2">Method</TableHead>
+                      <TableHead className="text-xs py-2">Reference</TableHead>
+                      <TableHead className="text-right text-xs py-2">Amount</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {payments.map((payment) => (
+                      <TableRow key={payment.id}>
+                        <TableCell className="text-xs py-2">
+                          {payment.paid_at 
+                            ? format(new Date(payment.paid_at), 'MMM dd, yyyy')
+                            : '—'
+                          }
+                        </TableCell>
+                        <TableCell className="capitalize text-xs py-2">
+                          {payment.payment_method?.replace('_', ' ') || '—'}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs py-2">
+                          {payment.stripe_payment_id || '—'}
+                        </TableCell>
+                        <TableCell className="text-right font-medium text-xs py-2">
+                          {CURRENCY_SYMBOLS[payment.currency || 'USD']}{Number(payment.amount).toFixed(2)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
 
           {/* Footer Actions */}
-          <div className="flex justify-between items-center pt-4 border-t flex-shrink-0">
-            <Button variant="outline" onClick={() => handlePrint()}>
+          <div className="flex justify-between items-center pt-3 border-t">
+            <Button variant="outline" size="sm" onClick={() => handlePrint()}>
               <Download className="h-4 w-4 mr-2" />
               Download PDF
             </Button>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
+              <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
                 Close
               </Button>
               {!isPaid && (
-                <Button onClick={() => setPaymentDialogOpen(true)}>
+                <Button size="sm" onClick={() => setPaymentDialogOpen(true)}>
                   <Plus className="h-4 w-4 mr-1" />
                   Record Payment
                 </Button>
