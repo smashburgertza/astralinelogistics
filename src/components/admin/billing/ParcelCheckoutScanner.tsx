@@ -83,8 +83,23 @@ export function ParcelCheckoutScanner() {
     setIsLoading(true);
     setError(null);
     
+    let barcodeToSearch = barcodeValue.trim();
+    
+    // Check if the scanned value is JSON (from a QR code with embedded data)
+    if (barcodeToSearch.startsWith('{') && barcodeToSearch.endsWith('}')) {
+      try {
+        const parsedData = JSON.parse(barcodeToSearch);
+        // Extract barcode from common field names
+        barcodeToSearch = parsedData.BARCODE || parsedData.barcode || 
+                          parsedData.TRACKING || parsedData.tracking ||
+                          parsedData.CODE || parsedData.code || barcodeToSearch;
+      } catch {
+        // Not valid JSON, use as-is
+      }
+    }
+    
     try {
-      // First, lookup the parcel
+      // First, lookup the parcel (case-insensitive)
       const { data: parcel, error: parcelError } = await supabase
         .from('parcels')
         .select(`
@@ -105,7 +120,7 @@ export function ParcelCheckoutScanner() {
             )
           )
         `)
-        .eq('barcode', barcodeValue.trim())
+        .ilike('barcode', barcodeToSearch)
         .maybeSingle();
 
       if (parcelError) throw parcelError;
