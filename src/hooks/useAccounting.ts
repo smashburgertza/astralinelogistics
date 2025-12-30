@@ -449,13 +449,68 @@ export function useBankAccounts() {
   return useQuery({
     queryKey: ['bank-accounts'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // First get all bank accounts
+      const { data: bankAccounts, error } = await supabase
         .from('bank_accounts')
         .select('*')
         .order('account_name', { ascending: true });
 
       if (error) throw error;
-      return data as BankAccount[];
+
+      // Get all chart account IDs that are linked to bank accounts
+      const chartAccountIds = bankAccounts
+        .filter(ba => ba.chart_account_id)
+        .map(ba => ba.chart_account_id);
+
+      if (chartAccountIds.length === 0) {
+        return bankAccounts as BankAccount[];
+      }
+
+      // Get all posted journal lines for these accounts
+      const { data: journalLines, error: linesError } = await supabase
+        .from('journal_lines')
+        .select(`
+          account_id,
+          debit_amount,
+          credit_amount,
+          journal_entry:journal_entries!inner(status)
+        `)
+        .in('account_id', chartAccountIds);
+
+      if (linesError) throw linesError;
+
+      // Filter to only posted entries and calculate totals per account
+      const postedLines = (journalLines || []).filter(
+        (line: any) => line.journal_entry?.status === 'posted'
+      );
+
+      const accountTotals: Record<string, { debits: number; credits: number }> = {};
+      for (const line of postedLines) {
+        if (!accountTotals[line.account_id]) {
+          accountTotals[line.account_id] = { debits: 0, credits: 0 };
+        }
+        accountTotals[line.account_id].debits += Number(line.debit_amount) || 0;
+        accountTotals[line.account_id].credits += Number(line.credit_amount) || 0;
+      }
+
+      // Calculate current balance for each bank account
+      // For asset accounts: balance = opening + debits - credits
+      return bankAccounts.map(account => {
+        if (!account.chart_account_id || !accountTotals[account.chart_account_id]) {
+          return {
+            ...account,
+            current_balance: account.opening_balance || 0,
+          } as BankAccount;
+        }
+
+        const totals = accountTotals[account.chart_account_id];
+        const calculatedBalance = (account.opening_balance || 0) + totals.debits - totals.credits;
+
+        return {
+          ...account,
+          current_balance: calculatedBalance,
+        } as BankAccount;
+      });
     },
   });
 }
