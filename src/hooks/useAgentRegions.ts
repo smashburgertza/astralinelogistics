@@ -15,11 +15,28 @@ interface AgentRegionInfo {
 // Hook to fetch all regions assigned to the current agent
 export function useAgentAssignedRegions() {
   const { user, roles } = useAuth();
+  const isSuperAdmin = roles.some(r => r.role === 'super_admin');
 
   return useQuery({
-    queryKey: ['agent-assigned-regions', user?.id],
+    queryKey: ['agent-assigned-regions', user?.id, isSuperAdmin],
     queryFn: async () => {
       if (!user?.id) return [];
+
+      // Super admins get access to all regions for testing
+      if (isSuperAdmin) {
+        const { data: allRegions } = await supabase
+          .from('regions')
+          .select('id, code, name, flag_emoji')
+          .eq('is_active', true)
+          .order('display_order');
+
+        return allRegions?.map(r => ({
+          region_code: r.code as AgentRegion,
+          region_id: r.id,
+          region_name: r.name,
+          flag_emoji: r.flag_emoji,
+        })) || [];
+      }
 
       // First check user_roles for region assignment
       const userRoleRegions = roles
