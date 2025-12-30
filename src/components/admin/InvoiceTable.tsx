@@ -313,6 +313,7 @@ export function InvoiceTable({ invoices, isLoading }: InvoiceTableProps) {
             paymentDate: details.paymentDate,
             reference: details.reference,
             notes: details.notes,
+            splits: details.splits,
           }, {
             onSuccess: () => {
               setPaymentDialogOpen(false);
