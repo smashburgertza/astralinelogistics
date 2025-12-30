@@ -33,6 +33,7 @@ import { toast } from "sonner";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { useExchangeRates } from "@/hooks/useExchangeRates";
 import { useProductsServices } from "@/hooks/useProductsServices";
+import { createAgentBillingJournalEntry } from "@/lib/journalEntryUtils";
 
 const lineItemSchema = z.object({
   product_service_id: z.string().optional(),
@@ -214,6 +215,20 @@ export function CreateAgentCargoInvoiceDialog({
 
       if (itemsError) throw itemsError;
 
+      // Create journal entry for billing the agent (to_agent invoice)
+      try {
+        await createAgentBillingJournalEntry({
+          invoiceId: invoice.id,
+          invoiceNumber: invoice.invoice_number,
+          amount: calculations.total,
+          currency: data.currency,
+          exchangeRate: calculations.tzsTotal ? calculations.tzsTotal / calculations.total : 1,
+          agentName: shipment.company_name || shipment.agent_name || undefined,
+        });
+      } catch (journalError) {
+        console.error("Failed to create journal entry:", journalError);
+      }
+
       return invoice;
     },
     onSuccess: () => {
@@ -223,6 +238,9 @@ export function CreateAgentCargoInvoiceDialog({
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       queryClient.invalidateQueries({ queryKey: ["agent-balance"] });
       queryClient.invalidateQueries({ queryKey: ["all-agent-balances"] });
+      queryClient.invalidateQueries({ queryKey: ["journal-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["trial-balance"] });
       onOpenChange(false);
       form.reset();
     },

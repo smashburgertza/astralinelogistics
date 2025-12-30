@@ -267,6 +267,10 @@ export function useApproveExpense() {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
       queryClient.invalidateQueries({ queryKey: ['expense-stats'] });
       queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['trial-balance'] });
+      queryClient.invalidateQueries({ queryKey: ['income-statement'] });
+      queryClient.invalidateQueries({ queryKey: ['balance-sheet'] });
       toast.success('Expense approved');
     },
     onError: (error: Error) => {

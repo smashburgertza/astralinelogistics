@@ -295,6 +295,10 @@ export function useVerifyPayment() {
       queryClient.invalidateQueries({ queryKey: ['agent-balance'] });
       queryClient.invalidateQueries({ queryKey: ['all-agent-balances'] });
       queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['trial-balance'] });
+      queryClient.invalidateQueries({ queryKey: ['income-statement'] });
+      queryClient.invalidateQueries({ queryKey: ['balance-sheet'] });
       toast.success(data.status === 'verified' ? 'Payment verified and recorded' : 'Payment rejected');
     },
     onError: (error) => {
