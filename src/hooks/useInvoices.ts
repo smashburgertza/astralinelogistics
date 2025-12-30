@@ -242,10 +242,13 @@ export function useRecordPayment() {
         : (params.depositAccountId ? [params.depositAccountId] : []);
       
       if (allAccountIds.length > 0) {
-        const { data: bankAccountsForMapping } = await supabase
+        console.log('Looking up bank accounts for IDs:', allAccountIds);
+        const { data: bankAccountsForMapping, error: mappingError } = await supabase
           .from('bank_accounts')
           .select('id, chart_account_id')
           .in('id', allAccountIds);
+        
+        console.log('Bank accounts mapping result:', bankAccountsForMapping, 'Error:', mappingError);
         
         if (bankAccountsForMapping) {
           bankAccountsForMapping.forEach(ba => {
@@ -254,6 +257,7 @@ export function useRecordPayment() {
             }
           });
         }
+        console.log('Final bankAccountChartMap:', bankAccountChartMap);
       }
 
       if (isSplitPayment) {
