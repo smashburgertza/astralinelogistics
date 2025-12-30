@@ -310,7 +310,7 @@ export function RoleBasedWidgets({ employeeRole, userId }: RoleWidgetProps) {
           
           <div className="flex gap-2">
             <Button variant="outline" size="sm" asChild>
-              <Link to="/admin/invoices">View Invoices</Link>
+              <Link to="/admin/billing">View Invoices</Link>
             </Button>
             <Button variant="outline" size="sm" asChild>
               <Link to="/admin/expenses">View Expenses</Link>

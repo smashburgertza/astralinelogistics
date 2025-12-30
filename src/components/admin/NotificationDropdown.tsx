@@ -65,7 +65,7 @@ export function NotificationDropdown() {
     if (notification.type === 'shipment' && notification.shipment_id) {
       navigate('/admin/shipments');
     } else if (notification.type === 'invoice') {
-      navigate('/admin/invoices');
+      navigate('/admin/billing');
     } else if (notification.type === 'expense') {
       navigate('/admin/expenses');
     }
