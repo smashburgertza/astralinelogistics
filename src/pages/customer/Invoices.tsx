@@ -4,31 +4,45 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
-import { FileText, Calendar, Package, CheckCircle, Clock, Download, CreditCard } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { FileText, Calendar, Package, CheckCircle, Clock, Download, CreditCard, Send, AlertCircle } from 'lucide-react';
 import { useCustomerInvoices } from '@/hooks/useCustomerPortal';
-import { useExchangeRates } from '@/hooks/useExchangeRates';
+import { useCustomerMarkInvoicePaid } from '@/hooks/useCustomerPayments';
 import { format } from 'date-fns';
-import { toast } from 'sonner';
+
+interface SelectedInvoice {
+  id: string;
+  invoice_number: string;
+  currency: string;
+  amount: number;
+  amount_in_tzs: number | null;
+}
 
 export default function CustomerInvoicesPage() {
   const { data: invoices, isLoading } = useCustomerInvoices();
-  const { data: exchangeRates } = useExchangeRates();
-  const [paymentDialog, setPaymentDialog] = useState<{
-    open: boolean;
-    invoiceId: string;
-    currency: string;
-    amount: number;
-    amountTZS: number | null;
-  }>({ open: false, invoiceId: '', currency: '', amount: 0, amountTZS: null });
-  const [selectedPaymentCurrency, setSelectedPaymentCurrency] = useState<string>('');
+  const markAsPaid = useCustomerMarkInvoicePaid();
+  
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<SelectedInvoice | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState('bank_transfer');
+  const [paymentReference, setPaymentReference] = useState('');
+  const [paymentCurrency, setPaymentCurrency] = useState('');
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -43,32 +57,47 @@ export default function CustomerInvoicesPage() {
     }
   };
 
-  const openPaymentDialog = (invoice: { id: string; currency: string | null; amount: number; amount_in_tzs?: number | null }) => {
+  const handleOpenPaymentDialog = (invoice: {
+    id: string;
+    invoice_number: string;
+    currency: string | null;
+    amount: number;
+    amount_in_tzs?: number | null;
+  }) => {
     const currency = invoice.currency || 'USD';
-    setPaymentDialog({
-      open: true,
-      invoiceId: invoice.id,
+    setSelectedInvoice({
+      id: invoice.id,
+      invoice_number: invoice.invoice_number,
       currency,
       amount: invoice.amount,
-      amountTZS: invoice.amount_in_tzs || null,
+      amount_in_tzs: invoice.amount_in_tzs || null,
     });
-    setSelectedPaymentCurrency(currency);
+    setPaymentMethod('bank_transfer');
+    setPaymentReference('');
+    setPaymentCurrency(currency);
+    setPaymentDialogOpen(true);
   };
 
-  const handlePayment = () => {
-    // This would integrate with Stripe in a real implementation
-    toast.info(`Payment initiated in ${selectedPaymentCurrency}`);
-    setPaymentDialog({ ...paymentDialog, open: false });
+  const handleSubmitPayment = async () => {
+    if (!selectedInvoice) return;
+    
+    await markAsPaid.mutateAsync({
+      invoiceId: selectedInvoice.id,
+      paymentMethod,
+      paymentReference,
+      paymentCurrency,
+    });
+    
+    setPaymentDialogOpen(false);
+    setSelectedInvoice(null);
   };
 
-  const getPaymentAmount = () => {
-    if (selectedPaymentCurrency === paymentDialog.currency) {
-      return `${paymentDialog.currency} ${paymentDialog.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+  const getDisplayAmount = () => {
+    if (!selectedInvoice) return '';
+    if (paymentCurrency === 'TZS' && selectedInvoice.amount_in_tzs) {
+      return `TZS ${selectedInvoice.amount_in_tzs.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
     }
-    if (selectedPaymentCurrency === 'TZS' && paymentDialog.amountTZS) {
-      return `TZS ${paymentDialog.amountTZS.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-    }
-    return `${selectedPaymentCurrency} —`;
+    return `${selectedInvoice.currency} ${selectedInvoice.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
   };
 
   return (
@@ -161,8 +190,9 @@ export default function CustomerInvoicesPage() {
                             {!isPaid && (
                               <Button 
                                 size="sm"
-                                onClick={() => openPaymentDialog({
+                                onClick={() => handleOpenPaymentDialog({
                                   id: invoice.id,
+                                  invoice_number: invoice.invoice_number,
                                   currency: invoice.currency,
                                   amount: Number(invoice.amount),
                                   amount_in_tzs: amountTZS,
@@ -202,57 +232,104 @@ export default function CustomerInvoicesPage() {
         </div>
       )}
 
-      {/* Payment Currency Selection Dialog */}
-      <Dialog open={paymentDialog.open} onOpenChange={(open) => setPaymentDialog({ ...paymentDialog, open })}>
-        <DialogContent className="sm:max-w-md">
+      {/* Mark as Paid Dialog */}
+      <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Choose Payment Currency</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5" />
+              Mark Invoice as Paid
+            </DialogTitle>
+            <DialogDescription>
+              Submit payment details for verification by Astraline
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 pt-4">
-            <p className="text-sm text-muted-foreground">
-              Select which currency you'd like to pay in:
-            </p>
-            
-            <RadioGroup value={selectedPaymentCurrency} onValueChange={setSelectedPaymentCurrency}>
-              {/* Original currency option */}
-              <div className="flex items-center space-x-3 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-                <RadioGroupItem value={paymentDialog.currency} id="original" />
-                <Label htmlFor="original" className="flex-1 cursor-pointer">
-                  <p className="font-medium">{paymentDialog.currency} (Original Currency)</p>
-                  <p className="text-lg font-bold text-primary">
-                    {paymentDialog.currency} {paymentDialog.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </p>
-                </Label>
+          
+          {selectedInvoice && (
+            <div className="space-y-4 py-4">
+              <div className="p-4 bg-muted/50 rounded-lg space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Invoice:</span>
+                  <span className="font-mono">{selectedInvoice.invoice_number}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Amount:</span>
+                  <span className="text-lg font-bold">
+                    {getDisplayAmount()}
+                  </span>
+                </div>
               </div>
 
-              {/* TZS option (if different from original) */}
-              {paymentDialog.currency !== 'TZS' && paymentDialog.amountTZS && (
-                <div className="flex items-center space-x-3 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-                  <RadioGroupItem value="TZS" id="tzs" />
-                  <Label htmlFor="tzs" className="flex-1 cursor-pointer">
-                    <p className="font-medium">TZS (Tanzanian Shilling)</p>
-                    <p className="text-lg font-bold text-primary">
-                      TZS {paymentDialog.amountTZS.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                    </p>
-                  </Label>
+              {/* Currency Selection (if TZS available) */}
+              {selectedInvoice.currency !== 'TZS' && selectedInvoice.amount_in_tzs && (
+                <div className="space-y-2">
+                  <Label>Payment Currency</Label>
+                  <Select value={paymentCurrency} onValueChange={setPaymentCurrency}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={selectedInvoice.currency}>
+                        {selectedInvoice.currency} {selectedInvoice.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </SelectItem>
+                      <SelectItem value="TZS">
+                        TZS {selectedInvoice.amount_in_tzs.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
-            </RadioGroup>
 
-            <div className="bg-muted/50 p-4 rounded-lg">
-              <p className="text-sm text-muted-foreground">You will pay:</p>
-              <p className="text-xl font-bold">{getPaymentAmount()}</p>
-            </div>
+              <div className="space-y-2">
+                <Label>Payment Method</Label>
+                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                    <SelectItem value="mobile_money">Mobile Money</SelectItem>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="card">Card</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => setPaymentDialog({ ...paymentDialog, open: false })}>
-                Cancel
-              </Button>
-              <Button onClick={handlePayment}>
-                Proceed to Payment
-              </Button>
+              <div className="space-y-2">
+                <Label>Payment Reference</Label>
+                <Input
+                  placeholder="Enter transaction reference or receipt number"
+                  value={paymentReference}
+                  onChange={(e) => setPaymentReference(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Provide your payment reference to help us verify your payment faster
+                </p>
+              </div>
+
+              <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg flex gap-2">
+                <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                <p className="text-sm text-amber-700 dark:text-amber-300">
+                  Your payment will be marked as pending until verified by Astraline. 
+                  Please ensure payment has been completed before submitting.
+                </p>
+              </div>
             </div>
-          </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPaymentDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSubmitPayment}
+              disabled={markAsPaid.isPending}
+              className="gap-1"
+            >
+              <Send className="h-4 w-4" />
+              {markAsPaid.isPending ? 'Submitting...' : 'Submit Payment'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </CustomerLayout>
