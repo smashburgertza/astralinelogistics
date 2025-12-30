@@ -63,6 +63,11 @@ export function AgentBatchGroupedShipmentTable({
     
     const groups: Record<string, BatchGroup> = {};
     
+    // Debug: log first shipment's cargo_batches
+    if (shipments.length > 0) {
+      console.log('Agent shipments cargo_batches sample:', shipments[0]?.cargo_batches);
+    }
+    
     shipments.forEach(shipment => {
       const key = shipment.batch_id || `unbatched-${shipment.origin_region}`;
       
