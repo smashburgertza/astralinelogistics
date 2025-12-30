@@ -230,10 +230,7 @@ export function InvoiceDetailDialog({ invoice, open, onOpenChange }: InvoiceDeta
                   invoiceItems.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell className="py-2">
-                        <span className="font-medium capitalize text-sm">{item.item_type.replace('_', ' ')}</span>
-                        {item.description && (
-                          <span className="text-muted-foreground text-xs"> - {item.description}</span>
-                        )}
+                        <span className="font-medium text-sm">{item.description || item.item_type.replace('_', ' ')}</span>
                         {item.weight_kg && (
                           <span className="text-muted-foreground text-xs"> ({item.weight_kg} kg)</span>
                         )}
