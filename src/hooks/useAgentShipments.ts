@@ -8,6 +8,7 @@ type AgentRegion = Database['public']['Enums']['agent_region'];
 
 export type Shipment = Tables<'shipments'> & {
   customers?: Tables<'customers'> | null;
+  cargo_batches?: Pick<Tables<'cargo_batches'>, 'batch_number' | 'cargo_type' | 'arrival_week_start'> | null;
 };
 
 export function useAgentShipments(
@@ -27,7 +28,7 @@ export function useAgentShipments(
 
       let query = supabase
         .from('shipments')
-        .select('*, customers(name, email, company_name)')
+        .select('*, customers(name, email, company_name), cargo_batches(batch_number, cargo_type, arrival_week_start)')
         .in('origin_region', regionCodes)
         .order('created_at', { ascending: false });
 

@@ -93,10 +93,10 @@ export function BatchGroupedShipmentTable({
       if (!groups[key]) {
         groups[key] = {
           batch_id: shipment.batch_id,
-          batch_number: null, // We'll fetch this if needed
+          batch_number: shipment.cargo_batches?.batch_number || null,
           origin_region: shipment.origin_region,
-          cargo_type: 'air', // Default
-          arrival_week_start: null,
+          cargo_type: shipment.cargo_batches?.cargo_type || 'air',
+          arrival_week_start: shipment.cargo_batches?.arrival_week_start || null,
           status: shipment.status || 'collected',
           shipments: [],
           total_weight: 0,
@@ -260,7 +260,7 @@ export function BatchGroupedShipmentTable({
                 <div className="flex-1 grid grid-cols-5 gap-4 items-center">
                   <div>
                     <p className="font-medium text-sm">
-                      {batch.batch_id ? `Batch Upload` : 'Individual Shipments'}
+                      {batch.batch_id ? (batch.batch_number || 'Batch Upload') : 'Individual Shipments'}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {batch.shipments.length} shipment{batch.shipments.length !== 1 ? 's' : ''}
