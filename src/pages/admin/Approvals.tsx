@@ -31,7 +31,7 @@ import {
 } from '@/components/ui/select';
 import { 
   Package, CheckCircle, XCircle, Clock, AlertTriangle,
-  User, FileText, DollarSign
+  User, FileText, DollarSign, CreditCard, Building2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import {
@@ -45,6 +45,7 @@ import {
   APPROVAL_STATUSES,
 } from '@/hooks/useApprovalRequests';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
+import { usePaymentsPendingVerification, useVerifyPayment } from '@/hooks/useAgentInvoices';
 
 function ApprovalStatusBadge({ status }: { status: ApprovalStatus }) {
   const config = APPROVAL_STATUSES[status];
@@ -296,6 +297,193 @@ function ParcelReleaseApprovals() {
   );
 }
 
+function PaymentVerificationApprovals() {
+  const { data: pendingPayments, isLoading } = usePaymentsPendingVerification();
+  const verifyMutation = useVerifyPayment();
+  const [selectedPayment, setSelectedPayment] = useState<any | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [verifyAction, setVerifyAction] = useState<'verified' | 'rejected'>('verified');
+
+  const handleVerify = (payment: any, action: 'verified' | 'rejected') => {
+    setSelectedPayment(payment);
+    setVerifyAction(action);
+    setDialogOpen(true);
+  };
+
+  const confirmVerify = () => {
+    if (!selectedPayment) return;
+    
+    verifyMutation.mutate({
+      paymentId: selectedPayment.id,
+      status: verifyAction,
+      invoiceId: selectedPayment.invoice_id,
+    }, {
+      onSuccess: () => {
+        setDialogOpen(false);
+        setSelectedPayment(null);
+      },
+    });
+  };
+
+  if (isLoading) {
+    return <Skeleton className="h-[400px]" />;
+  }
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CreditCard className="h-5 w-5" />
+            Payment Verifications
+          </CardTitle>
+          <CardDescription>
+            Verify payments marked by agents before updating accounting records
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Invoice</TableHead>
+                <TableHead>Agent</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+                <TableHead>Payment Method</TableHead>
+                <TableHead>Reference</TableHead>
+                <TableHead>Marked On</TableHead>
+                <TableHead className="w-[140px]">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {!pendingPayments || pendingPayments.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    <CreditCard className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p>No payments pending verification</p>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                pendingPayments.map((payment: any) => (
+                  <TableRow key={payment.id}>
+                    <TableCell>
+                      <p className="font-mono text-sm">{payment.invoices?.invoice_number}</p>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="font-medium">{payment.agent?.company_name || payment.agent?.full_name}</p>
+                          {payment.agent?.agent_code && (
+                            <p className="text-xs text-muted-foreground">{payment.agent.agent_code}</p>
+                          )}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right font-bold">
+                      {payment.currency} {payment.amount.toLocaleString()}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="capitalize">
+                        {payment.payment_method?.replace(/_/g, ' ')}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <p className="text-sm font-mono">
+                        {payment.stripe_payment_id || '-'}
+                      </p>
+                    </TableCell>
+                    <TableCell>
+                      <p className="text-sm">{format(new Date(payment.paid_at), 'MMM d, yyyy')}</p>
+                      <p className="text-xs text-muted-foreground">{format(new Date(payment.paid_at), 'HH:mm')}</p>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                          onClick={() => handleVerify(payment, 'verified')}
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => handleVerify(payment, 'rejected')}
+                        >
+                          <XCircle className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Verify Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {verifyAction === 'verified' ? (
+                <CheckCircle className="h-5 w-5 text-emerald-600" />
+              ) : (
+                <XCircle className="h-5 w-5 text-red-600" />
+              )}
+              {verifyAction === 'verified' ? 'Verify' : 'Reject'} Payment
+            </DialogTitle>
+            <DialogDescription>
+              {verifyAction === 'verified'
+                ? 'This will mark the invoice as paid and record the payment in accounting.'
+                : 'This will reject the payment and notify the agent.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedPayment && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Invoice</p>
+                  <p className="font-mono">{selectedPayment.invoices?.invoice_number}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Amount</p>
+                  <p className="font-bold">{selectedPayment.currency} {selectedPayment.amount.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Agent</p>
+                  <p>{selectedPayment.agent?.company_name || selectedPayment.agent?.full_name}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Reference</p>
+                  <p className="font-mono text-sm">{selectedPayment.stripe_payment_id || '-'}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmVerify}
+              disabled={verifyMutation.isPending}
+              className={verifyAction === 'verified' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'}
+            >
+              {verifyMutation.isPending ? 'Processing...' : verifyAction === 'verified' ? 'Verify Payment' : 'Reject'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 function ExpenseApprovals() {
   // Placeholder for expense approvals - can be integrated with existing expense approval flow
   return (
@@ -324,17 +512,29 @@ function ExpenseApprovals() {
 
 export default function ApprovalsPage() {
   const { data: pendingCount } = usePendingApprovalsCount();
+  const { data: pendingPayments } = usePaymentsPendingVerification();
+  
+  const totalPending = (pendingCount || 0) + (pendingPayments?.length || 0);
 
   return (
     <AdminLayout 
       title="Approvals" 
-      subtitle={pendingCount ? `${pendingCount} pending approval${pendingCount === 1 ? '' : 's'}` : 'Review and manage approval requests'}
+      subtitle={totalPending ? `${totalPending} pending approval${totalPending === 1 ? '' : 's'}` : 'Review and manage approval requests'}
     >
       <Tabs defaultValue="parcel_release" className="space-y-6">
         <TabsList>
           <TabsTrigger value="parcel_release" className="gap-2">
             <Package className="h-4 w-4" />
             Parcel Release
+          </TabsTrigger>
+          <TabsTrigger value="payments" className="gap-2">
+            <CreditCard className="h-4 w-4" />
+            Payment Verification
+            {pendingPayments && pendingPayments.length > 0 && (
+              <Badge variant="destructive" className="ml-1 h-5 w-5 p-0 flex items-center justify-center text-xs">
+                {pendingPayments.length}
+              </Badge>
+            )}
           </TabsTrigger>
           <TabsTrigger value="expenses" className="gap-2">
             <DollarSign className="h-4 w-4" />
@@ -344,6 +544,10 @@ export default function ApprovalsPage() {
 
         <TabsContent value="parcel_release">
           <ParcelReleaseApprovals />
+        </TabsContent>
+
+        <TabsContent value="payments">
+          <PaymentVerificationApprovals />
         </TabsContent>
 
         <TabsContent value="expenses">
