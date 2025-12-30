@@ -1,7 +1,5 @@
 import { useState, useMemo } from 'react';
-import { InvoiceFilters } from '@/components/admin/InvoiceFilters';
-import { InvoiceTable } from '@/components/admin/InvoiceTable';
-import { CreateInvoiceDialog } from '@/components/admin/CreateInvoiceDialog';
+import { InvoiceFilters, InvoiceTable, CreateInvoiceDialog } from '@/components/admin/invoices';
 import { useInvoices } from '@/hooks/useInvoices';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useExchangeRates, convertToTZS } from '@/hooks/useExchangeRates';
