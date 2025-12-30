@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 
 export type Shipment = Tables<'shipments'> & {
   customers?: Pick<Tables<'customers'>, 'name' | 'email' | 'company_name' | 'phone'> | null;
+  cargo_batches?: Pick<Tables<'cargo_batches'>, 'batch_number' | 'cargo_type' | 'arrival_week_start'> | null;
 };
 
 export function useShipments(filters?: {
@@ -17,7 +18,7 @@ export function useShipments(filters?: {
     queryFn: async () => {
       let query = supabase
         .from('shipments')
-        .select('*, customers(name, email, company_name, phone)')
+        .select('*, customers(name, email, company_name, phone), cargo_batches(batch_number, cargo_type, arrival_week_start)')
         .order('created_at', { ascending: false });
 
       if (filters?.status && filters.status !== 'all') {
@@ -58,7 +59,7 @@ export function useUninvoicedShipments() {
       // Get shipments that are NOT in the invoiced list
       let query = supabase
         .from('shipments')
-        .select('*, customers(name, email, company_name, phone)')
+        .select('*, customers(name, email, company_name, phone), cargo_batches(batch_number, cargo_type, arrival_week_start)')
         .eq('is_draft', false)
         .order('created_at', { ascending: false });
 
@@ -79,7 +80,7 @@ export function useShipment(id: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('shipments')
-        .select('*, customers(name, email, company_name, phone)')
+        .select('*, customers(name, email, company_name, phone), cargo_batches(batch_number, cargo_type, arrival_week_start)')
         .eq('id', id)
         .maybeSingle();
       if (error) throw error;
