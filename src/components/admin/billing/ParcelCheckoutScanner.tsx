@@ -23,6 +23,14 @@ import { useReactToPrint } from 'react-to-print';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 
+interface ParcelInfo {
+  id: string;
+  barcode: string;
+  description: string | null;
+  weight_kg: number;
+  picked_up_at: string | null;
+}
+
 interface ParcelWithInvoice {
   id: string;
   barcode: string;
@@ -41,6 +49,7 @@ interface ParcelWithInvoice {
     } | null;
   } | null;
   invoice: Invoice | null;
+  allParcels: ParcelInfo[]; // All parcels linked to this shipment
 }
 
 export function ParcelCheckoutScanner() {
@@ -52,7 +61,8 @@ export function ParcelCheckoutScanner() {
   const [parcelData, setParcelData] = useState<ParcelWithInvoice | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
-  const [recentCheckouts, setRecentCheckouts] = useState<ParcelWithInvoice[]>([]);
+  const [recentCheckouts, setRecentCheckouts] = useState<ParcelInfo[]>([]);
+  const [selectedParcelIds, setSelectedParcelIds] = useState<Set<string>>(new Set());
   
   const inputRef = useRef<HTMLInputElement>(null);
   const printRef = useRef<HTMLDivElement>(null);
@@ -136,22 +146,35 @@ export function ParcelCheckoutScanner() {
       // Get the shipment from the parcel
       const shipmentData = Array.isArray(parcel.shipment) ? parcel.shipment[0] : parcel.shipment;
       
-      // Now lookup the invoice for this shipment
+      // Fetch invoice and all parcels for this shipment in parallel
       let invoice: Invoice | null = null;
+      let allParcels: ParcelInfo[] = [];
+      
       if (shipmentData?.id) {
-        const { data: invoiceData, error: invoiceError } = await supabase
-          .from('invoices')
-          .select(`
-            *,
-            customers(id, name, email, phone, address, company_name, tin, vrn),
-            shipments(id, tracking_number, origin_region, total_weight_kg, customer_name, description)
-          `)
-          .eq('shipment_id', shipmentData.id)
-          .eq('invoice_type', 'shipping')
-          .maybeSingle();
+        const [invoiceResult, parcelsResult] = await Promise.all([
+          supabase
+            .from('invoices')
+            .select(`
+              *,
+              customers(id, name, email, phone, address, company_name, tin, vrn),
+              shipments(id, tracking_number, origin_region, total_weight_kg, customer_name, description)
+            `)
+            .eq('shipment_id', shipmentData.id)
+            .eq('invoice_type', 'shipping')
+            .maybeSingle(),
+          supabase
+            .from('parcels')
+            .select('id, barcode, description, weight_kg, picked_up_at')
+            .eq('shipment_id', shipmentData.id)
+            .order('barcode'),
+        ]);
 
-        if (!invoiceError && invoiceData) {
-          invoice = invoiceData as unknown as Invoice;
+        if (!invoiceResult.error && invoiceResult.data) {
+          invoice = invoiceResult.data as unknown as Invoice;
+        }
+        
+        if (!parcelsResult.error && parcelsResult.data) {
+          allParcels = parcelsResult.data;
         }
       }
 
@@ -168,8 +191,13 @@ export function ParcelCheckoutScanner() {
           customer: Array.isArray(shipmentData.customer) ? shipmentData.customer[0] : shipmentData.customer,
         } : null,
         invoice,
+        allParcels,
       };
 
+      // Pre-select unreleased parcels
+      const unreleasedIds = allParcels.filter(p => !p.picked_up_at).map(p => p.id);
+      setSelectedParcelIds(new Set(unreleasedIds));
+      
       setParcelData(result);
       setDialogOpen(true);
       playSuccessBeep();
@@ -195,47 +223,82 @@ export function ParcelCheckoutScanner() {
     setBarcode('');
   }, [barcode, lookupParcel]);
 
-  const releaseParcel = useCallback(async () => {
-    if (!parcelData || !user?.id) return;
+  const releaseSelectedParcels = useCallback(async () => {
+    if (!parcelData || !user?.id || selectedParcelIds.size === 0) return;
 
     setIsLoading(true);
     try {
+      const idsToRelease = Array.from(selectedParcelIds);
+      const now = new Date().toISOString();
+      
       const { error } = await supabase
         .from('parcels')
         .update({
-          picked_up_at: new Date().toISOString(),
+          picked_up_at: now,
           picked_up_by: user.id,
         })
-        .eq('id', parcelData.id);
+        .in('id', idsToRelease);
 
       if (error) throw error;
 
-      // Update local state
-      const updatedParcel = {
+      // Update local state - mark released parcels
+      const updatedParcels = parcelData.allParcels.map(p => 
+        idsToRelease.includes(p.id) ? { ...p, picked_up_at: now } : p
+      );
+      
+      // Add to recent checkouts
+      const releasedParcels = updatedParcels.filter(p => idsToRelease.includes(p.id));
+      setRecentCheckouts(prev => [...releasedParcels, ...prev].slice(0, 10));
+      
+      setParcelData({
         ...parcelData,
-        picked_up_at: new Date().toISOString(),
-      };
-      setParcelData(updatedParcel);
-      setRecentCheckouts(prev => [updatedParcel, ...prev.slice(0, 9)]);
+        picked_up_at: idsToRelease.includes(parcelData.id) ? now : parcelData.picked_up_at,
+        allParcels: updatedParcels,
+      });
+      
+      // Clear selection
+      setSelectedParcelIds(new Set());
       
       // Invalidate queries
       queryClient.invalidateQueries({ queryKey: ['parcels'] });
       queryClient.invalidateQueries({ queryKey: ['shipments'] });
 
-      toast.success('Parcel Released', {
-        description: `Parcel ${parcelData.barcode} has been released to customer.`,
+      toast.success(`${idsToRelease.length} Parcel${idsToRelease.length > 1 ? 's' : ''} Released`, {
+        description: `Released to customer.`,
       });
       playSuccessBeep();
     } catch (err: any) {
-      console.error('Error releasing parcel:', err);
-      toast.error('Failed to release parcel', {
+      console.error('Error releasing parcels:', err);
+      toast.error('Failed to release parcels', {
         description: err.message,
       });
       playErrorBeep();
     } finally {
       setIsLoading(false);
     }
-  }, [parcelData, user?.id, queryClient]);
+  }, [parcelData, user?.id, selectedParcelIds, queryClient]);
+
+  const toggleParcelSelection = (parcelId: string) => {
+    setSelectedParcelIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(parcelId)) {
+        newSet.delete(parcelId);
+      } else {
+        newSet.add(parcelId);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAllUnreleased = () => {
+    if (!parcelData) return;
+    const unreleasedIds = parcelData.allParcels.filter(p => !p.picked_up_at).map(p => p.id);
+    setSelectedParcelIds(new Set(unreleasedIds));
+  };
+
+  const deselectAll = () => {
+    setSelectedParcelIds(new Set());
+  };
 
   const handleRecordPayment = (details: PaymentDetails) => {
     recordPayment.mutate({
@@ -388,7 +451,7 @@ export function ParcelCheckoutScanner() {
                       <div>
                         <p className="font-mono font-medium">{parcel.barcode}</p>
                         <p className="text-sm text-muted-foreground">
-                          {parcel.shipment?.customer?.name || 'Unknown customer'}
+                          {parcel.description || `${parcel.weight_kg} kg`}
                         </p>
                       </div>
                     </div>
@@ -429,69 +492,118 @@ export function ParcelCheckoutScanner() {
           <div className="space-y-3">
             {/* Parcel & Customer Info - Compact Side by Side */}
             <div className="grid grid-cols-3 gap-3">
-              {/* Parcel Details */}
-              <div className="bg-muted/30 rounded-lg p-3 border">
-                <h4 className="font-medium text-sm flex items-center gap-1.5 mb-2">
-                  <Package className="h-3.5 w-3.5 text-muted-foreground" />
-                  Parcel
-                </h4>
-                <div className="space-y-1 text-sm">
-                  <p><span className="text-muted-foreground">Desc:</span> {parcelData?.description || 'N/A'}</p>
-                  <p><span className="text-muted-foreground">Weight:</span> {parcelData?.weight_kg} kg</p>
-                  {parcelData?.shipment && (
-                    <p className="font-mono text-xs">{parcelData.shipment.tracking_number}</p>
+              {/* Parcels List */}
+              <div className="bg-muted/30 rounded-lg p-3 border col-span-2">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-medium text-sm flex items-center gap-1.5">
+                    <Package className="h-3.5 w-3.5 text-muted-foreground" />
+                    Parcels ({parcelData?.allParcels.length || 0})
+                  </h4>
+                  {parcelData && parcelData.allParcels.filter(p => !p.picked_up_at).length > 0 && (
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={selectAllUnreleased}>
+                        Select All
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={deselectAll}>
+                        Clear
+                      </Button>
+                    </div>
                   )}
                 </div>
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                  {parcelData?.allParcels.map((parcel) => {
+                    const isReleased = !!parcel.picked_up_at;
+                    const isSelected = selectedParcelIds.has(parcel.id);
+                    return (
+                      <div 
+                        key={parcel.id}
+                        className={cn(
+                          "flex items-center gap-2 p-2 rounded-lg border text-sm cursor-pointer transition-colors",
+                          isReleased 
+                            ? "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 opacity-70" 
+                            : isSelected 
+                              ? "bg-primary/10 border-primary" 
+                              : "bg-background hover:bg-muted/50"
+                        )}
+                        onClick={() => !isReleased && toggleParcelSelection(parcel.id)}
+                      >
+                        {!isReleased && (
+                          <input 
+                            type="checkbox" 
+                            checked={isSelected}
+                            onChange={() => toggleParcelSelection(parcel.id)}
+                            className="h-4 w-4 rounded border-gray-300"
+                          />
+                        )}
+                        {isReleased && <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />}
+                        <div className="flex-1 min-w-0">
+                          <span className="font-mono text-xs">{parcel.barcode}</span>
+                          {parcel.description && (
+                            <span className="text-muted-foreground text-xs ml-2 truncate">{parcel.description}</span>
+                          )}
+                        </div>
+                        <span className="text-xs text-muted-foreground shrink-0">{parcel.weight_kg} kg</span>
+                        {isReleased && parcel.picked_up_at && (
+                          <span className="text-[10px] text-emerald-600 shrink-0">
+                            {format(new Date(parcel.picked_up_at), 'HH:mm')}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                {parcelData?.shipment && (
+                  <p className="font-mono text-xs text-muted-foreground mt-2">
+                    Tracking: {parcelData.shipment.tracking_number}
+                  </p>
+                )}
               </div>
 
-              {/* Customer */}
-              {parcelData?.shipment?.customer && (
-                <div className="bg-muted/30 rounded-lg p-3 border">
-                  <h4 className="font-medium text-sm flex items-center gap-1.5 mb-2">
-                    <User className="h-3.5 w-3.5 text-muted-foreground" />
-                    Customer
-                  </h4>
-                  <div className="space-y-1 text-sm">
-                    <p className="font-medium">{parcelData.shipment.customer.name}</p>
-                    {parcelData.shipment.customer.phone && (
-                      <p className="text-muted-foreground text-xs flex items-center gap-1">
-                        <Phone className="h-3 w-3" />
-                        {parcelData.shipment.customer.phone}
-                      </p>
-                    )}
-                    {parcelData.shipment.customer.email && (
-                      <p className="text-muted-foreground text-xs flex items-center gap-1">
-                        <Mail className="h-3 w-3" />
-                        {parcelData.shipment.customer.email}
-                      </p>
-                    )}
+              {/* Customer & Amount Column */}
+              <div className="space-y-3">
+                {/* Customer */}
+                {parcelData?.shipment?.customer && (
+                  <div className="bg-muted/30 rounded-lg p-3 border">
+                    <h4 className="font-medium text-sm flex items-center gap-1.5 mb-2">
+                      <User className="h-3.5 w-3.5 text-muted-foreground" />
+                      Customer
+                    </h4>
+                    <div className="space-y-1 text-sm">
+                      <p className="font-medium">{parcelData.shipment.customer.name}</p>
+                      {parcelData.shipment.customer.phone && (
+                        <p className="text-muted-foreground text-xs flex items-center gap-1">
+                          <Phone className="h-3 w-3" />
+                          {parcelData.shipment.customer.phone}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Amount Overview - Right Side */}
-              {invoice && (
-                <div className="space-y-2">
-                  <div className="bg-muted/50 rounded-lg p-2.5 text-center">
-                    <p className="text-xs text-muted-foreground">Total</p>
-                    <p className="text-lg font-bold">{currencySymbol}{totalAmount.toFixed(2)}</p>
-                    {showTzsEquivalent && (
-                      <p className="text-[10px] text-muted-foreground">≈ TZS {totalAmountTzs.toLocaleString()}</p>
-                    )}
-                  </div>
-                  <div className={`rounded-lg p-2.5 text-center ${remainingBalance > 0 ? 'bg-amber-50 dark:bg-amber-950/30' : 'bg-emerald-50 dark:bg-emerald-950/30'}`}>
-                    <p className={`text-xs ${remainingBalance > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>Balance Due</p>
-                    <p className={`text-lg font-bold ${remainingBalance > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
-                      {currencySymbol}{remainingBalance.toFixed(2)}
-                    </p>
-                    {showTzsEquivalent && (
-                      <p className={`text-[10px] ${remainingBalance > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                        ≈ TZS {remainingBalanceTzs.toLocaleString()}
+                {/* Amount Overview */}
+                {invoice && (
+                  <div className="space-y-2">
+                    <div className="bg-muted/50 rounded-lg p-2.5 text-center">
+                      <p className="text-xs text-muted-foreground">Total</p>
+                      <p className="text-lg font-bold">{currencySymbol}{totalAmount.toFixed(2)}</p>
+                      {showTzsEquivalent && (
+                        <p className="text-[10px] text-muted-foreground">≈ TZS {totalAmountTzs.toLocaleString()}</p>
+                      )}
+                    </div>
+                    <div className={`rounded-lg p-2.5 text-center ${remainingBalance > 0 ? 'bg-amber-50 dark:bg-amber-950/30' : 'bg-emerald-50 dark:bg-emerald-950/30'}`}>
+                      <p className={`text-xs ${remainingBalance > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>Balance Due</p>
+                      <p className={`text-lg font-bold ${remainingBalance > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
+                        {currencySymbol}{remainingBalance.toFixed(2)}
                       </p>
-                    )}
+                      {showTzsEquivalent && (
+                        <p className={`text-[10px] ${remainingBalance > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                          ≈ TZS {remainingBalanceTzs.toLocaleString()}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
             {/* Invoice Section */}
@@ -647,15 +759,15 @@ export function ParcelCheckoutScanner() {
                   Record Payment
                 </Button>
               )}
-              {!parcelData?.picked_up_at && (
+              {parcelData && parcelData.allParcels.some(p => !p.picked_up_at) && selectedParcelIds.size > 0 && (
                 <Button 
                   size="sm"
-                  onClick={releaseParcel} 
+                  onClick={releaseSelectedParcels} 
                   className="bg-emerald-600 hover:bg-emerald-700"
                   disabled={isLoading}
                 >
                   <CheckCircle2 className="h-4 w-4 mr-1" />
-                  Release
+                  Release {selectedParcelIds.size > 1 ? `(${selectedParcelIds.size})` : 'Parcel'}
                 </Button>
               )}
             </div>
