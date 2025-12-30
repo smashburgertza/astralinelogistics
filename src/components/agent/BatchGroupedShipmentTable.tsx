@@ -63,21 +63,21 @@ export function AgentBatchGroupedShipmentTable({
     
     const groups: Record<string, BatchGroup> = {};
     
-    // Debug: log first shipment's cargo_batches
-    if (shipments.length > 0) {
-      console.log('Agent shipments cargo_batches sample:', shipments[0]?.cargo_batches);
-    }
-    
     shipments.forEach(shipment => {
       const key = shipment.batch_id || `unbatched-${shipment.origin_region}`;
+      
+      // Handle cargo_batches - it could be an object or array depending on Supabase response
+      const batchData = Array.isArray(shipment.cargo_batches) 
+        ? shipment.cargo_batches[0] 
+        : shipment.cargo_batches;
       
       if (!groups[key]) {
         groups[key] = {
           batch_id: shipment.batch_id,
-          batch_number: shipment.cargo_batches?.batch_number || null,
+          batch_number: batchData?.batch_number || null,
           origin_region: shipment.origin_region,
-          cargo_type: shipment.cargo_batches?.cargo_type || 'air',
-          arrival_week_start: shipment.cargo_batches?.arrival_week_start || null,
+          cargo_type: batchData?.cargo_type || 'air',
+          arrival_week_start: batchData?.arrival_week_start || null,
           status: shipment.status || 'collected',
           shipments: [],
           total_weight: 0,
