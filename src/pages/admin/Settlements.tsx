@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -39,12 +40,15 @@ import {
   Filter,
   Eye,
   CreditCard,
+  FileText,
+  Users,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useSettlements, useCreateSettlement, useUpdateSettlementStatus, Settlement, SettlementType, SettlementStatus } from '@/hooks/useSettlements';
 import { useAgents } from '@/hooks/useAgents';
 import { cn } from '@/lib/utils';
 import { StatCard } from '@/components/admin/StatCard';
+import { B2BInvoices } from '@/components/admin/B2BInvoices';
 
 const STATUS_CONFIG = {
   pending: { label: 'Pending', color: 'bg-amber-100 text-amber-800', icon: Clock },
@@ -54,6 +58,7 @@ const STATUS_CONFIG = {
 };
 
 export default function SettlementsPage() {
+  const [activeTab, setActiveTab] = useState('invoices');
   const [filters, setFilters] = useState({ status: 'all', agent: 'all' });
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedSettlement, setSelectedSettlement] = useState<Settlement | null>(null);
@@ -109,151 +114,172 @@ export default function SettlementsPage() {
   };
 
   return (
-    <AdminLayout title="Settlements" subtitle="Manage agent payment settlements">
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <StatCard
-          title="Pending Approval"
-          value={`$${totalPending.toLocaleString()}`}
-          icon={Clock}
-          variant="warning"
-          subtitle={`${pendingCount} settlements`}
-        />
-        <StatCard
-          title="Approved"
-          value={`$${totalApproved.toLocaleString()}`}
-          icon={CheckCircle}
-          variant="primary"
-        />
-        <StatCard
-          title="Paid Out"
-          value={`$${totalPaid.toLocaleString()}`}
-          icon={CreditCard}
-          variant="success"
-        />
-        <StatCard
-          title="This Month"
-          value={settlements?.length || 0}
-          icon={Receipt}
-          variant="navy"
-        />
-      </div>
+    <AdminLayout title="Settlements" subtitle="Manage agent invoices and payment settlements">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="invoices" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Agent Invoices
+          </TabsTrigger>
+          <TabsTrigger value="settlements" className="flex items-center gap-2">
+            <Receipt className="h-4 w-4" />
+            Settlements
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Filters & Actions */}
-      <Card className="mb-6">
-        <CardContent className="py-4">
-          <div className="flex flex-wrap gap-4 items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Filter className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Filters:</span>
-              </div>
-              <Select value={filters.status} onValueChange={(v) => setFilters({ ...filters, status: v })}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="All Status" />
-                </SelectTrigger>
-                <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="approved">Approved</SelectItem>
-                <SelectItem value="paid">Paid</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={filters.agent} onValueChange={(v) => setFilters({ ...filters, agent: v })}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="All Agents" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Agents</SelectItem>
-                  {agents?.map((agent) => (
-                    <SelectItem key={agent.id} value={agent.user_id}>
-                      {agent.profile?.full_name || agent.profile?.email || 'Unknown'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button onClick={() => setCreateOpen(true)} className="gap-2">
-              <Plus className="w-4 h-4" />
-              Create Settlement
-            </Button>
+        {/* Agent Invoices Tab (B2B) */}
+        <TabsContent value="invoices" className="space-y-6">
+          <B2BInvoices />
+        </TabsContent>
+
+        {/* Settlements Tab */}
+        <TabsContent value="settlements" className="space-y-6">
+          {/* Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <StatCard
+              title="Pending Approval"
+              value={`$${totalPending.toLocaleString()}`}
+              icon={Clock}
+              variant="warning"
+              subtitle={`${pendingCount} settlements`}
+            />
+            <StatCard
+              title="Approved"
+              value={`$${totalApproved.toLocaleString()}`}
+              icon={CheckCircle}
+              variant="primary"
+            />
+            <StatCard
+              title="Paid Out"
+              value={`$${totalPaid.toLocaleString()}`}
+              icon={CreditCard}
+              variant="success"
+            />
+            <StatCard
+              title="This Month"
+              value={settlements?.length || 0}
+              icon={Receipt}
+              variant="navy"
+            />
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Settlements Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Settlement Records</CardTitle>
-          <CardDescription>Track and manage agent settlements</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-16 w-full" />)}
-            </div>
-          ) : settlements && settlements.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Settlement #</TableHead>
-                  <TableHead>Agent</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Period</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {settlements.map((settlement) => {
-                  const StatusIcon = STATUS_CONFIG[settlement.status as keyof typeof STATUS_CONFIG]?.icon || Clock;
-                  const statusConfig = STATUS_CONFIG[settlement.status as keyof typeof STATUS_CONFIG];
-                  
-                  return (
-                    <TableRow key={settlement.id}>
-                      <TableCell className="font-mono text-sm">{settlement.settlement_number}</TableCell>
-                      <TableCell>{settlement.profiles?.full_name || settlement.profiles?.email || 'Unknown'}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="capitalize">
-                          {settlement.settlement_type.replace('_', ' ')}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {format(new Date(settlement.period_start), 'MMM d')} - {format(new Date(settlement.period_end), 'MMM d, yyyy')}
-                      </TableCell>
-                      <TableCell className="text-right font-bold">
-                        {settlement.currency} {settlement.total_amount.toLocaleString()}
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={cn('gap-1', statusConfig?.color)}>
-                          <StatusIcon className="w-3 h-3" />
-                          {statusConfig?.label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setSelectedSettlement(settlement)}
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                      </TableCell>
+          {/* Filters & Actions */}
+          <Card>
+            <CardContent className="py-4">
+              <div className="flex flex-wrap gap-4 items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <Filter className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Filters:</span>
+                  </div>
+                  <Select value={filters.status} onValueChange={(v) => setFilters({ ...filters, status: v })}>
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue placeholder="All Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="approved">Approved</SelectItem>
+                    <SelectItem value="paid">Paid</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={filters.agent} onValueChange={(v) => setFilters({ ...filters, agent: v })}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="All Agents" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Agents</SelectItem>
+                      {agents?.map((agent) => (
+                        <SelectItem key={agent.id} value={agent.user_id}>
+                          {agent.profile?.full_name || agent.profile?.email || 'Unknown'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button onClick={() => setCreateOpen(true)} className="gap-2">
+                  <Plus className="w-4 h-4" />
+                  Create Settlement
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Settlements Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Settlement Records</CardTitle>
+              <CardDescription>Track and manage agent settlements</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => <Skeleton key={i} className="h-16 w-full" />)}
+                </div>
+              ) : settlements && settlements.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Settlement #</TableHead>
+                      <TableHead>Agent</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Period</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead></TableHead>
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          ) : (
-            <div className="text-center py-12 text-muted-foreground">
-              <Receipt className="w-12 h-12 mx-auto mb-3 opacity-40" />
-              <p>No settlements found</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {settlements.map((settlement) => {
+                      const StatusIcon = STATUS_CONFIG[settlement.status as keyof typeof STATUS_CONFIG]?.icon || Clock;
+                      const statusConfig = STATUS_CONFIG[settlement.status as keyof typeof STATUS_CONFIG];
+                      
+                      return (
+                        <TableRow key={settlement.id}>
+                          <TableCell className="font-mono text-sm">{settlement.settlement_number}</TableCell>
+                          <TableCell>{settlement.profiles?.full_name || settlement.profiles?.email || 'Unknown'}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="capitalize">
+                              {settlement.settlement_type.replace('_', ' ')}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {format(new Date(settlement.period_start), 'MMM d')} - {format(new Date(settlement.period_end), 'MMM d, yyyy')}
+                          </TableCell>
+                          <TableCell className="text-right font-bold">
+                            {settlement.currency} {settlement.total_amount.toLocaleString()}
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={cn('gap-1', statusConfig?.color)}>
+                              <StatusIcon className="w-3 h-3" />
+                              {statusConfig?.label}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setSelectedSettlement(settlement)}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Receipt className="w-12 h-12 mx-auto mb-3 opacity-40" />
+                  <p>No settlements found</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Create Settlement Dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
