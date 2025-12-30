@@ -2,7 +2,7 @@ import { ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, CloudUpload, PackageSearch, Settings2,
-  LogOut, BellRing, ChevronDown, Building2, FileText
+  LogOut, BellRing, ChevronDown, Building2, FileText, Receipt
 } from 'lucide-react';
 import astralineLogo from '@/assets/astraline-logo-horizontal.svg';
 import { Button } from '@/components/ui/button';
@@ -43,6 +43,7 @@ const navItems = [
   { label: 'Dashboard', href: '/agent', icon: LayoutDashboard },
   { label: 'My Shipments', href: '/agent/shipments', icon: PackageSearch },
   { label: 'My Invoices', href: '/agent/invoices', icon: FileText },
+  { label: 'Settlements', href: '/agent/settlements', icon: Receipt },
 ];
 
 const accountNavItems = [

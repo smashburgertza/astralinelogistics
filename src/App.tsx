@@ -36,6 +36,7 @@ const AgentDashboard = lazy(() => import("./pages/agent/Dashboard"));
 const AgentUploadPage = lazy(() => import("./pages/agent/Upload"));
 const AgentShipmentsPage = lazy(() => import("./pages/agent/Shipments"));
 const AgentInvoicesPage = lazy(() => import("./pages/agent/Invoices"));
+const AgentSettlementsPage = lazy(() => import("./pages/agent/Settlements"));
 const AgentSettingsPage = lazy(() => import("./pages/agent/Settings"));
 
 // Admin Portal - lazy loaded
@@ -115,6 +116,7 @@ const App = () => (
             <Route path="/agent/upload" element={<Suspense fallback={<PageLoader />}><AgentUploadPage /></Suspense>} />
             <Route path="/agent/shipments" element={<Suspense fallback={<PageLoader />}><AgentShipmentsPage /></Suspense>} />
             <Route path="/agent/invoices" element={<Suspense fallback={<PageLoader />}><AgentInvoicesPage /></Suspense>} />
+            <Route path="/agent/settlements" element={<Suspense fallback={<PageLoader />}><AgentSettlementsPage /></Suspense>} />
             <Route path="/agent/settings" element={<Suspense fallback={<PageLoader />}><AgentSettingsPage /></Suspense>} />
             
             {/* Admin Portal - Lazy Loaded with Permission Gates */}
