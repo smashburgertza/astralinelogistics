@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Package, Upload, TrendingUp, ArrowRight, Plus, Clock, CloudUpload, Sparkles, ArrowDownLeft, ArrowUpRight, CreditCard, Receipt } from 'lucide-react';
+import { Package, Upload, TrendingUp, ArrowRight, Plus, Clock, CloudUpload, Sparkles, ArrowDownLeft, ArrowUpRight, CreditCard, Receipt, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { useAgentShipments, useAgentShipmentStats } from '@/hooks/useAgentShipments';
@@ -14,13 +14,15 @@ import { useAgentAssignedRegions } from '@/hooks/useAgentRegions';
 import { ShipmentStatusBadge } from '@/components/admin/ShipmentStatusBadge';
 import { BatchFreightCostCard } from '@/components/agent/BatchFreightCostCard';
 import { useAgentBalance } from '@/hooks/useAgentBalance';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 
 export default function AgentDashboard() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   
   // Get assigned regions first - single source of truth
   const { data: assignedRegions = [] } = useAgentAssignedRegions();
@@ -66,6 +68,29 @@ export default function AgentDashboard() {
       })) || [];
     },
     enabled: !!user?.id,
+  });
+
+  // Mutation to verify a payment
+  const verifyPaymentMutation = useMutation({
+    mutationFn: async (paymentId: string) => {
+      const { error } = await supabase
+        .from('payments')
+        .update({
+          verification_status: 'verified',
+          verified_at: new Date().toISOString(),
+          verified_by: user?.id,
+        })
+        .eq('id', paymentId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agent-payments-received'] });
+      toast.success('Payment verified successfully');
+    },
+    onError: () => {
+      toast.error('Failed to verify payment');
+    },
   });
   
   const recentShipments = shipments?.slice(0, 5) || [];
@@ -207,13 +232,18 @@ export default function AgentDashboard() {
                     <TableHead>Method</TableHead>
                     <TableHead>Reference</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
+                    <TableHead className="text-center">Status</TableHead>
+                    <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {paymentsReceived.map((payment: any) => {
                     const currencySymbol = CURRENCY_SYMBOLS[payment.currency || 'USD'] || '$';
+                    const isVerified = payment.verification_status === 'verified';
+                    const isPending = !payment.verification_status || payment.verification_status === 'pending';
+                    
                     return (
-                      <TableRow key={payment.id}>
+                      <TableRow key={payment.id} className={isPending ? 'bg-amber-50/50 dark:bg-amber-950/20' : ''}>
                         <TableCell className="text-sm">
                           {payment.paid_at ? format(new Date(payment.paid_at), 'MMM d, yyyy') : '-'}
                         </TableCell>
@@ -230,6 +260,33 @@ export default function AgentDashboard() {
                         </TableCell>
                         <TableCell className="text-right font-semibold text-emerald-600">
                           {currencySymbol}{Number(payment.amount).toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {isVerified ? (
+                            <Badge variant="default" className="bg-emerald-500 text-white">
+                              <CheckCircle2 className="w-3 h-3 mr-1" />
+                              Verified
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-amber-600 border-amber-400 bg-amber-50 dark:bg-amber-950/30">
+                              <AlertCircle className="w-3 h-3 mr-1" />
+                              Pending
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {isPending && (
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              className="text-emerald-600 border-emerald-300 hover:bg-emerald-50"
+                              onClick={() => verifyPaymentMutation.mutate(payment.id)}
+                              disabled={verifyPaymentMutation.isPending}
+                            >
+                              <CheckCircle2 className="w-3 h-3 mr-1" />
+                              Verify
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     );
