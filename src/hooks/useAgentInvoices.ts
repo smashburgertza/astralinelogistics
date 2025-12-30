@@ -215,11 +215,19 @@ export function useVerifyPayment() {
     mutationFn: async ({ 
       paymentId, 
       status,
-      invoiceId 
+      invoiceId,
+      depositAccountId,
+      amount,
+      currency,
+      invoiceNumber,
     }: { 
       paymentId: string; 
       status: 'verified' | 'rejected';
       invoiceId: string;
+      depositAccountId?: string;
+      amount?: number;
+      currency?: string;
+      invoiceNumber?: string;
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
@@ -237,11 +245,11 @@ export function useVerifyPayment() {
 
       if (paymentError) throw paymentError;
 
-      // If verified, mark invoice as paid
+      // If verified, mark invoice as paid and create journal entry
       if (status === 'verified') {
         const { data: payment } = await supabase
           .from('payments')
-          .select('amount')
+          .select('amount, currency')
           .eq('id', paymentId)
           .single();
 
@@ -255,6 +263,20 @@ export function useVerifyPayment() {
           .eq('id', invoiceId);
 
         if (invoiceError) throw invoiceError;
+
+        // Create journal entry if deposit account is specified
+        if (depositAccountId && amount) {
+          // Import and use the journal entry utility
+          const { createAgentPaymentJournalEntry } = await import('@/lib/journalEntryUtils');
+          
+          await createAgentPaymentJournalEntry({
+            invoiceId,
+            invoiceNumber: invoiceNumber || 'Unknown',
+            amount,
+            currency: currency || 'USD',
+            sourceAccountId: depositAccountId,
+          });
+        }
       }
 
       return { paymentId, status };
@@ -265,7 +287,8 @@ export function useVerifyPayment() {
       queryClient.invalidateQueries({ queryKey: ['agent-invoices-to-me'] });
       queryClient.invalidateQueries({ queryKey: ['agent-balance'] });
       queryClient.invalidateQueries({ queryKey: ['all-agent-balances'] });
-      toast.success(data.status === 'verified' ? 'Payment verified' : 'Payment rejected');
+      queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
+      toast.success(data.status === 'verified' ? 'Payment verified and recorded' : 'Payment rejected');
     },
     onError: (error) => {
       toast.error(`Failed to update payment: ${error.message}`);

@@ -46,6 +46,9 @@ import {
 } from '@/hooks/useApprovalRequests';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 import { usePaymentsPendingVerification, useVerifyPayment } from '@/hooks/useAgentInvoices';
+import { useBankAccounts, useChartOfAccounts } from '@/hooks/useAccounting';
+import { toast } from 'sonner';
+import { Label } from '@/components/ui/label';
 
 function ApprovalStatusBadge({ status }: { status: ApprovalStatus }) {
   const config = APPROVAL_STATUSES[status];
@@ -299,28 +302,49 @@ function ParcelReleaseApprovals() {
 
 function PaymentVerificationApprovals() {
   const { data: pendingPayments, isLoading } = usePaymentsPendingVerification();
+  const { data: bankAccounts } = useBankAccounts();
+  const { data: chartAccounts } = useChartOfAccounts({ type: 'asset', active: true });
   const verifyMutation = useVerifyPayment();
   const [selectedPayment, setSelectedPayment] = useState<any | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [verifyAction, setVerifyAction] = useState<'verified' | 'rejected'>('verified');
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+
+  // Filter chart accounts to show cash/bank accounts
+  const cashAccounts = chartAccounts?.filter(acc => 
+    acc.account_subtype === 'cash' || 
+    acc.account_subtype === 'bank' ||
+    acc.account_code.startsWith('1001') || // Cash accounts
+    acc.account_code.startsWith('1002')    // Bank accounts
+  ) || [];
 
   const handleVerify = (payment: any, action: 'verified' | 'rejected') => {
     setSelectedPayment(payment);
     setVerifyAction(action);
+    setSelectedAccountId('');
     setDialogOpen(true);
   };
 
   const confirmVerify = () => {
     if (!selectedPayment) return;
+    if (verifyAction === 'verified' && !selectedAccountId) {
+      toast.error('Please select an account to credit the payment');
+      return;
+    }
     
     verifyMutation.mutate({
       paymentId: selectedPayment.id,
       status: verifyAction,
       invoiceId: selectedPayment.invoice_id,
+      depositAccountId: verifyAction === 'verified' ? selectedAccountId : undefined,
+      amount: selectedPayment.amount,
+      currency: selectedPayment.currency,
+      invoiceNumber: selectedPayment.invoices?.invoice_number,
     }, {
       onSuccess: () => {
         setDialogOpen(false);
         setSelectedPayment(null);
+        setSelectedAccountId('');
       },
     });
   };
@@ -463,6 +487,46 @@ function PaymentVerificationApprovals() {
                   <p className="font-mono text-sm">{selectedPayment.stripe_payment_id || '-'}</p>
                 </div>
               </div>
+
+              {verifyAction === 'verified' && (
+                <div className="space-y-2">
+                  <Label htmlFor="deposit-account">Credit to Account *</Label>
+                  <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+                    <SelectTrigger id="deposit-account">
+                      <SelectValue placeholder="Select account to credit..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bankAccounts && bankAccounts.length > 0 && (
+                        <>
+                          <SelectItem value="__bank_header" disabled className="font-semibold text-muted-foreground">
+                            Bank Accounts
+                          </SelectItem>
+                          {bankAccounts.filter(b => b.is_active).map(bank => (
+                            <SelectItem key={bank.id} value={bank.chart_account_id || bank.id}>
+                              {bank.bank_name} - {bank.account_name} ({bank.currency})
+                            </SelectItem>
+                          ))}
+                        </>
+                      )}
+                      {cashAccounts.length > 0 && (
+                        <>
+                          <SelectItem value="__cash_header" disabled className="font-semibold text-muted-foreground">
+                            Cash Accounts
+                          </SelectItem>
+                          {cashAccounts.map(acc => (
+                            <SelectItem key={acc.id} value={acc.id}>
+                              {acc.account_code} - {acc.account_name} ({acc.currency})
+                            </SelectItem>
+                          ))}
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Select where the payment was received
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
