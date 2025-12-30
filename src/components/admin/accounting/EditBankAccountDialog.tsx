@@ -138,13 +138,16 @@ export function EditBankAccountDialog({ open, onOpenChange, bankAccount, chartAc
 
           <div className="space-y-2">
             <Label htmlFor="chart_account">Link to Chart Account</Label>
-            <Select value={chartAccountId} onValueChange={setChartAccountId}>
+            <Select 
+              value={chartAccountId || 'none'} 
+              onValueChange={(val) => setChartAccountId(val === 'none' ? '' : val)}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Select account" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None</SelectItem>
-                {chartAccounts.map((account) => (
+                <SelectItem value="none">None</SelectItem>
+                {chartAccounts.filter(account => account.id).map((account) => (
                   <SelectItem key={account.id} value={account.id}>
                     {account.account_code} - {account.account_name}
                   </SelectItem>
