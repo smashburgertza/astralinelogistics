@@ -184,6 +184,7 @@ export function EditB2BInvoiceDialog({ invoice, open, onOpenChange }: EditB2BInv
             currency: data.currency,
             weight_kg: null,
             unit_type: 'fixed',
+            product_service_id: null,
           });
         }
       }
