@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from './useAuth';
-import { createAgentPaymentJournalEntry } from '@/lib/journalEntryUtils';
+import { createAgentPaymentJournalEntry, createInvoicePaymentJournalEntry } from '@/lib/journalEntryUtils';
 
 export interface AgentInvoice {
   id: string;
@@ -238,6 +238,7 @@ export function useVerifyPayment() {
       invoiceNumber,
       amountInTzs,
       exchangeRate,
+      isAgentPayment = false,
     }: { 
       paymentId: string; 
       status: 'verified' | 'rejected';
@@ -248,6 +249,7 @@ export function useVerifyPayment() {
       invoiceNumber?: string;
       amountInTzs?: number;
       exchangeRate?: number;
+      isAgentPayment?: boolean;
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
@@ -287,15 +289,28 @@ export function useVerifyPayment() {
 
         // Create journal entry if deposit account is specified
         if (depositAccountId && amount) {
-          await createAgentPaymentJournalEntry({
-            invoiceId,
-            invoiceNumber: invoiceNumber || 'Unknown',
-            amount,
-            currency: currency || 'USD',
-            sourceAccountId: depositAccountId,
-            amountInTzs,
-            exchangeRate,
-          });
+          if (isAgentPayment) {
+            // Agent payment: money going OUT (credit bank, debit agent payables)
+            await createAgentPaymentJournalEntry({
+              invoiceId,
+              invoiceNumber: invoiceNumber || 'Unknown',
+              amount,
+              currency: currency || 'USD',
+              sourceAccountId: depositAccountId,
+              amountInTzs,
+              exchangeRate,
+            });
+          } else {
+            // Customer payment: money coming IN (debit bank, credit accounts receivable)
+            await createInvoicePaymentJournalEntry({
+              invoiceId,
+              invoiceNumber: invoiceNumber || 'Unknown',
+              amount,
+              currency: currency || 'USD',
+              depositAccountId,
+              exchangeRate: exchangeRate || 1,
+            });
+          }
         }
       }
 

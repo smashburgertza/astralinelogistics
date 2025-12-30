@@ -212,11 +212,12 @@ export default function SettlementsPage() {
                               size="sm"
                               variant="outline"
                               className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                              onClick={() => verifyPayment.mutate({
-                                paymentId: payment.id,
-                                status: 'rejected',
-                                invoiceId: payment.invoice_id,
-                              })}
+                            onClick={() => verifyPayment.mutate({
+                              paymentId: payment.id,
+                              status: 'rejected',
+                              invoiceId: payment.invoice_id,
+                              isAgentPayment: payment.invoices?.invoice_direction === 'to_agent',
+                            })}
                               disabled={verifyPayment.isPending}
                             >
                               <XCircle className="h-4 w-4 mr-1" />
@@ -224,11 +225,12 @@ export default function SettlementsPage() {
                             </Button>
                             <Button
                               size="sm"
-                              onClick={() => verifyPayment.mutate({
-                                paymentId: payment.id,
-                                status: 'verified',
-                                invoiceId: payment.invoice_id,
-                              })}
+                            onClick={() => verifyPayment.mutate({
+                              paymentId: payment.id,
+                              status: 'verified',
+                              invoiceId: payment.invoice_id,
+                              isAgentPayment: payment.invoices?.invoice_direction === 'to_agent',
+                            })}
                               disabled={verifyPayment.isPending}
                             >
                               <CheckCircle className="h-4 w-4 mr-1" />
