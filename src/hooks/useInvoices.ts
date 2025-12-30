@@ -71,31 +71,32 @@ export function useCreateInvoice() {
         .single();
       if (error) throw error;
 
-      // Auto-create journal entry for the invoice (AR debit, Revenue credit)
-      try {
-        await createInvoiceJournalEntry({
-          invoiceId: data.id,
-          invoiceNumber: data.invoice_number,
-          amount: Number(data.amount),
-          currency: data.currency || 'USD',
-          exchangeRate: data.amount_in_tzs ? Number(data.amount_in_tzs) / Number(data.amount) : 1,
-          customerName: (data as any).customers?.name,
-        });
-      } catch (journalError) {
-        console.error('Failed to create journal entry for invoice:', journalError);
-        // Don't fail the invoice creation if journal entry fails
-      }
+      // Fire-and-forget: Create journal entry in background (don't block UI)
+      const createJournalAsync = async () => {
+        try {
+          await createInvoiceJournalEntry({
+            invoiceId: data.id,
+            invoiceNumber: data.invoice_number,
+            amount: Number(data.amount),
+            currency: data.currency || 'USD',
+            exchangeRate: data.amount_in_tzs ? Number(data.amount_in_tzs) / Number(data.amount) : 1,
+            customerName: (data as any).customers?.name,
+          });
+        } catch (journalError) {
+          console.error('Background journal entry creation failed:', journalError);
+        }
+      };
+      createJournalAsync();
 
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
-      queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
-      queryClient.invalidateQueries({ queryKey: ['trial-balance'] });
-      queryClient.invalidateQueries({ queryKey: ['income-statement'] });
-      queryClient.invalidateQueries({ queryKey: ['balance-sheet'] });
-      toast.success('Invoice created successfully');
+      // Defer less critical invalidations
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
+      }, 500);
+      toast.success('Invoice created');
     },
     onError: (error) => {
       toast.error(`Failed to create invoice: ${error.message}`);
@@ -181,14 +182,30 @@ export function useRecordPayment() {
 
   return useMutation({
     mutationFn: async (params: RecordPaymentParams) => {
-      // First get the current invoice to check amount_paid and direction
-      const { data: currentInvoice, error: fetchError } = await supabase
-        .from('invoices')
-        .select('amount, amount_paid, invoice_number, currency, invoice_direction, agent_id')
-        .eq('id', params.invoiceId)
-        .single();
+      const isSplitPayment = params.splits && params.splits.length > 0;
       
-      if (fetchError) throw fetchError;
+      // Parallel fetch: invoice data, exchange rate, and bank account mappings
+      const allAccountIds = isSplitPayment 
+        ? params.splits!.map(s => s.accountId) 
+        : (params.depositAccountId ? [params.depositAccountId] : []);
+
+      const [invoiceResult, rateResult, bankAccountsResult] = await Promise.all([
+        supabase
+          .from('invoices')
+          .select('amount, amount_paid, invoice_number, currency, invoice_direction, agent_id')
+          .eq('id', params.invoiceId)
+          .single(),
+        supabase
+          .from('currency_exchange_rates')
+          .select('rate_to_tzs, currency_code')
+          .in('currency_code', ['USD', 'GBP', 'EUR']),
+        allAccountIds.length > 0 
+          ? supabase.from('bank_accounts').select('id, chart_account_id, current_balance, opening_balance').in('id', allAccountIds)
+          : Promise.resolve({ data: [], error: null }),
+      ]);
+
+      if (invoiceResult.error) throw invoiceResult.error;
+      const currentInvoice = invoiceResult.data;
 
       const totalAmount = Number(currentInvoice.amount || 0);
       const currentPaid = Number(currentInvoice.amount_paid || 0);
@@ -196,220 +213,182 @@ export function useRecordPayment() {
       const isFullyPaid = newTotalPaid >= totalAmount;
       const isB2BAgentPayment = currentInvoice.invoice_direction === 'from_agent' && currentInvoice.agent_id;
 
-      // Update invoice with new amount_paid and status
+      // Build bank account chart map
+      const bankAccountChartMap: Record<string, string> = {};
+      const bankAccountBalanceMap: Record<string, number> = {};
+      if (bankAccountsResult.data) {
+        bankAccountsResult.data.forEach(ba => {
+          if (ba.chart_account_id) {
+            bankAccountChartMap[ba.id] = ba.chart_account_id;
+            bankAccountBalanceMap[ba.id] = Number(ba.current_balance) || 0;
+          }
+        });
+      }
+
+      // Get exchange rate
+      let invoiceCurrencyRate = 1;
+      if (currentInvoice.currency && currentInvoice.currency !== 'TZS' && rateResult.data) {
+        const rate = rateResult.data.find(r => r.currency_code === currentInvoice.currency);
+        invoiceCurrencyRate = rate?.rate_to_tzs || 1;
+      }
+
+      // Prepare invoice update
       const updates: TablesUpdate<'invoices'> = {
         amount_paid: newTotalPaid,
         payment_method: params.paymentMethod,
         payment_currency: params.paymentCurrency,
       };
-
-      // Only mark as paid if fully paid
       if (isFullyPaid) {
         updates.status = 'paid';
         updates.paid_at = params.paymentDate;
-      } else if (newTotalPaid > 0) {
-        // Optionally update status to reflect partial payment
-        // For now, keep existing status unless cancelled
       }
 
-      const { data, error } = await supabase
-        .from('invoices')
-        .update(updates)
-        .eq('id', params.invoiceId)
-        .select()
-        .single();
-      
-      if (error) throw error;
+      // Execute core updates in parallel using async functions to ensure proper Promise types
+      const updateInvoice = async () => {
+        return supabase
+          .from('invoices')
+          .update(updates)
+          .eq('id', params.invoiceId)
+          .select()
+          .single();
+      };
 
-      // Get exchange rate for invoice currency if paying in different currency
-      let invoiceCurrencyRate = 1;
-      if (currentInvoice.currency && currentInvoice.currency !== 'TZS') {
-        const { data: rateData } = await supabase
-          .from('currency_exchange_rates')
-          .select('rate_to_tzs')
-          .eq('currency_code', currentInvoice.currency)
-          .maybeSingle();
-        invoiceCurrencyRate = rateData?.rate_to_tzs || 1;
-      }
+      const insertPayment = async () => {
+        const paymentInsert = {
+          invoice_id: params.invoiceId,
+          amount: isSplitPayment ? params.splits!.reduce((sum, s) => sum + s.amount, 0) : params.amount,
+          currency: params.paymentCurrency,
+          payment_method: params.paymentMethod,
+          paid_at: params.paymentDate,
+          stripe_payment_id: isSplitPayment 
+            ? (params.reference ? `${params.reference} (Split: ${params.splits!.length} accounts)` : `Split payment: ${params.splits!.length} accounts`)
+            : (params.reference || null),
+          verification_status: 'verified',
+          status: 'completed',
+          verified_at: new Date().toISOString(),
+        };
+        return supabase.from('payments').insert(paymentInsert);
+      };
 
-      // Handle split payments or single payment
-      const isSplitPayment = params.splits && params.splits.length > 0;
-
-      // Pre-fetch bank accounts with chart_account_ids for all splits
-      let bankAccountChartMap: Record<string, string> = {};
-      const allAccountIds = isSplitPayment 
-        ? params.splits!.map(s => s.accountId) 
-        : (params.depositAccountId ? [params.depositAccountId] : []);
-      
-      if (allAccountIds.length > 0) {
-        console.log('Looking up bank accounts for IDs:', allAccountIds);
-        const { data: bankAccountsForMapping, error: mappingError } = await supabase
-          .from('bank_accounts')
-          .select('id, chart_account_id')
-          .in('id', allAccountIds);
-        
-        console.log('Bank accounts mapping result:', bankAccountsForMapping, 'Error:', mappingError);
-        
-        if (bankAccountsForMapping) {
-          bankAccountsForMapping.forEach(ba => {
-            if (ba.chart_account_id) {
-              bankAccountChartMap[ba.id] = ba.chart_account_id;
-            }
+      const updateBankBalances = async () => {
+        if (isSplitPayment && params.splits) {
+          const updatePromises = params.splits.map(async (split) => {
+            const currentBalance = bankAccountBalanceMap[split.accountId] || 0;
+            const newBalance = currentBalance + split.amount;
+            return supabase
+              .from('bank_accounts')
+              .update({ current_balance: newBalance })
+              .eq('id', split.accountId);
           });
+          return Promise.all(updatePromises);
+        } else if (params.depositAccountId && bankAccountBalanceMap[params.depositAccountId] !== undefined) {
+          const currentBalance = bankAccountBalanceMap[params.depositAccountId];
+          const newBalance = currentBalance + params.amount;
+          return supabase
+            .from('bank_accounts')
+            .update({ current_balance: newBalance })
+            .eq('id', params.depositAccountId);
         }
-        console.log('Final bankAccountChartMap:', bankAccountChartMap);
-      }
+        return null;
+      };
 
-      if (isSplitPayment) {
-        console.log('Processing split payment with splits:', params.splits);
-        console.log('Bank account chart map:', bankAccountChartMap);
-        
-        // Process each split as a separate journal entry
-        for (const split of params.splits!) {
-          const splitAmountInTzs = params.paymentCurrency === 'TZS' && currentInvoice.currency !== 'TZS'
-            ? split.amount  // Already in TZS
-            : split.amount * invoiceCurrencyRate;
+      // Execute all core operations in parallel
+      const [invoiceUpdateResult] = await Promise.all([
+        updateInvoice(),
+        insertPayment(),
+        updateBankBalances(),
+      ]);
+      if (invoiceUpdateResult.error) throw invoiceUpdateResult.error;
 
-          // Get the chart_account_id for this bank account
-          const chartAccountId = bankAccountChartMap[split.accountId] || split.accountId;
-          console.log(`Split: accountId=${split.accountId}, chartAccountId=${chartAccountId}, amount=${split.amount}`);
+      // Fire-and-forget: Create journal entries in background (don't block UI)
+      const createJournalEntriesAsync = async () => {
+        try {
+          if (isSplitPayment && params.splits) {
+            for (const split of params.splits) {
+              const splitAmountInTzs = params.paymentCurrency === 'TZS' && currentInvoice.currency !== 'TZS'
+                ? split.amount
+                : split.amount * invoiceCurrencyRate;
+              const chartAccountId = bankAccountChartMap[split.accountId] || split.accountId;
 
-          try {
+              if (isB2BAgentPayment) {
+                await createAgentPaymentJournalEntry({
+                  invoiceId: invoiceUpdateResult.data.id,
+                  invoiceNumber: currentInvoice.invoice_number,
+                  amount: split.amount,
+                  currency: params.paymentCurrency || currentInvoice.currency || 'USD',
+                  exchangeRate: invoiceCurrencyRate,
+                  paymentCurrency: params.paymentCurrency,
+                  sourceAccountId: chartAccountId,
+                  amountInTzs: splitAmountInTzs,
+                });
+              } else {
+                await createInvoicePaymentJournalEntry({
+                  invoiceId: invoiceUpdateResult.data.id,
+                  invoiceNumber: currentInvoice.invoice_number,
+                  amount: split.amount,
+                  currency: params.paymentCurrency || currentInvoice.currency || 'USD',
+                  exchangeRate: invoiceCurrencyRate,
+                  paymentCurrency: params.paymentCurrency,
+                  depositAccountId: chartAccountId,
+                });
+              }
+            }
+          } else {
+            const paymentAmountInTzs = params.paymentCurrency === 'TZS' && currentInvoice.currency !== 'TZS'
+              ? params.amount * invoiceCurrencyRate
+              : params.amount;
+            const chartAccountId = params.depositAccountId 
+              ? bankAccountChartMap[params.depositAccountId] || params.depositAccountId 
+              : undefined;
+
             if (isB2BAgentPayment) {
               await createAgentPaymentJournalEntry({
-                invoiceId: data.id,
+                invoiceId: invoiceUpdateResult.data.id,
                 invoiceNumber: currentInvoice.invoice_number,
-                amount: split.amount,
+                amount: paymentAmountInTzs,
                 currency: params.paymentCurrency || currentInvoice.currency || 'USD',
                 exchangeRate: invoiceCurrencyRate,
                 paymentCurrency: params.paymentCurrency,
                 sourceAccountId: chartAccountId,
-                amountInTzs: splitAmountInTzs,
+                amountInTzs: paymentAmountInTzs,
               });
             } else {
               await createInvoicePaymentJournalEntry({
-                invoiceId: data.id,
+                invoiceId: invoiceUpdateResult.data.id,
                 invoiceNumber: currentInvoice.invoice_number,
-                amount: split.amount,
+                amount: paymentAmountInTzs,
                 currency: params.paymentCurrency || currentInvoice.currency || 'USD',
                 exchangeRate: invoiceCurrencyRate,
                 paymentCurrency: params.paymentCurrency,
                 depositAccountId: chartAccountId,
               });
             }
-          } catch (journalError) {
-            console.error('Failed to create split payment journal entry:', journalError);
           }
+        } catch (err) {
+          console.error('Background journal entry creation failed:', err);
         }
+      };
 
-        // Record split payment in payments table with reference to all accounts
-        const splitAccountNames = params.splits!.map(s => s.accountId).join(',');
-        await supabase.from('payments').insert({
-          invoice_id: params.invoiceId,
-          amount: params.splits!.reduce((sum, s) => sum + s.amount, 0),
-          currency: params.paymentCurrency,
-          payment_method: params.paymentMethod,
-          paid_at: params.paymentDate,
-          stripe_payment_id: params.reference ? `${params.reference} (Split: ${params.splits!.length} accounts)` : `Split payment: ${params.splits!.length} accounts`,
-          verification_status: 'verified',
-          status: 'completed',
-          verified_at: new Date().toISOString(),
-        });
-      } else {
-        // Single account payment (original flow)
-        const paymentAmountInTzs = params.paymentCurrency === 'TZS' && currentInvoice.currency !== 'TZS'
-          ? params.amount * invoiceCurrencyRate
-          : params.amount;
+      // Start journal creation but don't wait for it
+      createJournalEntriesAsync();
 
-        // Get the chart_account_id for this bank account
-        const chartAccountId = params.depositAccountId ? bankAccountChartMap[params.depositAccountId] || params.depositAccountId : undefined;
-
-        try {
-          if (isB2BAgentPayment) {
-            await createAgentPaymentJournalEntry({
-              invoiceId: data.id,
-              invoiceNumber: currentInvoice.invoice_number,
-              amount: paymentAmountInTzs,
-              currency: params.paymentCurrency || currentInvoice.currency || 'USD',
-              exchangeRate: invoiceCurrencyRate,
-              paymentCurrency: params.paymentCurrency,
-              sourceAccountId: chartAccountId,
-              amountInTzs: paymentAmountInTzs,
-            });
-          } else {
-            await createInvoicePaymentJournalEntry({
-              invoiceId: data.id,
-              invoiceNumber: currentInvoice.invoice_number,
-              amount: paymentAmountInTzs,
-              currency: params.paymentCurrency || currentInvoice.currency || 'USD',
-              exchangeRate: invoiceCurrencyRate,
-              paymentCurrency: params.paymentCurrency,
-              depositAccountId: chartAccountId,
-            });
-          }
-        } catch (journalError) {
-          console.error('Failed to create payment journal entry:', journalError);
-        }
-
-        await supabase.from('payments').insert({
-          invoice_id: params.invoiceId,
-          amount: params.amount,
-          currency: params.paymentCurrency,
-          payment_method: params.paymentMethod,
-          paid_at: params.paymentDate,
-          stripe_payment_id: params.reference || null,
-          verification_status: 'verified',
-          status: 'completed',
-          verified_at: new Date().toISOString(),
-        });
-      }
-
-      // Update bank account balances by recalculating from journal lines
-      // Reuse allAccountIds from earlier  
-      if (allAccountIds.length > 0) {
-        // Get chart account IDs for the bank accounts
-        const { data: bankAccounts } = await supabase
-          .from('bank_accounts')
-          .select('id, chart_account_id, opening_balance')
-          .in('id', allAccountIds);
-
-        if (bankAccounts) {
-          for (const ba of bankAccounts) {
-            if (ba.chart_account_id) {
-              // Calculate new balance from journal lines
-              const { data: totals } = await supabase
-                .from('journal_lines')
-                .select('debit_amount, credit_amount')
-                .eq('account_id', ba.chart_account_id);
-              
-              const totalDebits = totals?.reduce((sum, l) => sum + (Number(l.debit_amount) || 0), 0) || 0;
-              const totalCredits = totals?.reduce((sum, l) => sum + (Number(l.credit_amount) || 0), 0) || 0;
-              const newBalance = (Number(ba.opening_balance) || 0) + totalDebits - totalCredits;
-
-              await supabase
-                .from('bank_accounts')
-                .update({ current_balance: newBalance })
-                .eq('id', ba.id);
-            }
-          }
-        }
-      }
-
-      return data;
+      return invoiceUpdateResult.data;
     },
     onSuccess: () => {
+      // Minimal invalidations for speed - only what's immediately visible
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['b2b-invoices'] });
       queryClient.invalidateQueries({ queryKey: ['invoice-payments'] });
-      queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
-      queryClient.invalidateQueries({ queryKey: ['accounting-summary'] });
-      queryClient.invalidateQueries({ queryKey: ['agent-balance'] });
-      queryClient.invalidateQueries({ queryKey: ['all-agent-balances'] });
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
-      queryClient.invalidateQueries({ queryKey: ['trial-balance'] });
-      queryClient.invalidateQueries({ queryKey: ['income-statement'] });
-      queryClient.invalidateQueries({ queryKey: ['balance-sheet'] });
-      toast.success('Payment recorded successfully');
+      
+      // Defer less critical invalidations
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['b2b-invoices'] });
+        queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
+        queryClient.invalidateQueries({ queryKey: ['agent-balance'] });
+        queryClient.invalidateQueries({ queryKey: ['accounting-summary'] });
+      }, 500);
+      
+      toast.success('Payment recorded');
     },
     onError: (error) => {
       toast.error(`Failed to record payment: ${error.message}`);
