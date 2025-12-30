@@ -155,7 +155,7 @@ export function useAgentMarkInvoicePaid() {
   });
 }
 
-// Admin: Fetch payments pending verification
+// Admin: Fetch payments pending verification (both agent and customer payments)
 export function usePaymentsPendingVerification() {
   return useQuery({
     queryKey: ['payments-pending-verification'],
@@ -177,18 +177,18 @@ export function usePaymentsPendingVerification() {
             amount,
             currency,
             agent_id,
+            customer_id,
             invoice_direction
           )
         `)
         .eq('verification_status', 'pending')
-        .eq('invoices.invoice_direction', 'to_agent')
         .order('paid_at', { ascending: false });
 
       if (error) throw error;
 
       // Get agent profiles
       const agentIds = [...new Set(data?.map(p => p.invoices?.agent_id).filter(Boolean))];
-      let profilesMap = new Map();
+      let agentProfilesMap = new Map();
 
       if (agentIds.length > 0) {
         const { data: profiles } = await supabase
@@ -196,12 +196,27 @@ export function usePaymentsPendingVerification() {
           .select('id, full_name, company_name, agent_code')
           .in('id', agentIds);
         
-        profilesMap = new Map((profiles || []).map(p => [p.id, p]));
+        agentProfilesMap = new Map((profiles || []).map(p => [p.id, p]));
+      }
+
+      // Get customer names
+      const customerIds = [...new Set(data?.map(p => p.invoices?.customer_id).filter(Boolean))];
+      let customerMap = new Map();
+
+      if (customerIds.length > 0) {
+        const { data: customers } = await supabase
+          .from('customers')
+          .select('id, name, company_name')
+          .in('id', customerIds);
+        
+        customerMap = new Map((customers || []).map(c => [c.id, c]));
       }
 
       return (data || []).map(payment => ({
         ...payment,
-        agent: profilesMap.get(payment.invoices?.agent_id) || null,
+        agent: agentProfilesMap.get(payment.invoices?.agent_id) || null,
+        customer: customerMap.get(payment.invoices?.customer_id) || null,
+        payer_type: payment.invoices?.invoice_direction === 'to_agent' ? 'agent' : 'customer',
       }));
     },
   });
@@ -299,6 +314,10 @@ export function useVerifyPayment() {
       queryClient.invalidateQueries({ queryKey: ['trial-balance'] });
       queryClient.invalidateQueries({ queryKey: ['income-statement'] });
       queryClient.invalidateQueries({ queryKey: ['balance-sheet'] });
+      // Customer-related queries
+      queryClient.invalidateQueries({ queryKey: ['customer-payments'] });
+      queryClient.invalidateQueries({ queryKey: ['customer-invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
       toast.success(data.status === 'verified' ? 'Payment verified and recorded' : 'Payment rejected');
     },
     onError: (error) => {

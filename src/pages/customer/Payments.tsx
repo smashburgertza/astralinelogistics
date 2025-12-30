@@ -12,13 +12,19 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { format } from 'date-fns';
-import { CreditCard, Receipt, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { CreditCard, Receipt, CheckCircle, Clock, XCircle, AlertCircle } from 'lucide-react';
 import { useExchangeRatesMap } from '@/hooks/useExchangeRates';
 
-const statusConfig: Record<string, { icon: typeof CheckCircle; className: string }> = {
-  completed: { icon: CheckCircle, className: 'bg-green-100 text-green-800 border-green-200' },
-  pending: { icon: Clock, className: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
-  failed: { icon: XCircle, className: 'bg-red-100 text-red-800 border-red-200' },
+const statusConfig: Record<string, { icon: typeof CheckCircle; className: string; label: string }> = {
+  completed: { icon: CheckCircle, className: 'bg-green-100 text-green-800 border-green-200', label: 'Completed' },
+  pending: { icon: Clock, className: 'bg-yellow-100 text-yellow-800 border-yellow-200', label: 'Pending' },
+  failed: { icon: XCircle, className: 'bg-red-100 text-red-800 border-red-200', label: 'Failed' },
+};
+
+const verificationConfig: Record<string, { icon: typeof CheckCircle; className: string; label: string }> = {
+  verified: { icon: CheckCircle, className: 'bg-green-100 text-green-800 border-green-200', label: 'Verified' },
+  pending: { icon: Clock, className: 'bg-amber-100 text-amber-800 border-amber-200', label: 'Pending Verification' },
+  rejected: { icon: XCircle, className: 'bg-red-100 text-red-800 border-red-200', label: 'Rejected' },
 };
 
 const paymentMethodLabels: Record<string, string> = {
@@ -42,12 +48,14 @@ export default function CustomerPayments() {
   };
 
   const totalPaidTZS = payments?.reduce((sum, p) => {
-    if (p.status === 'completed') {
+    if (p.status === 'completed' && p.verification_status === 'verified') {
       const currency = p.currency || 'TZS';
       return sum + convertToTZS(p.amount, currency);
     }
     return sum;
   }, 0) || 0;
+
+  const pendingVerificationCount = payments?.filter(p => p.verification_status === 'pending').length || 0;
 
   return (
     <CustomerLayout 
@@ -59,7 +67,7 @@ export default function CustomerPayments() {
         <div className="grid gap-4 md:grid-cols-3">
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Total Paid (TZS)</CardDescription>
+              <CardDescription>Verified Payments (TZS)</CardDescription>
               <CardTitle className="text-2xl text-green-600">
                 {formatTZS(totalPaidTZS)}
               </CardTitle>
@@ -73,14 +81,14 @@ export default function CustomerPayments() {
               </CardTitle>
             </CardHeader>
           </Card>
-          <Card>
+          <Card className={pendingVerificationCount > 0 ? 'border-amber-200 bg-amber-50/50 dark:bg-amber-900/10' : ''}>
             <CardHeader className="pb-2">
-              <CardDescription>Last Payment</CardDescription>
-              <CardTitle className="text-2xl">
-                {payments?.[0]?.paid_at 
-                  ? format(new Date(payments[0].paid_at), 'MMM d, yyyy')
-                  : '—'
-                }
+              <CardDescription className="flex items-center gap-1">
+                {pendingVerificationCount > 0 && <AlertCircle className="h-3 w-3 text-amber-600" />}
+                Pending Verification
+              </CardDescription>
+              <CardTitle className={`text-2xl ${pendingVerificationCount > 0 ? 'text-amber-600' : ''}`}>
+                {pendingVerificationCount}
               </CardTitle>
             </CardHeader>
           </Card>
@@ -94,7 +102,7 @@ export default function CustomerPayments() {
               Payment History
             </CardTitle>
             <CardDescription>
-              All your completed and pending payments
+              All your payments and their verification status
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -113,13 +121,16 @@ export default function CustomerPayments() {
                       <TableHead>Invoice</TableHead>
                       <TableHead>Method</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Verification</TableHead>
                       <TableHead className="text-right">Amount (TZS)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {payments.map((payment) => {
                       const status = payment.status || 'pending';
+                      const verification = payment.verification_status || 'pending';
                       const StatusIcon = statusConfig[status]?.icon || Clock;
+                      const VerificationIcon = verificationConfig[verification]?.icon || Clock;
                       const currency = payment.currency || 'TZS';
                       const amountInTZS = convertToTZS(payment.amount, currency);
                       
@@ -146,7 +157,16 @@ export default function CustomerPayments() {
                               className={statusConfig[status]?.className || ''}
                             >
                               <StatusIcon className="h-3 w-3 mr-1" />
-                              {status.charAt(0).toUpperCase() + status.slice(1)}
+                              {statusConfig[status]?.label || status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant="outline" 
+                              className={verificationConfig[verification]?.className || ''}
+                            >
+                              <VerificationIcon className="h-3 w-3 mr-1" />
+                              {verificationConfig[verification]?.label || verification}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
