@@ -9,7 +9,7 @@ import { useBankAccounts } from '@/hooks/useAccounting';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { Invoice } from '@/hooks/useInvoices';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
-import { Banknote, CreditCard, Smartphone, Building2 } from 'lucide-react';
+import { Banknote, CreditCard, Smartphone, Building2, Plus, Trash2, Split } from 'lucide-react';
 
 interface RecordPaymentDialogProps {
   invoice: Invoice | null;
@@ -24,6 +24,11 @@ interface RecordPaymentDialogProps {
   payeeName?: string;
 }
 
+export interface PaymentSplit {
+  accountId: string;
+  amount: number;
+}
+
 export interface PaymentDetails {
   invoiceId: string;
   amount: number;
@@ -33,6 +38,8 @@ export interface PaymentDetails {
   paymentDate: string;
   reference?: string;
   notes?: string;
+  /** For split payments */
+  splits?: PaymentSplit[];
 }
 
 const PAYMENT_METHODS = [
@@ -53,12 +60,20 @@ export function RecordPaymentDialog({
   payeeName,
 }: RecordPaymentDialogProps) {
   const [paymentMethod, setPaymentMethod] = useState('bank_transfer');
-  const [depositAccountId, setDepositAccountId] = useState('');
   const [paymentCurrency, setPaymentCurrency] = useState('TZS');
-  const [amountInPaymentCurrency, setAmountInPaymentCurrency] = useState('');
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
   const [reference, setReference] = useState('');
   const [notes, setNotes] = useState('');
+  
+  // Split payment state
+  const [isSplitPayment, setIsSplitPayment] = useState(false);
+  const [splits, setSplits] = useState<{ accountId: string; amount: string }[]>([
+    { accountId: '', amount: '' }
+  ]);
+  
+  // Single account payment state (for non-split)
+  const [depositAccountId, setDepositAccountId] = useState('');
+  const [amountInPaymentCurrency, setAmountInPaymentCurrency] = useState('');
 
   // Get bank accounts for deposit selection
   const { data: bankAccounts = [] } = useBankAccounts();
@@ -82,8 +97,10 @@ export function RecordPaymentDialog({
   const balanceInTZS = balance * invoiceCurrencyRate;
   const balanceInPaymentCurrency = paymentCurrencyRate > 0 ? balanceInTZS / paymentCurrencyRate : balanceInTZS;
   
-  // Calculate how much of the invoice currency is being paid
-  const paymentAmountNum = parseFloat(amountInPaymentCurrency) || 0;
+  // Calculate total from splits or single amount
+  const totalSplitAmount = splits.reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0);
+  const paymentAmountNum = isSplitPayment ? totalSplitAmount : (parseFloat(amountInPaymentCurrency) || 0);
+  
   const amountInInvoiceCurrency = paymentCurrencyRate > 0 
     ? (paymentAmountNum * paymentCurrencyRate) / invoiceCurrencyRate 
     : paymentAmountNum;
@@ -93,43 +110,103 @@ export function RecordPaymentDialog({
   // Reset form when invoice changes or dialog opens
   useEffect(() => {
     if (invoice && open) {
-      // Default to TZS for payment (common local currency)
       setPaymentCurrency('TZS');
       setPaymentDate(new Date().toISOString().split('T')[0]);
       setReference('');
       setNotes('');
       setDepositAccountId('');
       setAmountInPaymentCurrency('');
+      setIsSplitPayment(false);
+      setSplits([{ accountId: '', amount: '' }]);
     }
   }, [invoice, open, remainingBalance]);
 
-  // Update amount when payment currency changes
+  // Update amount when payment currency changes (only for non-split)
   useEffect(() => {
-    if (invoice && open && balance > 0) {
+    if (invoice && open && balance > 0 && !isSplitPayment) {
       const newBalanceInPaymentCurrency = paymentCurrencyRate > 0 
         ? (balance * invoiceCurrencyRate) / paymentCurrencyRate 
         : balance * invoiceCurrencyRate;
       setAmountInPaymentCurrency(newBalanceInPaymentCurrency.toFixed(2));
     }
-  }, [paymentCurrency, invoice, open, balance, invoiceCurrencyRate, paymentCurrencyRate]);
+  }, [paymentCurrency, invoice, open, balance, invoiceCurrencyRate, paymentCurrencyRate, isSplitPayment]);
+
+  const handleAddSplit = () => {
+    setSplits([...splits, { accountId: '', amount: '' }]);
+  };
+
+  const handleRemoveSplit = (index: number) => {
+    if (splits.length > 1) {
+      setSplits(splits.filter((_, i) => i !== index));
+    }
+  };
+
+  const handleSplitChange = (index: number, field: 'accountId' | 'amount', value: string) => {
+    const newSplits = [...splits];
+    newSplits[index][field] = value;
+    setSplits(newSplits);
+  };
+
+  const handleToggleSplit = () => {
+    if (!isSplitPayment) {
+      // Switching to split mode - initialize with current amount split
+      const currentAmount = parseFloat(amountInPaymentCurrency) || balanceInPaymentCurrency;
+      setSplits([{ accountId: depositAccountId || '', amount: currentAmount.toFixed(2) }]);
+    } else {
+      // Switching back to single mode
+      setAmountInPaymentCurrency(totalSplitAmount.toFixed(2));
+      setDepositAccountId(splits[0]?.accountId || '');
+    }
+    setIsSplitPayment(!isSplitPayment);
+  };
+
+  const distributeEvenly = () => {
+    const total = balanceInPaymentCurrency;
+    const perAccount = total / splits.length;
+    setSplits(splits.map(s => ({ ...s, amount: perAccount.toFixed(2) })));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!invoice) return;
 
-    // We record the payment in invoice currency for consistency
-    onRecordPayment({
-      invoiceId: invoice.id,
-      amount: amountInInvoiceCurrency,
-      paymentMethod,
-      depositAccountId: depositAccountId || undefined,
-      paymentCurrency,
-      paymentDate,
-      reference: reference || undefined,
-      notes: notes || undefined,
-    });
+    if (isSplitPayment) {
+      // Validate splits
+      const validSplits = splits.filter(s => s.accountId && parseFloat(s.amount) > 0);
+      if (validSplits.length === 0) {
+        return;
+      }
+
+      onRecordPayment({
+        invoiceId: invoice.id,
+        amount: amountInInvoiceCurrency,
+        paymentMethod,
+        paymentCurrency,
+        paymentDate,
+        reference: reference || undefined,
+        notes: notes || undefined,
+        splits: validSplits.map(s => ({
+          accountId: s.accountId,
+          amount: parseFloat(s.amount),
+        })),
+      });
+    } else {
+      onRecordPayment({
+        invoiceId: invoice.id,
+        amount: amountInInvoiceCurrency,
+        paymentMethod,
+        depositAccountId: depositAccountId || undefined,
+        paymentCurrency,
+        paymentDate,
+        reference: reference || undefined,
+        notes: notes || undefined,
+      });
+    }
   };
+
+  // Get remaining balance to allocate in split mode
+  const remainingToAllocate = balanceInPaymentCurrency - totalSplitAmount;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -200,28 +277,6 @@ export function RecordPaymentDialog({
             </div>
           </div>
 
-          {/* Deposit Account Selection */}
-          <div className="space-y-2">
-            <Label>{isOutgoingPayment ? 'Pay From Account' : 'Deposit To Account'}</Label>
-            <Select value={depositAccountId} onValueChange={setDepositAccountId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select bank account" />
-              </SelectTrigger>
-              <SelectContent>
-                {activeBankAccounts.map((account) => (
-                  <SelectItem key={account.id} value={account.id}>
-                    {account.bank_name} - {account.account_name} ({account.currency})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {activeBankAccounts.length === 0 && (
-              <p className="text-xs text-muted-foreground">
-                No bank accounts configured. Add bank accounts in Accounting settings.
-              </p>
-            )}
-          </div>
-
           {/* Payment Currency */}
           <div className="space-y-2">
             <Label>Payment Currency</Label>
@@ -267,29 +322,162 @@ export function RecordPaymentDialog({
             </div>
           )}
 
-          {/* Amount in Payment Currency */}
-          <div className="space-y-2">
-            <Label>
-              {isOutgoingPayment ? 'Amount to Pay' : 'Amount Received'} ({paymentCurrency})
-            </Label>
-            <Input
-              type="number"
-              min="0"
-              step="0.01"
-              value={amountInPaymentCurrency}
-              onChange={(e) => setAmountInPaymentCurrency(e.target.value)}
-              required
-            />
-            {isDifferentCurrency && paymentAmountNum > 0 && (
-              <p className="text-xs text-muted-foreground">
-                ≈ {currencySymbol}{amountInInvoiceCurrency.toFixed(2)} {invoiceCurrency}
-                {amountInInvoiceCurrency < balance && ' (partial payment)'}
-              </p>
-            )}
-            {!isDifferentCurrency && paymentAmountNum < balance && paymentAmountNum > 0 && (
-              <p className="text-xs text-blue-600">This will be a partial payment</p>
-            )}
+          {/* Split Payment Toggle */}
+          <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
+            <div className="flex items-center gap-2">
+              <Split className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Split Payment Across Multiple Accounts</span>
+            </div>
+            <Button
+              type="button"
+              variant={isSplitPayment ? "default" : "outline"}
+              size="sm"
+              onClick={handleToggleSplit}
+            >
+              {isSplitPayment ? 'Using Split' : 'Enable Split'}
+            </Button>
           </div>
+
+          {/* Single Account Payment */}
+          {!isSplitPayment && (
+            <>
+              <div className="space-y-2">
+                <Label>{isOutgoingPayment ? 'Pay From Account' : 'Deposit To Account'}</Label>
+                <Select value={depositAccountId} onValueChange={setDepositAccountId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select bank account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeBankAccounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        {account.bank_name} - {account.account_name} ({account.currency})
+                        {account.current_balance !== undefined && (
+                          <span className="ml-2 text-muted-foreground">
+                            Bal: {account.current_balance.toLocaleString()}
+                          </span>
+                        )}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>
+                  {isOutgoingPayment ? 'Amount to Pay' : 'Amount Received'} ({paymentCurrency})
+                </Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={amountInPaymentCurrency}
+                  onChange={(e) => setAmountInPaymentCurrency(e.target.value)}
+                  required
+                />
+                {isDifferentCurrency && paymentAmountNum > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    ≈ {currencySymbol}{amountInInvoiceCurrency.toFixed(2)} {invoiceCurrency}
+                    {amountInInvoiceCurrency < balance && ' (partial payment)'}
+                  </p>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* Split Payment Accounts */}
+          {isSplitPayment && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>Payment Sources</Label>
+                <Button type="button" variant="outline" size="sm" onClick={distributeEvenly}>
+                  Distribute Evenly
+                </Button>
+              </div>
+              
+              {splits.map((split, index) => (
+                <div key={index} className="flex gap-2 items-start p-3 bg-muted/20 rounded-lg border">
+                  <div className="flex-1 space-y-2">
+                    <Select 
+                      value={split.accountId} 
+                      onValueChange={(v) => handleSplitChange(index, 'accountId', v)}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select account" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {activeBankAccounts.map((account) => (
+                          <SelectItem key={account.id} value={account.id}>
+                            {account.bank_name} - {account.account_name}
+                            {account.current_balance !== undefined && (
+                              <span className="ml-2 text-muted-foreground text-xs">
+                                (Bal: {account.currency} {account.current_balance.toLocaleString()})
+                              </span>
+                            )}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="w-40">
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="Amount"
+                      value={split.amount}
+                      onChange={(e) => handleSplitChange(index, 'amount', e.target.value)}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleRemoveSplit(index)}
+                    disabled={splits.length === 1}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleAddSplit}
+                className="w-full"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Another Account
+              </Button>
+
+              {/* Split Summary */}
+              <div className="bg-muted/50 rounded-lg p-3 space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Total Allocated:</span>
+                  <span className="font-medium">
+                    {paymentCurrencySymbol}{totalSplitAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Balance Due:</span>
+                  <span className="font-medium">
+                    {paymentCurrencySymbol}{balanceInPaymentCurrency.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className={`flex justify-between text-sm font-medium border-t pt-1 ${
+                  Math.abs(remainingToAllocate) < 0.01 ? 'text-emerald-600' : 
+                  remainingToAllocate > 0 ? 'text-amber-600' : 'text-red-600'
+                }`}>
+                  <span>Remaining:</span>
+                  <span>
+                    {paymentCurrencySymbol}{remainingToAllocate.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Payment Date */}
           <div className="space-y-2">
@@ -327,7 +515,10 @@ export function RecordPaymentDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading || paymentAmountNum <= 0}>
+            <Button 
+              type="submit" 
+              disabled={isLoading || paymentAmountNum <= 0 || (isSplitPayment && splits.every(s => !s.accountId || !s.amount))}
+            >
               {isLoading ? 'Recording...' : 'Record Payment'}
             </Button>
           </div>
