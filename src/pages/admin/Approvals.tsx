@@ -538,13 +538,13 @@ function PaymentVerificationApprovals() {
                         <SelectValue placeholder="Select account to credit..." />
                       </SelectTrigger>
                       <SelectContent>
-                        {bankAccounts && bankAccounts.length > 0 && (
+                        {bankAccounts && bankAccounts.filter(b => b.is_active && b.chart_account_id).length > 0 && (
                           <>
                             <SelectItem value="__bank_header" disabled className="font-semibold text-muted-foreground">
                               Bank Accounts
                             </SelectItem>
-                            {bankAccounts.filter(b => b.is_active).map(bank => (
-                              <SelectItem key={bank.id} value={bank.chart_account_id || bank.id}>
+                            {bankAccounts.filter(b => b.is_active && b.chart_account_id).map(bank => (
+                              <SelectItem key={bank.id} value={bank.chart_account_id!}>
                                 {bank.bank_name} - {bank.account_name} ({bank.currency})
                               </SelectItem>
                             ))}
