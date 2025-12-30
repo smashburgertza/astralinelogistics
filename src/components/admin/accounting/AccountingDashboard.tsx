@@ -21,9 +21,11 @@ interface AccountingSummary {
     date: string;
     description: string;
     amount: number;
+    amountInTzs: number;
     currency: string;
     type: 'income' | 'expense' | 'transfer';
   }>;
+  exchangeRates: Map<string, number>;
 }
 
 function useAccountingSummary() {
@@ -126,12 +128,14 @@ function useAccountingSummary() {
           const transactionAmount = Math.max(totalDebit, totalCredit);
           // Get the currency from the first line (entries are typically in one currency)
           const currency = lines?.[0]?.currency || 'TZS';
+          const amountInTzs = convertToTzs(transactionAmount, currency);
           
           return {
             id: entry.id,
             date: entry.entry_date,
             description: entry.description,
             amount: transactionAmount,
+            amountInTzs,
             currency,
             type: entry.reference_type === 'expense' ? 'expense' as const : 
                   entry.reference_type === 'payment' ? 'income' as const : 'transfer' as const,
@@ -151,6 +155,7 @@ function useAccountingSummary() {
         monthlyExpenses,
         monthlyExpensesCurrency: 'TZS',
         recentTransactions,
+        exchangeRates: ratesMap,
       };
     },
   });
@@ -304,13 +309,20 @@ export function AccountingDashboard() {
                       </p>
                     </div>
                   </div>
-                  <span className={`font-semibold ${
-                    tx.type === 'income' ? 'text-green-600' : 
-                    tx.type === 'expense' ? 'text-red-600' : ''
-                  }`}>
-                    {tx.type === 'expense' ? '-' : tx.type === 'income' ? '+' : ''}
-                    {formatCurrency(tx.amount, tx.currency)}
-                  </span>
+                  <div className="text-right">
+                    <span className={`font-semibold ${
+                      tx.type === 'income' ? 'text-green-600' : 
+                      tx.type === 'expense' ? 'text-red-600' : ''
+                    }`}>
+                      {tx.type === 'expense' ? '-' : tx.type === 'income' ? '+' : ''}
+                      {formatCurrency(tx.amount, tx.currency)}
+                    </span>
+                    {tx.currency !== 'TZS' && (
+                      <p className="text-xs text-muted-foreground">
+                        ≈ TZS {tx.amountInTzs.toLocaleString('en-TZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                      </p>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
