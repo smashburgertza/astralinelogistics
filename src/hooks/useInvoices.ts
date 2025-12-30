@@ -158,6 +158,11 @@ export function useUpdateInvoiceStatus() {
   });
 }
 
+export interface PaymentSplit {
+  accountId: string;
+  amount: number;
+}
+
 export interface RecordPaymentParams {
   invoiceId: string;
   amount: number;
@@ -167,6 +172,8 @@ export interface RecordPaymentParams {
   paymentDate: string;
   reference?: string;
   notes?: string;
+  /** For split payments across multiple accounts */
+  splits?: PaymentSplit[];
 }
 
 export function useRecordPayment() {
@@ -225,53 +232,136 @@ export function useRecordPayment() {
         invoiceCurrencyRate = rateData?.rate_to_tzs || 1;
       }
 
-      // Calculate the actual payment amount in TZS if paying in TZS for foreign currency invoice
-      const paymentAmountInTzs = params.paymentCurrency === 'TZS' && currentInvoice.currency !== 'TZS'
-        ? params.amount * invoiceCurrencyRate  // Convert invoice amount to TZS
-        : params.amount;
+      // Handle split payments or single payment
+      const isSplitPayment = params.splits && params.splits.length > 0;
 
-      // Create journal entry for the payment
-      try {
-        if (isB2BAgentPayment) {
-          // For B2B agent payments (we pay the agent): Debit Agent Payables, Credit Cash
-          await createAgentPaymentJournalEntry({
-            invoiceId: data.id,
-            invoiceNumber: currentInvoice.invoice_number,
-            amount: paymentAmountInTzs,
-            currency: params.paymentCurrency || currentInvoice.currency || 'USD',
-            exchangeRate: invoiceCurrencyRate,
-            paymentCurrency: params.paymentCurrency,
-            sourceAccountId: params.depositAccountId,
-            amountInTzs: paymentAmountInTzs,
-          });
-        } else {
-          // For customer payments (we receive money): Debit Cash, Credit Accounts Receivable
-          await createInvoicePaymentJournalEntry({
-            invoiceId: data.id,
-            invoiceNumber: currentInvoice.invoice_number,
-            amount: paymentAmountInTzs,
-            currency: params.paymentCurrency || currentInvoice.currency || 'USD',
-            exchangeRate: invoiceCurrencyRate,
-            paymentCurrency: params.paymentCurrency,
-            depositAccountId: params.depositAccountId,
-          });
+      if (isSplitPayment) {
+        // Process each split as a separate journal entry
+        for (const split of params.splits!) {
+          const splitAmountInTzs = params.paymentCurrency === 'TZS' && currentInvoice.currency !== 'TZS'
+            ? split.amount  // Already in TZS
+            : split.amount * invoiceCurrencyRate;
+
+          try {
+            if (isB2BAgentPayment) {
+              await createAgentPaymentJournalEntry({
+                invoiceId: data.id,
+                invoiceNumber: currentInvoice.invoice_number,
+                amount: split.amount,
+                currency: params.paymentCurrency || currentInvoice.currency || 'USD',
+                exchangeRate: invoiceCurrencyRate,
+                paymentCurrency: params.paymentCurrency,
+                sourceAccountId: split.accountId,
+                amountInTzs: splitAmountInTzs,
+              });
+            } else {
+              await createInvoicePaymentJournalEntry({
+                invoiceId: data.id,
+                invoiceNumber: currentInvoice.invoice_number,
+                amount: split.amount,
+                currency: params.paymentCurrency || currentInvoice.currency || 'USD',
+                exchangeRate: invoiceCurrencyRate,
+                paymentCurrency: params.paymentCurrency,
+                depositAccountId: split.accountId,
+              });
+            }
+          } catch (journalError) {
+            console.error('Failed to create split payment journal entry:', journalError);
+          }
         }
-      } catch (journalError) {
-        console.error('Failed to create payment journal entry:', journalError);
+
+        // Record split payment in payments table with reference to all accounts
+        const splitAccountNames = params.splits!.map(s => s.accountId).join(',');
+        await supabase.from('payments').insert({
+          invoice_id: params.invoiceId,
+          amount: params.splits!.reduce((sum, s) => sum + s.amount, 0),
+          currency: params.paymentCurrency,
+          payment_method: params.paymentMethod,
+          paid_at: params.paymentDate,
+          stripe_payment_id: params.reference ? `${params.reference} (Split: ${params.splits!.length} accounts)` : `Split payment: ${params.splits!.length} accounts`,
+          verification_status: 'verified',
+          status: 'completed',
+          verified_at: new Date().toISOString(),
+        });
+      } else {
+        // Single account payment (original flow)
+        const paymentAmountInTzs = params.paymentCurrency === 'TZS' && currentInvoice.currency !== 'TZS'
+          ? params.amount * invoiceCurrencyRate
+          : params.amount;
+
+        try {
+          if (isB2BAgentPayment) {
+            await createAgentPaymentJournalEntry({
+              invoiceId: data.id,
+              invoiceNumber: currentInvoice.invoice_number,
+              amount: paymentAmountInTzs,
+              currency: params.paymentCurrency || currentInvoice.currency || 'USD',
+              exchangeRate: invoiceCurrencyRate,
+              paymentCurrency: params.paymentCurrency,
+              sourceAccountId: params.depositAccountId,
+              amountInTzs: paymentAmountInTzs,
+            });
+          } else {
+            await createInvoicePaymentJournalEntry({
+              invoiceId: data.id,
+              invoiceNumber: currentInvoice.invoice_number,
+              amount: paymentAmountInTzs,
+              currency: params.paymentCurrency || currentInvoice.currency || 'USD',
+              exchangeRate: invoiceCurrencyRate,
+              paymentCurrency: params.paymentCurrency,
+              depositAccountId: params.depositAccountId,
+            });
+          }
+        } catch (journalError) {
+          console.error('Failed to create payment journal entry:', journalError);
+        }
+
+        await supabase.from('payments').insert({
+          invoice_id: params.invoiceId,
+          amount: params.amount,
+          currency: params.paymentCurrency,
+          payment_method: params.paymentMethod,
+          paid_at: params.paymentDate,
+          stripe_payment_id: params.reference || null,
+          verification_status: 'verified',
+          status: 'completed',
+          verified_at: new Date().toISOString(),
+        });
       }
 
-      // Record in payments table - admin-initiated payments are auto-verified
-      await supabase.from('payments').insert({
-        invoice_id: params.invoiceId,
-        amount: params.amount,
-        currency: params.paymentCurrency,
-        payment_method: params.paymentMethod,
-        paid_at: params.paymentDate,
-        stripe_payment_id: params.reference || null,
-        verification_status: 'verified',
-        status: 'completed',
-        verified_at: new Date().toISOString(),
-      });
+      // Update bank account balances by recalculating from journal lines
+      const accountIds = isSplitPayment 
+        ? params.splits!.map(s => s.accountId) 
+        : (params.depositAccountId ? [params.depositAccountId] : []);
+      
+      if (accountIds.length > 0) {
+        // Get chart account IDs for the bank accounts
+        const { data: bankAccounts } = await supabase
+          .from('bank_accounts')
+          .select('id, chart_account_id, opening_balance')
+          .in('id', accountIds);
+
+        if (bankAccounts) {
+          for (const ba of bankAccounts) {
+            if (ba.chart_account_id) {
+              // Calculate new balance from journal lines
+              const { data: totals } = await supabase
+                .from('journal_lines')
+                .select('debit_amount, credit_amount')
+                .eq('account_id', ba.chart_account_id);
+              
+              const totalDebits = totals?.reduce((sum, l) => sum + (Number(l.debit_amount) || 0), 0) || 0;
+              const totalCredits = totals?.reduce((sum, l) => sum + (Number(l.credit_amount) || 0), 0) || 0;
+              const newBalance = (Number(ba.opening_balance) || 0) + totalDebits - totalCredits;
+
+              await supabase
+                .from('bank_accounts')
+                .update({ current_balance: newBalance })
+                .eq('id', ba.id);
+            }
+          }
+        }
+      }
 
       return data;
     },
