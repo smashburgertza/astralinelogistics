@@ -220,6 +220,8 @@ export function useVerifyPayment() {
       amount,
       currency,
       invoiceNumber,
+      amountInTzs,
+      exchangeRate,
     }: { 
       paymentId: string; 
       status: 'verified' | 'rejected';
@@ -228,6 +230,8 @@ export function useVerifyPayment() {
       amount?: number;
       currency?: string;
       invoiceNumber?: string;
+      amountInTzs?: number;
+      exchangeRate?: number;
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
@@ -259,6 +263,7 @@ export function useVerifyPayment() {
             status: 'paid',
             paid_at: new Date().toISOString(),
             amount_paid: payment?.amount || 0,
+            amount_in_tzs: amountInTzs || null,
           })
           .eq('id', invoiceId);
 
@@ -275,6 +280,8 @@ export function useVerifyPayment() {
             amount,
             currency: currency || 'USD',
             sourceAccountId: depositAccountId,
+            amountInTzs,
+            exchangeRate,
           });
         }
       }

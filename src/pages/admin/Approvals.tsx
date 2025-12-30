@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import {
   Table,
   TableBody,
@@ -47,6 +48,7 @@ import {
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 import { usePaymentsPendingVerification, useVerifyPayment } from '@/hooks/useAgentInvoices';
 import { useBankAccounts, useChartOfAccounts } from '@/hooks/useAccounting';
+import { useExchangeRatesMap } from '@/hooks/useExchangeRates';
 import { toast } from 'sonner';
 import { Label } from '@/components/ui/label';
 
@@ -304,11 +306,15 @@ function PaymentVerificationApprovals() {
   const { data: pendingPayments, isLoading } = usePaymentsPendingVerification();
   const { data: bankAccounts } = useBankAccounts();
   const { data: chartAccounts } = useChartOfAccounts({ type: 'asset', active: true });
+  const { rates: exchangeRates, getRate } = useExchangeRatesMap();
   const verifyMutation = useVerifyPayment();
   const [selectedPayment, setSelectedPayment] = useState<any | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [verifyAction, setVerifyAction] = useState<'verified' | 'rejected'>('verified');
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+  const [amountInTzs, setAmountInTzs] = useState<string>('');
+  const [useCustomRate, setUseCustomRate] = useState(false);
+  const [customExchangeRate, setCustomExchangeRate] = useState<string>('');
 
   // Filter chart accounts to show cash/bank accounts
   const cashAccounts = chartAccounts?.filter(acc => 
@@ -318,10 +324,32 @@ function PaymentVerificationApprovals() {
     acc.account_code.startsWith('1002')    // Bank accounts
   ) || [];
 
+  // Calculate system exchange rate for the currency
+  const systemExchangeRate = useMemo(() => {
+    if (!selectedPayment) return 1;
+    return getRate(selectedPayment.currency);
+  }, [selectedPayment, getRate]);
+
+  // Calculate TZS amount based on exchange rate
+  useEffect(() => {
+    if (!selectedPayment || selectedPayment.currency === 'TZS') {
+      setAmountInTzs(selectedPayment?.amount?.toString() || '');
+      return;
+    }
+    
+    const rate = useCustomRate && customExchangeRate ? parseFloat(customExchangeRate) : systemExchangeRate;
+    if (rate && selectedPayment.amount) {
+      setAmountInTzs((selectedPayment.amount * rate).toFixed(0));
+    }
+  }, [selectedPayment, systemExchangeRate, useCustomRate, customExchangeRate]);
+
   const handleVerify = (payment: any, action: 'verified' | 'rejected') => {
     setSelectedPayment(payment);
     setVerifyAction(action);
     setSelectedAccountId('');
+    setAmountInTzs('');
+    setUseCustomRate(false);
+    setCustomExchangeRate('');
     setDialogOpen(true);
   };
 
@@ -331,6 +359,14 @@ function PaymentVerificationApprovals() {
       toast.error('Please select an account to credit the payment');
       return;
     }
+    if (verifyAction === 'verified' && !amountInTzs) {
+      toast.error('Please enter the TZS equivalent amount');
+      return;
+    }
+
+    const finalExchangeRate = useCustomRate && customExchangeRate 
+      ? parseFloat(customExchangeRate) 
+      : systemExchangeRate;
     
     verifyMutation.mutate({
       paymentId: selectedPayment.id,
@@ -340,11 +376,16 @@ function PaymentVerificationApprovals() {
       amount: selectedPayment.amount,
       currency: selectedPayment.currency,
       invoiceNumber: selectedPayment.invoices?.invoice_number,
+      amountInTzs: parseFloat(amountInTzs),
+      exchangeRate: finalExchangeRate,
     }, {
       onSuccess: () => {
         setDialogOpen(false);
         setSelectedPayment(null);
         setSelectedAccountId('');
+        setAmountInTzs('');
+        setUseCustomRate(false);
+        setCustomExchangeRate('');
       },
     });
   };
@@ -489,42 +530,98 @@ function PaymentVerificationApprovals() {
               </div>
 
               {verifyAction === 'verified' && (
-                <div className="space-y-2">
-                  <Label htmlFor="deposit-account">Credit to Account *</Label>
-                  <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
-                    <SelectTrigger id="deposit-account">
-                      <SelectValue placeholder="Select account to credit..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {bankAccounts && bankAccounts.length > 0 && (
-                        <>
-                          <SelectItem value="__bank_header" disabled className="font-semibold text-muted-foreground">
-                            Bank Accounts
-                          </SelectItem>
-                          {bankAccounts.filter(b => b.is_active).map(bank => (
-                            <SelectItem key={bank.id} value={bank.chart_account_id || bank.id}>
-                              {bank.bank_name} - {bank.account_name} ({bank.currency})
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="deposit-account">Credit to Account *</Label>
+                    <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+                      <SelectTrigger id="deposit-account">
+                        <SelectValue placeholder="Select account to credit..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {bankAccounts && bankAccounts.length > 0 && (
+                          <>
+                            <SelectItem value="__bank_header" disabled className="font-semibold text-muted-foreground">
+                              Bank Accounts
                             </SelectItem>
-                          ))}
-                        </>
-                      )}
-                      {cashAccounts.length > 0 && (
-                        <>
-                          <SelectItem value="__cash_header" disabled className="font-semibold text-muted-foreground">
-                            Cash Accounts
-                          </SelectItem>
-                          {cashAccounts.map(acc => (
-                            <SelectItem key={acc.id} value={acc.id}>
-                              {acc.account_code} - {acc.account_name} ({acc.currency})
+                            {bankAccounts.filter(b => b.is_active).map(bank => (
+                              <SelectItem key={bank.id} value={bank.chart_account_id || bank.id}>
+                                {bank.bank_name} - {bank.account_name} ({bank.currency})
+                              </SelectItem>
+                            ))}
+                          </>
+                        )}
+                        {cashAccounts.length > 0 && (
+                          <>
+                            <SelectItem value="__cash_header" disabled className="font-semibold text-muted-foreground">
+                              Cash Accounts
                             </SelectItem>
-                          ))}
-                        </>
-                      )}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Select where the payment was received
-                  </p>
+                            {cashAccounts.map(acc => (
+                              <SelectItem key={acc.id} value={acc.id}>
+                                {acc.account_code} - {acc.account_name} ({acc.currency})
+                              </SelectItem>
+                            ))}
+                          </>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Select where the payment was received
+                    </p>
+                  </div>
+
+                  {/* Exchange Rate Section */}
+                  {selectedPayment?.currency !== 'TZS' && (
+                    <div className="space-y-3 p-3 bg-muted/50 rounded-lg border">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-medium">Exchange Rate</Label>
+                        <Button
+                          type="button"
+                          variant={useCustomRate ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setUseCustomRate(!useCustomRate)}
+                        >
+                          {useCustomRate ? 'Using Custom Rate' : 'Use Custom Rate'}
+                        </Button>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label className="text-xs text-muted-foreground">System Rate (1 {selectedPayment?.currency})</Label>
+                          <p className="font-mono text-sm">TZS {systemExchangeRate.toLocaleString()}</p>
+                        </div>
+                        {useCustomRate && (
+                          <div>
+                            <Label className="text-xs text-muted-foreground">Custom Rate *</Label>
+                            <Input
+                              type="number"
+                              placeholder="Enter rate..."
+                              value={customExchangeRate}
+                              onChange={(e) => setCustomExchangeRate(e.target.value)}
+                              className="mt-1"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TZS Equivalent */}
+                  <div className="space-y-2">
+                    <Label htmlFor="amount-tzs">TZS Equivalent *</Label>
+                    <Input
+                      id="amount-tzs"
+                      type="number"
+                      placeholder="Enter TZS amount..."
+                      value={amountInTzs}
+                      onChange={(e) => setAmountInTzs(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {selectedPayment?.currency === 'TZS' 
+                        ? 'Same as payment amount'
+                        : `Based on rate: 1 ${selectedPayment?.currency} = TZS ${(useCustomRate && customExchangeRate ? parseFloat(customExchangeRate) : systemExchangeRate).toLocaleString()}`
+                      }
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
