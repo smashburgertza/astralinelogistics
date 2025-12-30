@@ -28,7 +28,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { format } from 'date-fns';
 import { ShipmentStatusBadge } from '@/components/admin/ShipmentStatusBadge';
 import { ShipmentDetailDrawer } from '@/components/admin/ShipmentDetailDrawer';
-import { Shipment } from '@/hooks/useShipments';
+import { Shipment } from '@/hooks/useAgentShipments';
 import { useRegions } from '@/hooks/useRegions';
 import { toast } from 'sonner';
 
