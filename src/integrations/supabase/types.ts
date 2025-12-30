@@ -177,6 +177,94 @@ export type Database = {
         }
         Relationships: []
       }
+      approval_requests: {
+        Row: {
+          amount: number | null
+          approval_type: Database["public"]["Enums"]["approval_type"]
+          created_at: string
+          currency: string | null
+          customer_id: string | null
+          id: string
+          invoice_id: string | null
+          metadata: Json | null
+          parcel_id: string | null
+          reason: string
+          reference_id: string
+          reference_type: string
+          requested_at: string
+          requested_by: string
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["approval_status"]
+          updated_at: string
+        }
+        Insert: {
+          amount?: number | null
+          approval_type: Database["public"]["Enums"]["approval_type"]
+          created_at?: string
+          currency?: string | null
+          customer_id?: string | null
+          id?: string
+          invoice_id?: string | null
+          metadata?: Json | null
+          parcel_id?: string | null
+          reason: string
+          reference_id: string
+          reference_type: string
+          requested_at?: string
+          requested_by: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["approval_status"]
+          updated_at?: string
+        }
+        Update: {
+          amount?: number | null
+          approval_type?: Database["public"]["Enums"]["approval_type"]
+          created_at?: string
+          currency?: string | null
+          customer_id?: string | null
+          id?: string
+          invoice_id?: string | null
+          metadata?: Json | null
+          parcel_id?: string | null
+          reason?: string
+          reference_id?: string
+          reference_type?: string
+          requested_at?: string
+          requested_by?: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["approval_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approval_requests_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_requests_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_requests_parcel_id_fkey"
+            columns: ["parcel_id"]
+            isOneToOne: false
+            referencedRelation: "parcels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -2535,6 +2623,8 @@ export type Database = {
     Enums: {
       agent_region: "europe" | "dubai" | "china" | "india" | "usa" | "uk"
       app_role: "super_admin" | "employee" | "agent" | "customer"
+      approval_status: "pending" | "approved" | "rejected"
+      approval_type: "parcel_release" | "expense" | "refund" | "discount"
       billing_party_type:
         | "customer_direct"
         | "agent_collect"
@@ -2673,6 +2763,8 @@ export const Constants = {
     Enums: {
       agent_region: ["europe", "dubai", "china", "india", "usa", "uk"],
       app_role: ["super_admin", "employee", "agent", "customer"],
+      approval_status: ["pending", "approved", "rejected"],
+      approval_type: ["parcel_release", "expense", "refund", "discount"],
       billing_party_type: [
         "customer_direct",
         "agent_collect",

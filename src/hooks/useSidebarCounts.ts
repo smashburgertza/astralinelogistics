@@ -9,6 +9,7 @@ interface SidebarCounts {
   orders: number;
   expenses: number;
   settlements: number;
+  approvals: number;
 }
 
 export function useSidebarCounts() {
@@ -26,6 +27,7 @@ export function useSidebarCounts() {
         ordersResult,
         expensesResult,
         settlementsResult,
+        approvalsResult,
       ] = await Promise.all([
         // New shipments (last 24 hours)
         supabase
@@ -62,6 +64,12 @@ export function useSidebarCounts() {
           .from("settlements")
           .select("*", { count: "exact", head: true })
           .in("status", ["pending", "draft"]),
+
+        // Pending approval requests
+        supabase
+          .from("approval_requests")
+          .select("*", { count: "exact", head: true })
+          .eq("status", "pending"),
       ]);
 
       return {
@@ -71,6 +79,7 @@ export function useSidebarCounts() {
         orders: ordersResult.count || 0,
         expenses: expensesResult.count || 0,
         settlements: settlementsResult.count || 0,
+        approvals: approvalsResult.count || 0,
       };
     },
     refetchInterval: 60000, // Refresh every minute
