@@ -7,8 +7,9 @@ import { Badge } from '@/components/ui/badge';
 import { 
   PackageSearch, UsersRound, BadgeDollarSign, TrendingUp, 
   Plane, ArrowRight, AlertTriangle, MapPinned, ReceiptText,
-  ArrowUpRight, Sparkles, ScanBarcode, Clock
+  ArrowUpRight, Sparkles, ScanBarcode, Clock, Landmark, Wallet
 } from 'lucide-react';
+import { useBankAccounts } from '@/hooks/useAccounting';
 import { supabase } from '@/integrations/supabase/client';
 import { SHIPMENT_STATUSES, type ShipmentStatus } from '@/lib/constants';
 import { useRegions } from '@/hooks/useRegions';
@@ -80,6 +81,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export default function AdminDashboard() {
   const { data: regions = [] } = useRegions();
+  const { data: bankAccounts = [] } = useBankAccounts();
   const [stats, setStats] = useState<DashboardStats>({
     totalShipments: 0,
     thisMonthShipments: 0,
@@ -345,6 +347,52 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Bank Accounts */}
+      {bankAccounts.length > 0 && (
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <Landmark className="w-5 h-5 text-primary" />
+              Bank Accounts
+            </h2>
+            <Link to="/admin/accounting">
+              <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary">
+                View All <ArrowRight className="w-4 h-4 ml-1" />
+              </Button>
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {bankAccounts.map((account) => (
+              <Card key={account.id} className="shadow-lg border-0 bg-gradient-to-br from-primary/5 to-primary/10 backdrop-blur-sm overflow-hidden hover:shadow-xl transition-shadow">
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-md">
+                      <Wallet className="w-5 h-5 text-primary-foreground" />
+                    </div>
+                    <Badge variant="outline" className={account.is_active ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' : 'bg-muted text-muted-foreground'}>
+                      {account.is_active ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-foreground truncate">{account.account_name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{account.bank_name}</p>
+                    {account.account_number && (
+                      <p className="text-xs text-muted-foreground">••••{account.account_number.slice(-4)}</p>
+                    )}
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-border/50">
+                    <p className="text-xs text-muted-foreground mb-1">Current Balance</p>
+                    <p className="text-xl font-bold text-foreground">
+                      {account.currency || 'TZS'} {(account.current_balance || 0).toLocaleString()}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
