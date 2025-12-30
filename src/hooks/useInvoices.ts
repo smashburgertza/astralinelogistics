@@ -214,16 +214,21 @@ export function useRecordPayment() {
       
       if (error) throw error;
 
-      // Get exchange rate if different currency
-      let exchangeRate = 1;
-      if (params.paymentCurrency !== 'TZS') {
+      // Get exchange rate for invoice currency if paying in different currency
+      let invoiceCurrencyRate = 1;
+      if (currentInvoice.currency && currentInvoice.currency !== 'TZS') {
         const { data: rateData } = await supabase
           .from('currency_exchange_rates')
           .select('rate_to_tzs')
-          .eq('currency_code', params.paymentCurrency)
+          .eq('currency_code', currentInvoice.currency)
           .maybeSingle();
-        exchangeRate = rateData?.rate_to_tzs || 1;
+        invoiceCurrencyRate = rateData?.rate_to_tzs || 1;
       }
+
+      // Calculate the actual payment amount in TZS if paying in TZS for foreign currency invoice
+      const paymentAmountInTzs = params.paymentCurrency === 'TZS' && currentInvoice.currency !== 'TZS'
+        ? params.amount * invoiceCurrencyRate  // Convert invoice amount to TZS
+        : params.amount;
 
       // Create journal entry for the payment
       try {
@@ -232,20 +237,21 @@ export function useRecordPayment() {
           await createAgentPaymentJournalEntry({
             invoiceId: data.id,
             invoiceNumber: currentInvoice.invoice_number,
-            amount: params.amount,
-            currency: currentInvoice.currency || 'USD',
-            exchangeRate,
+            amount: paymentAmountInTzs,
+            currency: params.paymentCurrency || currentInvoice.currency || 'USD',
+            exchangeRate: invoiceCurrencyRate,
             paymentCurrency: params.paymentCurrency,
             sourceAccountId: params.depositAccountId,
+            amountInTzs: paymentAmountInTzs,
           });
         } else {
           // For customer payments (we receive money): Debit Cash, Credit Accounts Receivable
           await createInvoicePaymentJournalEntry({
             invoiceId: data.id,
             invoiceNumber: currentInvoice.invoice_number,
-            amount: params.amount,
-            currency: currentInvoice.currency || 'USD',
-            exchangeRate,
+            amount: paymentAmountInTzs,
+            currency: params.paymentCurrency || currentInvoice.currency || 'USD',
+            exchangeRate: invoiceCurrencyRate,
             paymentCurrency: params.paymentCurrency,
             depositAccountId: params.depositAccountId,
           });
