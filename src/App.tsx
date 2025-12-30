@@ -58,7 +58,7 @@ const AdminAnalyticsPage = lazy(() => import("./pages/admin/Analytics"));
 const AdminFinancialSummaryPage = lazy(() => import("./pages/admin/FinancialSummary"));
 const AdminProfilePage = lazy(() => import("./pages/admin/Profile"));
 const AdminNotificationsPage = lazy(() => import("./pages/admin/Notifications"));
-const AdminBatchProfitabilityPage = lazy(() => import("./pages/admin/BatchProfitability"));
+
 const AdminSettlementsPage = lazy(() => import("./pages/admin/Settlements"));
 const AdminApprovalsPage = lazy(() => import("./pages/admin/Approvals"));
 
@@ -144,7 +144,7 @@ const App = () => (
             {/* Reports & Analytics - requires view_reports */}
             <Route path="/admin/accounting" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="view_reports"><AdminAccountingPage /></PermissionGate></Suspense>} />
             <Route path="/admin/financial-summary" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="view_reports"><AdminFinancialSummaryPage /></PermissionGate></Suspense>} />
-            <Route path="/admin/batches" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="view_reports"><AdminBatchProfitabilityPage /></PermissionGate></Suspense>} />
+            
             <Route path="/admin/reports" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="view_reports"><AdminReportsPage /></PermissionGate></Suspense>} />
             <Route path="/admin/commissions" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="view_reports"><AdminCommissionsPage /></PermissionGate></Suspense>} />
             <Route path="/admin/analytics" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="view_reports"><AdminAnalyticsPage /></PermissionGate></Suspense>} />
