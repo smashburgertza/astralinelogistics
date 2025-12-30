@@ -775,7 +775,7 @@ export default function AdminDashboard() {
                 <div>
                   <p className="text-xs text-muted-foreground font-medium">Net Profit (Est.)</p>
                   <p className="text-2xl font-bold">
-                    ${(stats.revenue - stats.totalExpenses).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    TZS {(stats.revenue - stats.totalExpenses).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                   </p>
                 </div>
               </div>
