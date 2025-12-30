@@ -53,12 +53,12 @@ export function useCreateInvoiceItem() {
     mutationFn: async (item: Omit<InvoiceItem, 'id' | 'created_at'>) => {
       const { data, error } = await supabase
         .from('invoice_items')
-        .insert(item)
+        .insert(item as any)
         .select()
         .single();
 
       if (error) throw error;
-      return data;
+      return data as InvoiceItem;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['invoice-items', variables.invoice_id] });
@@ -79,11 +79,11 @@ export function useCreateInvoiceItems() {
       
       const { data, error } = await supabase
         .from('invoice_items')
-        .insert(items)
+        .insert(items as any)
         .select();
 
       if (error) throw error;
-      return data;
+      return data as InvoiceItem[];
     },
     onSuccess: (_, variables) => {
       if (variables.length > 0) {
