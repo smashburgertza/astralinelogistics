@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from './useAuth';
+import { createAgentPaymentJournalEntry } from '@/lib/journalEntryUtils';
 
 export interface AgentInvoice {
   id: string;
@@ -286,9 +287,6 @@ export function useVerifyPayment() {
 
         // Create journal entry if deposit account is specified
         if (depositAccountId && amount) {
-          // Import and use the journal entry utility
-          const { createAgentPaymentJournalEntry } = await import('@/lib/journalEntryUtils');
-          
           await createAgentPaymentJournalEntry({
             invoiceId,
             invoiceNumber: invoiceNumber || 'Unknown',
