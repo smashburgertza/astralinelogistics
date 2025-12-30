@@ -254,7 +254,7 @@ export function useRecordPayment() {
         console.error('Failed to create payment journal entry:', journalError);
       }
 
-      // Record in payments table
+      // Record in payments table - admin-initiated payments are auto-verified
       await supabase.from('payments').insert({
         invoice_id: params.invoiceId,
         amount: params.amount,
@@ -262,6 +262,9 @@ export function useRecordPayment() {
         payment_method: params.paymentMethod,
         paid_at: params.paymentDate,
         stripe_payment_id: params.reference || null,
+        verification_status: 'verified',
+        status: 'completed',
+        verified_at: new Date().toISOString(),
       });
 
       return data;
