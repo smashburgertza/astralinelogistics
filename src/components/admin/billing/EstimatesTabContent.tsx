@@ -1,8 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { format } from 'date-fns';
 import { 
   Plus, ArrowRight, Trash2, CheckCircle, XCircle, Clock,
-  Package, Truck, MessageSquare, Pencil
+  MessageSquare, Pencil
 } from 'lucide-react';
 import { Estimate } from '@/hooks/useEstimates';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,13 +17,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,13 +33,13 @@ import {
   useUpdateEstimateStatus,
   useConvertEstimateToInvoice,
   useDeleteEstimate,
-  type EstimateType,
 } from '@/hooks/useEstimates';
 import { useExchangeRates, convertToTZS } from '@/hooks/useExchangeRates';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 import { useActiveRegions, regionsToMap } from '@/hooks/useRegions';
 import { CreateEstimateDialog } from './CreateEstimateDialog';
 import { EditEstimateDialog } from './EditEstimateDialog';
+
 const CUSTOMER_RESPONSE_CONFIG = {
   pending: { label: 'Awaiting', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
   approved: { label: 'Approved', color: 'bg-green-100 text-green-800', icon: CheckCircle },
@@ -57,7 +50,6 @@ export function EstimatesTabContent() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [estimateToEdit, setEstimateToEdit] = useState<Estimate | null>(null);
-  const [typeFilter, setTypeFilter] = useState<'all' | EstimateType>('all');
   const { data: estimates, isLoading } = useEstimates();
   const { data: exchangeRates } = useExchangeRates();
   const { data: regions } = useActiveRegions();
@@ -70,12 +62,6 @@ export function EstimatesTabContent() {
     setEstimateToEdit(estimate);
     setEditOpen(true);
   };
-
-  const filteredEstimates = useMemo(() => {
-    if (!estimates) return [];
-    if (typeFilter === 'all') return estimates;
-    return estimates.filter(e => e.estimate_type === typeFilter);
-  }, [estimates, typeFilter]);
 
   if (isLoading) {
     return (
@@ -104,29 +90,9 @@ export function EstimatesTabContent() {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>All Estimates</CardTitle>
-              <CardDescription>Manage and convert estimates to invoices</CardDescription>
-            </div>
-            <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as 'all' | EstimateType)}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="shipping">
-                  <div className="flex items-center gap-2">
-                    <Truck className="h-4 w-4" /> Shipping Only
-                  </div>
-                </SelectItem>
-                <SelectItem value="purchase_shipping">
-                  <div className="flex items-center gap-2">
-                    <Package className="h-4 w-4" /> Purchase + Shipping
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
+          <div>
+            <CardTitle>All Estimates</CardTitle>
+            <CardDescription>Manage and convert estimates to invoices</CardDescription>
           </div>
         </CardHeader>
         <CardContent>
@@ -134,7 +100,6 @@ export function EstimatesTabContent() {
             <TableHeader>
               <TableRow>
                 <TableHead>Estimate #</TableHead>
-                <TableHead>Type</TableHead>
                 <TableHead>Customer</TableHead>
                 <TableHead>Region</TableHead>
                 <TableHead>Total</TableHead>
@@ -144,14 +109,14 @@ export function EstimatesTabContent() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredEstimates.length === 0 ? (
+              {!estimates || estimates.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                    {estimates?.length === 0 ? 'No estimates yet. Create your first estimate.' : 'No estimates match the selected filter.'}
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    No estimates yet. Create your first estimate.
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredEstimates.map((estimate) => {
+                estimates.map((estimate) => {
                   const customerResponseConfig = CUSTOMER_RESPONSE_CONFIG[(estimate as any).customer_response as keyof typeof CUSTOMER_RESPONSE_CONFIG] || CUSTOMER_RESPONSE_CONFIG.pending;
                   const ResponseIcon = customerResponseConfig.icon;
                   
@@ -159,15 +124,6 @@ export function EstimatesTabContent() {
                     <TableRow key={estimate.id}>
                       <TableCell className="font-mono font-medium">
                         {estimate.estimate_number}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={estimate.estimate_type === 'purchase_shipping' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'}>
-                          {estimate.estimate_type === 'purchase_shipping' ? (
-                            <><Package className="h-3 w-3 mr-1" /> Purchase</>
-                          ) : (
-                            <><Truck className="h-3 w-3 mr-1" /> Shipping</>
-                          )}
-                        </Badge>
                       </TableCell>
                       <TableCell>
                         {estimate.customers?.name || '-'}
