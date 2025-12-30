@@ -31,7 +31,10 @@ export interface PaymentSplit {
 
 export interface PaymentDetails {
   invoiceId: string;
+  /** Amount in invoice currency (for updating invoice amount_paid) */
   amount: number;
+  /** Actual amount received in the payment currency (for payment record) */
+  amountInPaymentCurrency?: number;
   paymentMethod: string;
   depositAccountId?: string;
   paymentCurrency: string;
@@ -181,6 +184,7 @@ export function RecordPaymentDialog({
       onRecordPayment({
         invoiceId: invoice.id,
         amount: amountInInvoiceCurrency,
+        amountInPaymentCurrency: totalSplitAmount,
         paymentMethod,
         paymentCurrency,
         paymentDate,
@@ -195,6 +199,7 @@ export function RecordPaymentDialog({
       onRecordPayment({
         invoiceId: invoice.id,
         amount: amountInInvoiceCurrency,
+        amountInPaymentCurrency: paymentAmountNum,
         paymentMethod,
         depositAccountId: depositAccountId || undefined,
         paymentCurrency,

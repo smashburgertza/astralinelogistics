@@ -166,7 +166,10 @@ export interface PaymentSplit {
 
 export interface RecordPaymentParams {
   invoiceId: string;
+  /** Amount in invoice currency (for updating invoice amount_paid) */
   amount: number;
+  /** Actual amount received in the payment currency (for payment record) */
+  amountInPaymentCurrency?: number;
   paymentMethod: string;
   depositAccountId?: string;
   paymentCurrency: string;
@@ -254,9 +257,15 @@ export function useRecordPayment() {
       };
 
       const insertPayment = async () => {
+        // For split payments, sum the split amounts (which are in payment currency)
+        // For single payments, use amountInPaymentCurrency if provided, otherwise fall back to amount
+        const paymentAmount = isSplitPayment 
+          ? params.splits!.reduce((sum, s) => sum + s.amount, 0) 
+          : (params.amountInPaymentCurrency ?? params.amount);
+        
         const paymentInsert = {
           invoice_id: params.invoiceId,
-          amount: isSplitPayment ? params.splits!.reduce((sum, s) => sum + s.amount, 0) : params.amount,
+          amount: paymentAmount,
           currency: params.paymentCurrency,
           payment_method: params.paymentMethod,
           paid_at: params.paymentDate,
