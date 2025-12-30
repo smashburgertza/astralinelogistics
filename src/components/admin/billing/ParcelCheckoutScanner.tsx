@@ -13,6 +13,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useRecordPayment, Invoice } from '@/hooks/useInvoices';
 import { useInvoicePayments } from '@/hooks/useInvoicePayments';
 import { useInvoiceItems } from '@/hooks/useInvoiceItems';
+import { useExchangeRates, convertToTZS } from '@/hooks/useExchangeRates';
 import { InvoiceStatusBadge } from '@/components/admin/InvoiceStatusBadge';
 import { InvoicePDFPreview } from '@/components/admin/InvoicePDFPreview';
 import { RecordPaymentDialog, PaymentDetails } from '@/components/admin/RecordPaymentDialog';
@@ -63,6 +64,7 @@ export function ParcelCheckoutScanner() {
   
   const { data: payments = [], refetch: refetchPayments } = useInvoicePayments(parcelData?.invoice?.id || '');
   const { data: invoiceItems = [] } = useInvoiceItems(parcelData?.invoice?.id || '');
+  const { data: exchangeRates = [] } = useExchangeRates();
 
   // Auto-focus input on mount
   useEffect(() => {
@@ -287,6 +289,13 @@ export function ParcelCheckoutScanner() {
   const totalPaid = Math.max(Number(invoice?.amount_paid || 0), paidFromPayments);
   const remainingBalance = Math.max(0, totalAmount - totalPaid);
   const isPaid = invoice?.status === 'paid' || remainingBalance <= 0;
+
+  // Calculate TZS equivalents
+  const invoiceCurrency = invoice?.currency || 'USD';
+  const showTzsEquivalent = invoiceCurrency !== 'TZS' && exchangeRates.length > 0;
+  const totalAmountTzs = showTzsEquivalent ? convertToTZS(totalAmount, invoiceCurrency, exchangeRates) : 0;
+  const totalPaidTzs = showTzsEquivalent ? convertToTZS(totalPaid, invoiceCurrency, exchangeRates) : 0;
+  const remainingBalanceTzs = showTzsEquivalent ? convertToTZS(remainingBalance, invoiceCurrency, exchangeRates) : 0;
 
   return (
     <>
@@ -584,12 +593,18 @@ export function ParcelCheckoutScanner() {
                       <p className="text-xl font-bold">
                         {currencySymbol}{totalAmount.toFixed(2)}
                       </p>
+                      {showTzsEquivalent && (
+                        <p className="text-xs text-muted-foreground">≈ TZS {totalAmountTzs.toLocaleString()}</p>
+                      )}
                     </div>
                     <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-lg p-4">
                       <p className="text-sm text-emerald-600 dark:text-emerald-400">Amount Paid</p>
                       <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">
                         {currencySymbol}{totalPaid.toFixed(2)}
                       </p>
+                      {showTzsEquivalent && (
+                        <p className="text-xs text-emerald-600 dark:text-emerald-400">≈ TZS {totalPaidTzs.toLocaleString()}</p>
+                      )}
                     </div>
                     <div className={`rounded-lg p-4 ${remainingBalance > 0 ? 'bg-amber-50 dark:bg-amber-950/30' : 'bg-emerald-50 dark:bg-emerald-950/30'}`}>
                       <p className={`text-sm ${remainingBalance > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
@@ -598,6 +613,11 @@ export function ParcelCheckoutScanner() {
                       <p className={`text-xl font-bold ${remainingBalance > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-emerald-700 dark:text-emerald-300'}`}>
                         {currencySymbol}{remainingBalance.toFixed(2)}
                       </p>
+                      {showTzsEquivalent && (
+                        <p className={`text-xs ${remainingBalance > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                          ≈ TZS {remainingBalanceTzs.toLocaleString()}
+                        </p>
+                      )}
                     </div>
                   </div>
 
