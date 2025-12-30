@@ -715,7 +715,7 @@ export default function AdminDashboard() {
                 </div>
               </div>
               <Button variant="ghost" size="sm" className="text-orange-600 hover:text-orange-700 hover:bg-orange-500/10" asChild>
-                <Link to="/admin/invoices">View</Link>
+                <Link to="/admin/billing">View</Link>
               </Button>
             </div>
 
@@ -779,7 +779,7 @@ export default function AdminDashboard() {
           className="h-auto py-5 flex-col gap-3 bg-card/50 border-border/50 hover:bg-accent/5 hover:border-accent/50 hover:shadow-lg transition-all duration-300 group" 
           asChild
         >
-          <Link to="/admin/invoices">
+          <Link to="/admin/billing">
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500/10 to-teal-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
               <BadgeDollarSign className="w-6 h-6 text-emerald-600" />
             </div>

@@ -34,7 +34,7 @@ interface SearchResult {
 const typeConfig = {
   shipment: { icon: Package, label: 'Shipment', route: '/admin/shipments', color: 'text-blue-500' },
   customer: { icon: Users, label: 'Customer', route: '/admin/customers', color: 'text-purple-500' },
-  invoice: { icon: FileText, label: 'Invoice', route: '/admin/invoices', color: 'text-green-500' },
+  invoice: { icon: FileText, label: 'Invoice', route: '/admin/billing', color: 'text-green-500' },
   estimate: { icon: ReceiptText, label: 'Estimate', route: '/admin/estimates', color: 'text-orange-500' },
 };
 

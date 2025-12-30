@@ -186,7 +186,7 @@ export function LiveActivityFeed() {
           status: i.status || undefined,
           employeeName,
           customerName,
-          link: '/admin/invoices',
+          link: '/admin/billing',
         });
       });
 
