@@ -15,6 +15,7 @@ import { CURRENCY_SYMBOLS } from '@/lib/constants';
 import { useRegions } from '@/hooks/useRegions';
 import { format } from 'date-fns';
 import { useReactToPrint } from 'react-to-print';
+import { useExchangeRatesMap } from '@/hooks/useExchangeRates';
 
 interface InvoiceTableProps {
   invoices?: Invoice[];
@@ -32,6 +33,16 @@ export function InvoiceTable({ invoices, isLoading }: InvoiceTableProps) {
   const recordPayment = useRecordPayment();
   const printRef = useRef<HTMLDivElement>(null);
   const { data: regions = [] } = useRegions();
+  const { getRate } = useExchangeRatesMap();
+
+  const formatTZS = (amount: number) => {
+    return `TZS ${amount.toLocaleString('en-TZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  };
+
+  const convertToTZS = (amount: number, currency: string) => {
+    const rate = getRate(currency);
+    return amount * rate;
+  };
 
   const handleEditInvoice = (invoice: Invoice) => {
     setInvoiceToEdit(invoice);
@@ -109,8 +120,8 @@ export function InvoiceTable({ invoices, isLoading }: InvoiceTableProps) {
               <TableHead>Invoice #</TableHead>
               <TableHead>Customer</TableHead>
               <TableHead>Shipment</TableHead>
-              <TableHead>Amount</TableHead>
-              <TableHead>Paid</TableHead>
+              <TableHead>Amount (TZS)</TableHead>
+              <TableHead>Paid (TZS)</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Due Date</TableHead>
               <TableHead className="w-[50px]"></TableHead>
@@ -125,6 +136,9 @@ export function InvoiceTable({ invoices, isLoading }: InvoiceTableProps) {
               const totalAmount = Number(invoice.amount || 0);
               const amountPaid = Number(invoice.amount_paid || 0);
               const isPartiallyPaid = amountPaid > 0 && amountPaid < totalAmount;
+              const currency = invoice.currency || 'USD';
+              const amountInTZS = invoice.amount_in_tzs || convertToTZS(totalAmount, currency);
+              const paidInTZS = convertToTZS(amountPaid, currency);
 
               return (
                 <TableRow 
@@ -158,19 +172,17 @@ export function InvoiceTable({ invoices, isLoading }: InvoiceTableProps) {
                   <TableCell>
                     <div>
                       <span className="font-medium">
-                        {currencySymbol}{totalAmount.toFixed(2)}
+                        {formatTZS(amountInTZS)}
                       </span>
-                      {invoice.rate_per_kg && (
-                        <p className="text-xs text-muted-foreground">
-                          @ {currencySymbol}{Number(invoice.rate_per_kg).toFixed(2)}/kg
-                        </p>
-                      )}
+                      <p className="text-xs text-muted-foreground">
+                        {currencySymbol}{totalAmount.toFixed(2)}
+                      </p>
                     </div>
                   </TableCell>
                   <TableCell>
                     <div>
                       <span className={amountPaid > 0 ? 'font-medium text-emerald-600' : 'text-muted-foreground'}>
-                        {currencySymbol}{amountPaid.toFixed(2)}
+                        {formatTZS(paidInTZS)}
                       </span>
                       {isPartiallyPaid && (
                         <Badge variant="outline" className="ml-2 text-xs bg-blue-50 text-blue-700 border-blue-200">

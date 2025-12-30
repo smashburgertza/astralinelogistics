@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/table';
 import { format } from 'date-fns';
 import { CreditCard, Receipt, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { useExchangeRatesMap } from '@/hooks/useExchangeRates';
 
 const statusConfig: Record<string, { icon: typeof CheckCircle; className: string }> = {
   completed: { icon: CheckCircle, className: 'bg-green-100 text-green-800 border-green-200' },
@@ -29,10 +30,24 @@ const paymentMethodLabels: Record<string, string> = {
 
 export default function CustomerPayments() {
   const { data: payments, isLoading } = useCustomerPayments();
+  const { getRate } = useExchangeRatesMap();
 
-  const totalPaid = payments?.reduce((sum, p) => 
-    p.status === 'completed' ? sum + p.amount : sum, 0
-  ) || 0;
+  const formatTZS = (amount: number) => {
+    return `TZS ${amount.toLocaleString('en-TZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  };
+
+  const convertToTZS = (amount: number, currency: string) => {
+    const rate = getRate(currency);
+    return amount * rate;
+  };
+
+  const totalPaidTZS = payments?.reduce((sum, p) => {
+    if (p.status === 'completed') {
+      const currency = p.currency || 'TZS';
+      return sum + convertToTZS(p.amount, currency);
+    }
+    return sum;
+  }, 0) || 0;
 
   return (
     <CustomerLayout 
@@ -44,9 +59,9 @@ export default function CustomerPayments() {
         <div className="grid gap-4 md:grid-cols-3">
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Total Paid</CardDescription>
+              <CardDescription>Total Paid (TZS)</CardDescription>
               <CardTitle className="text-2xl text-green-600">
-                ${totalPaid.toFixed(2)}
+                {formatTZS(totalPaidTZS)}
               </CardTitle>
             </CardHeader>
           </Card>
@@ -98,13 +113,15 @@ export default function CustomerPayments() {
                       <TableHead>Invoice</TableHead>
                       <TableHead>Method</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead className="text-right">Amount (TZS)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {payments.map((payment) => {
                       const status = payment.status || 'pending';
                       const StatusIcon = statusConfig[status]?.icon || Clock;
+                      const currency = payment.currency || 'TZS';
+                      const amountInTZS = convertToTZS(payment.amount, currency);
                       
                       return (
                         <TableRow key={payment.id}>
@@ -132,8 +149,15 @@ export default function CustomerPayments() {
                               {status.charAt(0).toUpperCase() + status.slice(1)}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-right font-semibold">
-                            ${payment.amount.toFixed(2)} {payment.currency?.toUpperCase()}
+                          <TableCell className="text-right">
+                            <div>
+                              <span className="font-semibold">{formatTZS(amountInTZS)}</span>
+                              {currency !== 'TZS' && (
+                                <p className="text-xs text-muted-foreground">
+                                  {currency} {payment.amount.toFixed(2)}
+                                </p>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
