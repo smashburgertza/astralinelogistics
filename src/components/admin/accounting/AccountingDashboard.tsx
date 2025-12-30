@@ -7,15 +7,21 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 interface AccountingSummary {
   cashBalance: number;
+  cashCurrency: string;
   receivables: number;
+  receivablesCurrency: string;
   payables: number;
+  payablesCurrency: string;
   monthlyIncome: number;
+  monthlyIncomeCurrency: string;
   monthlyExpenses: number;
+  monthlyExpensesCurrency: string;
   recentTransactions: Array<{
     id: string;
     date: string;
     description: string;
     amount: number;
+    currency: string;
     type: 'income' | 'expense' | 'transfer';
   }>;
 }
@@ -27,48 +33,77 @@ function useAccountingSummary() {
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
       
-      // Get bank accounts for cash balance
+      // Get exchange rates for conversion to TZS
+      const { data: exchangeRates } = await supabase
+        .from('currency_exchange_rates')
+        .select('currency_code, rate_to_tzs');
+      
+      const ratesMap = new Map<string, number>();
+      exchangeRates?.forEach(r => ratesMap.set(r.currency_code, r.rate_to_tzs));
+      ratesMap.set('TZS', 1); // TZS to TZS is 1
+      
+      const convertToTzs = (amount: number, currency: string): number => {
+        const rate = ratesMap.get(currency) || 1;
+        return amount * rate;
+      };
+      
+      // Get bank accounts for cash balance (already in TZS typically)
       const { data: bankAccounts } = await supabase
         .from('bank_accounts')
-        .select('current_balance')
+        .select('current_balance, currency')
         .eq('is_active', true);
       
-      const cashBalance = bankAccounts?.reduce((sum, acc) => sum + (acc.current_balance || 0), 0) || 0;
+      let cashBalance = 0;
+      bankAccounts?.forEach(acc => {
+        cashBalance += convertToTzs(acc.current_balance || 0, acc.currency || 'TZS');
+      });
 
-      // Get unpaid invoices (receivables) - invoices TO customers
+      // Get unpaid invoices (receivables) - invoices TO agents that are pending
       const { data: receivables } = await supabase
         .from('invoices')
-        .select('amount')
+        .select('amount, currency')
         .eq('status', 'pending')
         .eq('invoice_direction', 'to_agent');
 
-      const receivablesTotal = receivables?.reduce((sum, inv) => sum + (inv.amount || 0), 0) || 0;
+      let receivablesTotal = 0;
+      receivables?.forEach(inv => {
+        receivablesTotal += convertToTzs(inv.amount || 0, inv.currency || 'USD');
+      });
 
       // Get unpaid expenses (payables)
       const { data: payables } = await supabase
         .from('expenses')
-        .select('amount')
+        .select('amount, currency')
         .in('status', ['pending', 'approved']);
 
-      const payablesTotal = payables?.reduce((sum, exp) => sum + (exp.amount || 0), 0) || 0;
+      let payablesTotal = 0;
+      payables?.forEach(exp => {
+        payablesTotal += convertToTzs(exp.amount || 0, exp.currency || 'USD');
+      });
 
       // Get monthly income (paid invoices)
       const { data: paidInvoices } = await supabase
         .from('invoices')
-        .select('amount')
+        .select('amount, currency')
         .eq('status', 'paid')
         .gte('paid_at', startOfMonth);
 
-      const monthlyIncome = paidInvoices?.reduce((sum, inv) => sum + (inv.amount || 0), 0) || 0;
+      let monthlyIncome = 0;
+      paidInvoices?.forEach(inv => {
+        monthlyIncome += convertToTzs(inv.amount || 0, inv.currency || 'USD');
+      });
 
       // Get monthly expenses (approved expenses)
       const { data: approvedExpenses } = await supabase
         .from('expenses')
-        .select('amount')
+        .select('amount, currency')
         .eq('status', 'approved')
         .gte('approved_at', startOfMonth);
 
-      const monthlyExpenses = approvedExpenses?.reduce((sum, exp) => sum + (exp.amount || 0), 0) || 0;
+      let monthlyExpenses = 0;
+      approvedExpenses?.forEach(exp => {
+        monthlyExpenses += convertToTzs(exp.amount || 0, exp.currency || 'USD');
+      });
 
       // Get recent transactions from journal entries
       const { data: recentEntries } = await supabase
@@ -83,19 +118,21 @@ function useAccountingSummary() {
         (recentEntries || []).map(async (entry) => {
           const { data: lines } = await supabase
             .from('journal_lines')
-            .select('debit_amount, credit_amount')
+            .select('debit_amount, credit_amount, currency')
             .eq('journal_entry_id', entry.id);
           
           const totalDebit = lines?.reduce((sum, l) => sum + (l.debit_amount || 0), 0) || 0;
           const totalCredit = lines?.reduce((sum, l) => sum + (l.credit_amount || 0), 0) || 0;
-          // Use the larger value - they should be equal in a balanced entry
           const transactionAmount = Math.max(totalDebit, totalCredit);
+          // Get the currency from the first line (entries are typically in one currency)
+          const currency = lines?.[0]?.currency || 'TZS';
           
           return {
             id: entry.id,
             date: entry.entry_date,
             description: entry.description,
             amount: transactionAmount,
+            currency,
             type: entry.reference_type === 'expense' ? 'expense' as const : 
                   entry.reference_type === 'payment' ? 'income' as const : 'transfer' as const,
           };
@@ -104,22 +141,38 @@ function useAccountingSummary() {
 
       return {
         cashBalance,
+        cashCurrency: 'TZS',
         receivables: receivablesTotal,
+        receivablesCurrency: 'TZS',
         payables: payablesTotal,
+        payablesCurrency: 'TZS',
         monthlyIncome,
+        monthlyIncomeCurrency: 'TZS',
         monthlyExpenses,
+        monthlyExpensesCurrency: 'TZS',
         recentTransactions,
       };
     },
   });
 }
 
-const formatCurrency = (amount: number) => {
+const formatCurrency = (amount: number, currency: string = 'TZS') => {
+  // For TZS, use no decimals and proper formatting
+  if (currency === 'TZS') {
+    return new Intl.NumberFormat('en-TZ', {
+      style: 'currency',
+      currency: 'TZS',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  }
+  
+  // For other currencies
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: 'USD',
+    currency: currency,
     minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    maximumFractionDigits: 2,
   }).format(amount);
 };
 
@@ -146,54 +199,56 @@ export function AccountingDashboard() {
     );
   }
 
+  const netIncome = (data?.monthlyIncome || 0) - (data?.monthlyExpenses || 0);
+
   const stats = [
     {
       title: 'Cash Balance',
-      value: formatCurrency(data?.cashBalance || 0),
+      value: formatCurrency(data?.cashBalance || 0, data?.cashCurrency),
       icon: Wallet,
-      description: 'Total across all accounts',
+      description: 'Total across all accounts (TZS)',
       color: 'text-blue-600',
       bgColor: 'bg-blue-100',
     },
     {
       title: 'Accounts Receivable',
-      value: formatCurrency(data?.receivables || 0),
+      value: formatCurrency(data?.receivables || 0, data?.receivablesCurrency),
       icon: ArrowDownCircle,
-      description: 'Unpaid customer invoices',
+      description: 'Unpaid invoices (converted to TZS)',
       color: 'text-green-600',
       bgColor: 'bg-green-100',
     },
     {
       title: 'Accounts Payable',
-      value: formatCurrency(data?.payables || 0),
+      value: formatCurrency(data?.payables || 0, data?.payablesCurrency),
       icon: ArrowUpCircle,
-      description: 'Pending expenses',
+      description: 'Pending expenses (converted to TZS)',
       color: 'text-orange-600',
       bgColor: 'bg-orange-100',
     },
     {
       title: 'Income This Month',
-      value: formatCurrency(data?.monthlyIncome || 0),
+      value: formatCurrency(data?.monthlyIncome || 0, data?.monthlyIncomeCurrency),
       icon: TrendingUp,
-      description: 'Paid invoices',
+      description: 'Paid invoices (converted to TZS)',
       color: 'text-emerald-600',
       bgColor: 'bg-emerald-100',
     },
     {
       title: 'Expenses This Month',
-      value: formatCurrency(data?.monthlyExpenses || 0),
+      value: formatCurrency(data?.monthlyExpenses || 0, data?.monthlyExpensesCurrency),
       icon: CreditCard,
-      description: 'Approved expenses',
+      description: 'Approved expenses (converted to TZS)',
       color: 'text-red-600',
       bgColor: 'bg-red-100',
     },
     {
       title: 'Net Income',
-      value: formatCurrency((data?.monthlyIncome || 0) - (data?.monthlyExpenses || 0)),
+      value: formatCurrency(netIncome, 'TZS'),
       icon: Receipt,
-      description: 'Income minus expenses',
-      color: (data?.monthlyIncome || 0) >= (data?.monthlyExpenses || 0) ? 'text-green-600' : 'text-red-600',
-      bgColor: (data?.monthlyIncome || 0) >= (data?.monthlyExpenses || 0) ? 'bg-green-100' : 'bg-red-100',
+      description: 'Income minus expenses (TZS)',
+      color: netIncome >= 0 ? 'text-green-600' : 'text-red-600',
+      bgColor: netIncome >= 0 ? 'bg-green-100' : 'bg-red-100',
     },
   ];
 
@@ -254,7 +309,7 @@ export function AccountingDashboard() {
                     tx.type === 'expense' ? 'text-red-600' : ''
                   }`}>
                     {tx.type === 'expense' ? '-' : tx.type === 'income' ? '+' : ''}
-                    {formatCurrency(tx.amount)}
+                    {formatCurrency(tx.amount, tx.currency)}
                   </span>
                 </div>
               ))}
