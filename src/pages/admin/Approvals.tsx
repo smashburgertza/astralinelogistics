@@ -378,6 +378,7 @@ function PaymentVerificationApprovals() {
       invoiceNumber: selectedPayment.invoices?.invoice_number,
       amountInTzs: parseFloat(amountInTzs),
       exchangeRate: finalExchangeRate,
+      isAgentPayment: selectedPayment.invoices?.invoice_direction === 'to_agent',
     }, {
       onSuccess: () => {
         setDialogOpen(false);
