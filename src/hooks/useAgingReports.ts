@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { differenceInDays } from 'date-fns';
+import { useExchangeRatesMap } from '@/hooks/useExchangeRates';
 
 export interface AgingBucket {
   label: string;
@@ -65,6 +66,8 @@ function categorizeByAge(daysOutstanding: number, item: AgingItem, buckets: Agin
 
 // Accounts Receivable Aging - Outstanding Invoices
 export function useAccountsReceivableAging() {
+  const { getRate } = useExchangeRatesMap();
+
   return useQuery({
     queryKey: ['ar-aging'],
     queryFn: async () => {
@@ -82,14 +85,17 @@ export function useAccountsReceivableAging() {
       invoices?.forEach((invoice) => {
         const invoiceDate = new Date(invoice.due_date || invoice.created_at || today);
         const daysOutstanding = Math.max(0, differenceInDays(today, invoiceDate));
+        const currency = invoice.currency || 'USD';
+        const rate = getRate(currency);
+        const amountInTZS = Number(invoice.amount_in_tzs) || Number(invoice.amount) * rate;
 
         const item: AgingItem = {
           id: invoice.id,
           reference: invoice.invoice_number,
           date: invoice.created_at || '',
           dueDate: invoice.due_date || undefined,
-          amount: Number(invoice.amount),
-          currency: invoice.currency || 'USD',
+          amount: amountInTZS,
+          currency: 'TZS',
           daysOutstanding,
           customerName: (invoice.customers as any)?.name,
         };
@@ -104,6 +110,8 @@ export function useAccountsReceivableAging() {
 
 // Accounts Payable Aging - Approved but unpaid expenses (simplified as payables)
 export function useAccountsPayableAging() {
+  const { getRate } = useExchangeRatesMap();
+
   return useQuery({
     queryKey: ['ap-aging'],
     queryFn: async () => {
@@ -122,13 +130,16 @@ export function useAccountsPayableAging() {
       expenses?.forEach((expense) => {
         const expenseDate = new Date(expense.approved_at || expense.created_at || today);
         const daysOutstanding = Math.max(0, differenceInDays(today, expenseDate));
+        const currency = expense.currency || 'TZS';
+        const rate = getRate(currency);
+        const amountInTZS = Number(expense.amount) * rate;
 
         const item: AgingItem = {
           id: expense.id,
           reference: `EXP-${expense.id.slice(0, 8).toUpperCase()}`,
           date: expense.created_at || '',
-          amount: Number(expense.amount),
-          currency: expense.currency || 'USD',
+          amount: amountInTZS,
+          currency: 'TZS',
           daysOutstanding,
           description: expense.description || expense.category,
         };

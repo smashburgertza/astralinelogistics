@@ -27,6 +27,7 @@ import { EXPENSE_CATEGORIES, useApproveExpense } from '@/hooks/useExpenses';
 import { ExpenseStatusBadge } from './ExpenseStatusBadge';
 import { ExpenseApprovalDialog } from './ExpenseApprovalDialog';
 import { useRegions } from '@/hooks/useRegions';
+import { useExchangeRatesMap } from '@/hooks/useExchangeRates';
 
 interface ExpenseWithShipment {
   id: string;
@@ -78,6 +79,16 @@ export function ExpenseTable({ expenses, isLoading, showActions = true }: Expens
 
   const approveExpense = useApproveExpense();
   const { data: regions = [] } = useRegions();
+  const { getRate } = useExchangeRatesMap();
+
+  const formatTZS = (amount: number) => {
+    return `TZS ${amount.toLocaleString('en-TZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  };
+
+  const convertToTZS = (amount: number, currency: string) => {
+    const rate = getRate(currency);
+    return amount * rate;
+  };
 
   const handleApprove = (expenseId: string) => {
     approveExpense.mutate(expenseId);
@@ -145,7 +156,7 @@ export function ExpenseTable({ expenses, isLoading, showActions = true }: Expens
           <TableHeader>
             <TableRow className="bg-muted/50 hover:bg-muted/50">
               <TableHead className="font-semibold">Category</TableHead>
-              <TableHead className="font-semibold">Amount</TableHead>
+              <TableHead className="font-semibold">Amount (TZS)</TableHead>
               <TableHead className="font-semibold">Status</TableHead>
               <TableHead className="font-semibold">Shipment</TableHead>
               <TableHead className="font-semibold">Region</TableHead>
@@ -160,6 +171,8 @@ export function ExpenseTable({ expenses, isLoading, showActions = true }: Expens
               const isPending = expense.status === 'pending';
               const needsClarification = expense.status === 'needs_clarification';
               const canTakeAction = isPending || needsClarification;
+              const currency = expense.currency || 'TZS';
+              const amountInTZS = convertToTZS(Number(expense.amount), currency);
               
               return (
                 <TableRow key={expense.id}>
@@ -169,9 +182,16 @@ export function ExpenseTable({ expenses, isLoading, showActions = true }: Expens
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <span className="font-medium">
-                      {expense.currency || 'USD'} {Number(expense.amount).toFixed(2)}
-                    </span>
+                    <div>
+                      <span className="font-medium">
+                        {formatTZS(amountInTZS)}
+                      </span>
+                      {currency !== 'TZS' && (
+                        <p className="text-xs text-muted-foreground">
+                          {currency} {Number(expense.amount).toFixed(2)}
+                        </p>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
