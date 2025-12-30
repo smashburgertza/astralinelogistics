@@ -12,7 +12,7 @@ import { format } from 'date-fns';
 import { useAgentShipments, useAgentShipmentStats } from '@/hooks/useAgentShipments';
 import { useAgentAssignedRegions } from '@/hooks/useAgentRegions';
 import { ShipmentStatusBadge } from '@/components/admin/ShipmentStatusBadge';
-import { BatchFreightCostCard } from '@/components/agent/BatchFreightCostCard';
+
 import { useAgentBalance } from '@/hooks/useAgentBalance';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -308,11 +308,6 @@ export default function AgentDashboard() {
         </CardContent>
       </Card>
 
-      {/* Batch Freight Costs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <BatchFreightCostCard cargoType="air" />
-        <BatchFreightCostCard cargoType="sea" />
-      </div>
 
       {/* Main Content */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

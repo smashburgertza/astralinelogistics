@@ -67,7 +67,7 @@ const mainNavItems: NavItem[] = [
 const financeNavItems: NavItem[] = [
   { label: 'Accounting', href: '/admin/accounting', icon: Calculator, permission: 'view_reports' },
   { label: 'Financial Summary', href: '/admin/financial-summary', icon: PiggyBank, permission: 'view_reports' },
-  { label: 'Batch Profitability', href: '/admin/batches', icon: Container, permission: 'view_reports' },
+  
   { label: 'Settlements', href: '/admin/settlements', icon: TrendingUp, permission: 'manage_invoices', countKey: 'settlements' },
   { label: 'Expenses', href: '/admin/expenses', icon: Wallet, permission: 'manage_expenses', countKey: 'expenses' },
   { label: 'Commissions', href: '/admin/commissions', icon: TrendingUp, permission: 'view_reports' },
