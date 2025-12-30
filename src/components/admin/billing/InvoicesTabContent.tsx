@@ -37,7 +37,6 @@ const CurrencyTooltip = ({ active, payload }: any) => {
 export function InvoicesTabContent() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
-  const [invoiceType, setInvoiceType] = useState('all');
 
   const debouncedSearch = useDebounce(search, 300);
 
@@ -53,10 +52,8 @@ export function InvoicesTabContent() {
   const filteredInvoices = useMemo(() => {
     if (!invoices) return [];
     // Only show customer invoices (invoice_direction is null or undefined)
-    const customerInvoices = invoices.filter(inv => !inv.invoice_direction || inv.invoice_direction === null);
-    if (invoiceType === 'all') return customerInvoices;
-    return customerInvoices.filter(inv => inv.invoice_type === invoiceType);
-  }, [invoices, invoiceType]);
+    return invoices.filter(inv => !inv.invoice_direction || inv.invoice_direction === null);
+  }, [invoices]);
 
   // Calculate currency breakdown from paid invoices
   const currencyBreakdown = useMemo(() => {
@@ -83,7 +80,6 @@ export function InvoicesTabContent() {
   const clearFilters = () => {
     setSearch('');
     setStatus('all');
-    setInvoiceType('all');
   };
 
   // Calculate totals in TZS from filtered invoices using proper currency conversion
@@ -111,10 +107,8 @@ export function InvoicesTabContent() {
       <InvoiceFilters
         search={search}
         status={status}
-        invoiceType={invoiceType}
         onSearchChange={setSearch}
         onStatusChange={setStatus}
-        onTypeChange={setInvoiceType}
         onClear={clearFilters}
       />
 

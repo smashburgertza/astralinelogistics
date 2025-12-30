@@ -1,29 +1,25 @@
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Search, X, Truck, Package } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import { INVOICE_STATUSES } from '@/hooks/useInvoices';
 
 interface InvoiceFiltersProps {
   search: string;
   status: string;
-  invoiceType: string;
   onSearchChange: (value: string) => void;
   onStatusChange: (value: string) => void;
-  onTypeChange: (value: string) => void;
   onClear: () => void;
 }
 
 export function InvoiceFilters({
   search,
   status,
-  invoiceType,
   onSearchChange,
   onStatusChange,
-  onTypeChange,
   onClear,
 }: InvoiceFiltersProps) {
-  const hasFilters = search || status !== 'all' || invoiceType !== 'all';
+  const hasFilters = search || status !== 'all';
 
   return (
     <div className="flex flex-col sm:flex-row gap-3">
@@ -36,25 +32,6 @@ export function InvoiceFilters({
           className="pl-10"
         />
       </div>
-
-      <Select value={invoiceType} onValueChange={onTypeChange}>
-        <SelectTrigger className="w-full sm:w-[180px]">
-          <SelectValue placeholder="Type" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Types</SelectItem>
-          <SelectItem value="shipping">
-            <div className="flex items-center gap-2">
-              <Truck className="h-4 w-4" /> Shipping Only
-            </div>
-          </SelectItem>
-          <SelectItem value="purchase_shipping">
-            <div className="flex items-center gap-2">
-              <Package className="h-4 w-4" /> Purchase + Shipping
-            </div>
-          </SelectItem>
-        </SelectContent>
-      </Select>
 
       <Select value={status} onValueChange={onStatusChange}>
         <SelectTrigger className="w-full sm:w-[160px]">
