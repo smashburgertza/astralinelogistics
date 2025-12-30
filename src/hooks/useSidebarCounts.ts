@@ -28,6 +28,7 @@ export function useSidebarCounts() {
         expensesResult,
         settlementsResult,
         approvalsResult,
+        pendingPaymentsResult,
       ] = await Promise.all([
         // New shipments (last 24 hours)
         supabase
@@ -70,7 +71,16 @@ export function useSidebarCounts() {
           .from("approval_requests")
           .select("*", { count: "exact", head: true })
           .eq("status", "pending"),
+
+        // Pending payment verifications from agents
+        supabase
+          .from("payments")
+          .select("*", { count: "exact", head: true })
+          .eq("verification_status", "pending"),
       ]);
+
+      // Combine approval requests and pending payment verifications
+      const totalApprovals = (approvalsResult.count || 0) + (pendingPaymentsResult.count || 0);
 
       return {
         shipments: shipmentsResult.count || 0,
@@ -79,7 +89,7 @@ export function useSidebarCounts() {
         orders: ordersResult.count || 0,
         expenses: expensesResult.count || 0,
         settlements: settlementsResult.count || 0,
-        approvals: approvalsResult.count || 0,
+        approvals: totalApprovals,
       };
     },
     refetchInterval: 60000, // Refresh every minute
