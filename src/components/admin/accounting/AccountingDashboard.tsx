@@ -78,7 +78,7 @@ function useAccountingSummary() {
         .order('entry_date', { ascending: false })
         .limit(10);
 
-      // Get totals for each entry
+      // Get totals for each entry - use max of debit/credit totals since they should balance
       const recentTransactions = await Promise.all(
         (recentEntries || []).map(async (entry) => {
           const { data: lines } = await supabase
@@ -87,12 +87,15 @@ function useAccountingSummary() {
             .eq('journal_entry_id', entry.id);
           
           const totalDebit = lines?.reduce((sum, l) => sum + (l.debit_amount || 0), 0) || 0;
+          const totalCredit = lines?.reduce((sum, l) => sum + (l.credit_amount || 0), 0) || 0;
+          // Use the larger value - they should be equal in a balanced entry
+          const transactionAmount = Math.max(totalDebit, totalCredit);
           
           return {
             id: entry.id,
             date: entry.entry_date,
             description: entry.description,
-            amount: totalDebit,
+            amount: transactionAmount,
             type: entry.reference_type === 'expense' ? 'expense' as const : 
                   entry.reference_type === 'payment' ? 'income' as const : 'transfer' as const,
           };
