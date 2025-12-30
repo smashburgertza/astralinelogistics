@@ -406,14 +406,14 @@ export function ParcelCheckoutScanner() {
 
       {/* Parcel & Invoice Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader className="flex-shrink-0">
+        <DialogContent className="max-w-5xl max-h-[95vh] overflow-auto p-4">
+          <DialogHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Package className="h-6 w-6 text-primary" />
+              <div className="flex items-center gap-2">
+                <Package className="h-5 w-5 text-primary" />
                 <div>
-                  <DialogTitle className="text-xl">Parcel Checkout</DialogTitle>
-                  <p className="text-sm text-muted-foreground font-mono">
+                  <DialogTitle className="text-lg">Parcel Checkout</DialogTitle>
+                  <p className="text-xs text-muted-foreground font-mono">
                     {parcelData?.barcode}
                   </p>
                 </div>
@@ -427,304 +427,236 @@ export function ParcelCheckoutScanner() {
             </div>
           </DialogHeader>
 
-          <ScrollArea className="flex-1 -mx-6 px-6">
-            <div className="space-y-6 py-4">
-              {/* Parcel & Customer Info */}
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <h4 className="font-medium flex items-center gap-2">
-                    <Package className="h-4 w-4 text-muted-foreground" />
-                    Parcel Details
+          <div className="space-y-3">
+            {/* Parcel & Customer Info - Compact Side by Side */}
+            <div className="grid grid-cols-3 gap-3">
+              {/* Parcel Details */}
+              <div className="bg-muted/30 rounded-lg p-3 border">
+                <h4 className="font-medium text-sm flex items-center gap-1.5 mb-2">
+                  <Package className="h-3.5 w-3.5 text-muted-foreground" />
+                  Parcel
+                </h4>
+                <div className="space-y-1 text-sm">
+                  <p><span className="text-muted-foreground">Desc:</span> {parcelData?.description || 'N/A'}</p>
+                  <p><span className="text-muted-foreground">Weight:</span> {parcelData?.weight_kg} kg</p>
+                  {parcelData?.shipment && (
+                    <p className="font-mono text-xs">{parcelData.shipment.tracking_number}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Customer */}
+              {parcelData?.shipment?.customer && (
+                <div className="bg-muted/30 rounded-lg p-3 border">
+                  <h4 className="font-medium text-sm flex items-center gap-1.5 mb-2">
+                    <User className="h-3.5 w-3.5 text-muted-foreground" />
+                    Customer
                   </h4>
-                  <div className="pl-6 space-y-2">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Description</p>
-                      <p className="font-medium">{parcelData?.description || 'No description'}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Weight</p>
-                      <p className="font-medium">{parcelData?.weight_kg} kg</p>
-                    </div>
-                    {parcelData?.shipment && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Tracking #</p>
-                        <p className="font-mono font-medium">{parcelData.shipment.tracking_number}</p>
-                      </div>
+                  <div className="space-y-1 text-sm">
+                    <p className="font-medium">{parcelData.shipment.customer.name}</p>
+                    {parcelData.shipment.customer.phone && (
+                      <p className="text-muted-foreground text-xs flex items-center gap-1">
+                        <Phone className="h-3 w-3" />
+                        {parcelData.shipment.customer.phone}
+                      </p>
+                    )}
+                    {parcelData.shipment.customer.email && (
+                      <p className="text-muted-foreground text-xs flex items-center gap-1">
+                        <Mail className="h-3 w-3" />
+                        {parcelData.shipment.customer.email}
+                      </p>
                     )}
                   </div>
                 </div>
+              )}
 
-                {parcelData?.shipment?.customer && (
-                  <div className="space-y-4">
-                    <h4 className="font-medium flex items-center gap-2">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      Customer
-                    </h4>
-                    <div className="pl-6 p-4 rounded-lg bg-muted/50 border space-y-2">
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium">{parcelData.shipment.customer.name}</span>
-                      </div>
-                      {parcelData.shipment.customer.phone && (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Phone className="h-4 w-4" />
-                          <span>{parcelData.shipment.customer.phone}</span>
-                        </div>
-                      )}
-                      {parcelData.shipment.customer.email && (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Mail className="h-4 w-4" />
-                          <span>{parcelData.shipment.customer.email}</span>
-                        </div>
-                      )}
-                    </div>
+              {/* Amount Overview - Right Side */}
+              {invoice && (
+                <div className="space-y-2">
+                  <div className="bg-muted/50 rounded-lg p-2.5 text-center">
+                    <p className="text-xs text-muted-foreground">Total</p>
+                    <p className="text-lg font-bold">{currencySymbol}{totalAmount.toFixed(2)}</p>
+                    {showTzsEquivalent && (
+                      <p className="text-[10px] text-muted-foreground">≈ TZS {totalAmountTzs.toLocaleString()}</p>
+                    )}
                   </div>
-                )}
-              </div>
+                  <div className={`rounded-lg p-2.5 text-center ${remainingBalance > 0 ? 'bg-amber-50 dark:bg-amber-950/30' : 'bg-emerald-50 dark:bg-emerald-950/30'}`}>
+                    <p className={`text-xs ${remainingBalance > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>Balance Due</p>
+                    <p className={`text-lg font-bold ${remainingBalance > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
+                      {currencySymbol}{remainingBalance.toFixed(2)}
+                    </p>
+                    {showTzsEquivalent && (
+                      <p className={`text-[10px] ${remainingBalance > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                        ≈ TZS {remainingBalanceTzs.toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
 
-              <Separator />
-
-              {/* Invoice Section */}
-              {invoice ? (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-muted-foreground" />
-                      Invoice {invoice.invoice_number}
-                    </h4>
+            {/* Invoice Section */}
+            {invoice ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium text-sm flex items-center gap-1.5">
+                    <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                    Invoice {invoice.invoice_number}
+                  </h4>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {invoice.created_at ? format(new Date(invoice.created_at), 'MMM dd, yyyy') : '-'}
+                    </span>
                     <InvoiceStatusBadge status={invoice.status || 'pending'} />
                   </div>
+                </div>
 
-                  {/* Invoice Details */}
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p className="text-muted-foreground">Invoice Date</p>
-                      <p className="font-medium">{invoice.created_at ? format(new Date(invoice.created_at), 'MMM dd, yyyy') : '-'}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Due Date</p>
-                      <p className="font-medium">{invoice.due_date ? format(new Date(invoice.due_date), 'MMM dd, yyyy') : '-'}</p>
-                    </div>
-                    {invoice.shipments?.origin_region && (
-                      <div>
-                        <p className="text-muted-foreground">Origin</p>
-                        <p className="font-medium capitalize">{invoice.shipments.origin_region}</p>
-                      </div>
-                    )}
-                    {invoice.rate_per_kg && (
-                      <div>
-                        <p className="text-muted-foreground">Rate per kg</p>
-                        <p className="font-medium">{currencySymbol}{Number(invoice.rate_per_kg).toFixed(2)}/kg</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Invoice Line Items */}
-                  <div className="rounded-lg border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-muted/50">
-                          <TableHead>Description</TableHead>
-                          <TableHead className="text-center">Qty</TableHead>
-                          <TableHead className="text-right">Unit Price</TableHead>
-                          <TableHead className="text-right">Amount</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {invoiceItems.length > 0 ? (
-                          invoiceItems.map((item) => (
-                            <TableRow key={item.id}>
-                              <TableCell>
-                                <div>
-                                  <p className="font-medium capitalize">{item.item_type.replace('_', ' ')}</p>
-                                  {item.description && (
-                                    <p className="text-sm text-muted-foreground">{item.description}</p>
-                                  )}
-                                  {item.weight_kg && (
-                                    <p className="text-xs text-muted-foreground">{item.weight_kg} kg</p>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-center">{item.quantity}</TableCell>
-                              <TableCell className="text-right">
-                                {CURRENCY_SYMBOLS[item.currency] || '$'}{Number(item.unit_price).toFixed(2)}
-                                {item.unit_type === 'kg' && '/kg'}
-                              </TableCell>
-                              <TableCell className="text-right font-medium">
-                                {CURRENCY_SYMBOLS[item.currency] || '$'}{Number(item.amount).toFixed(2)}
-                              </TableCell>
-                            </TableRow>
-                          ))
-                        ) : (
-                          // Fallback: show basic invoice info if no line items
-                          <TableRow>
-                            <TableCell>
-                              <div>
-                                <p className="font-medium">Shipping Charges</p>
-                                {invoice.shipments?.total_weight_kg && (
-                                  <p className="text-sm text-muted-foreground">{invoice.shipments.total_weight_kg} kg</p>
-                                )}
-                              </div>
+                {/* Invoice Line Items - Compact Table */}
+                <div className="rounded-lg border overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50">
+                        <TableHead className="py-2 text-xs">Description</TableHead>
+                        <TableHead className="py-2 text-xs text-center w-16">Qty</TableHead>
+                        <TableHead className="py-2 text-xs text-right w-24">Rate</TableHead>
+                        <TableHead className="py-2 text-xs text-right w-24">Amount</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {invoiceItems.length > 0 ? (
+                        invoiceItems.map((item) => (
+                          <TableRow key={item.id} className="text-sm">
+                            <TableCell className="py-1.5">
+                              <span className="capitalize">{item.item_type.replace('_', ' ')}</span>
+                              {item.description && (
+                                <span className="text-muted-foreground text-xs ml-1">- {item.description}</span>
+                              )}
+                              {item.weight_kg && (
+                                <span className="text-muted-foreground text-xs ml-1">({item.weight_kg} kg)</span>
+                              )}
                             </TableCell>
-                            <TableCell className="text-center">1</TableCell>
-                            <TableCell className="text-right">
-                              {currencySymbol}{totalAmount.toFixed(2)}
+                            <TableCell className="py-1.5 text-center text-xs">{item.quantity}</TableCell>
+                            <TableCell className="py-1.5 text-right text-xs">
+                              {CURRENCY_SYMBOLS[item.currency] || '$'}{Number(item.unit_price).toFixed(2)}
+                              {item.unit_type === 'kg' && '/kg'}
                             </TableCell>
-                            <TableCell className="text-right font-medium">
-                              {currencySymbol}{totalAmount.toFixed(2)}
+                            <TableCell className="py-1.5 text-right font-medium text-xs">
+                              {CURRENCY_SYMBOLS[item.currency] || '$'}{Number(item.amount).toFixed(2)}
                             </TableCell>
                           </TableRow>
-                        )}
-                        {/* Subtotal / Total row */}
-                        <TableRow className="bg-muted/30 font-semibold">
-                          <TableCell colSpan={3} className="text-right">Total</TableCell>
-                          <TableCell className="text-right">
-                            {currencySymbol}{totalAmount.toFixed(2)} {invoice.currency}
+                        ))
+                      ) : (
+                        <TableRow className="text-sm">
+                          <TableCell className="py-1.5">
+                            Shipping Charges
+                            {invoice.shipments?.total_weight_kg && (
+                              <span className="text-muted-foreground text-xs ml-1">({invoice.shipments.total_weight_kg} kg)</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="py-1.5 text-center text-xs">1</TableCell>
+                          <TableCell className="py-1.5 text-right text-xs">
+                            {currencySymbol}{totalAmount.toFixed(2)}
+                          </TableCell>
+                          <TableCell className="py-1.5 text-right font-medium text-xs">
+                            {currencySymbol}{totalAmount.toFixed(2)}
                           </TableCell>
                         </TableRow>
+                      )}
+                      <TableRow className="bg-muted/30 font-semibold text-sm">
+                        <TableCell colSpan={3} className="py-1.5 text-right">Total</TableCell>
+                        <TableCell className="py-1.5 text-right">
+                          {currencySymbol}{totalAmount.toFixed(2)} {invoice.currency}
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* Payment History - Inline if exists */}
+                {payments.length > 0 && (
+                  <div className="rounded-lg border overflow-hidden">
+                    <div className="bg-muted/30 px-3 py-1.5 text-xs font-medium flex items-center gap-1.5">
+                      <CreditCard className="h-3 w-3" />
+                      Payment History
+                    </div>
+                    <Table>
+                      <TableBody>
+                        {payments.map((payment) => (
+                          <TableRow key={payment.id} className="text-xs">
+                            <TableCell className="py-1">
+                              {payment.paid_at ? format(new Date(payment.paid_at), 'MMM dd, yyyy') : '—'}
+                            </TableCell>
+                            <TableCell className="py-1 capitalize">
+                              {payment.payment_method?.replace('_', ' ') || '—'}
+                            </TableCell>
+                            <TableCell className="py-1 font-mono text-[10px]">
+                              {payment.stripe_payment_id || '—'}
+                            </TableCell>
+                            <TableCell className="py-1 text-right font-medium">
+                              {CURRENCY_SYMBOLS[payment.currency || 'USD']}{Number(payment.amount).toFixed(2)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
                       </TableBody>
                     </Table>
                   </div>
+                )}
 
-                  {/* Amount Overview */}
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="bg-muted/50 rounded-lg p-4">
-                      <p className="text-sm text-muted-foreground">Total Amount</p>
-                      <p className="text-xl font-bold">
-                        {currencySymbol}{totalAmount.toFixed(2)}
-                      </p>
-                      {showTzsEquivalent && (
-                        <p className="text-xs text-muted-foreground">≈ TZS {totalAmountTzs.toLocaleString()}</p>
-                      )}
-                    </div>
-                    <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-lg p-4">
-                      <p className="text-sm text-emerald-600 dark:text-emerald-400">Amount Paid</p>
-                      <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">
-                        {currencySymbol}{totalPaid.toFixed(2)}
-                      </p>
-                      {showTzsEquivalent && (
-                        <p className="text-xs text-emerald-600 dark:text-emerald-400">≈ TZS {totalPaidTzs.toLocaleString()}</p>
-                      )}
-                    </div>
-                    <div className={`rounded-lg p-4 ${remainingBalance > 0 ? 'bg-amber-50 dark:bg-amber-950/30' : 'bg-emerald-50 dark:bg-emerald-950/30'}`}>
-                      <p className={`text-sm ${remainingBalance > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                        Balance Due
-                      </p>
-                      <p className={`text-xl font-bold ${remainingBalance > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-emerald-700 dark:text-emerald-300'}`}>
-                        {currencySymbol}{remainingBalance.toFixed(2)}
-                      </p>
-                      {showTzsEquivalent && (
-                        <p className={`text-xs ${remainingBalance > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                          ≈ TZS {remainingBalanceTzs.toLocaleString()}
-                        </p>
-                      )}
-                    </div>
+                {/* Notes - Compact */}
+                {invoice.notes && (
+                  <div className="p-2 rounded-lg bg-muted/30 border text-xs">
+                    <span className="text-muted-foreground">Notes:</span> {invoice.notes}
                   </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-6 text-muted-foreground">
+                <FileText className="h-6 w-6 mx-auto mb-1 opacity-50" />
+                <p className="text-sm">No invoice found for this shipment</p>
+              </div>
+            )}
 
-                  {/* Notes */}
-                  {invoice.notes && (
-                    <div className="p-3 rounded-lg bg-muted/50 border">
-                      <p className="text-sm text-muted-foreground mb-1">Notes</p>
-                      <p className="text-sm">{invoice.notes}</p>
-                    </div>
-                  )}
-
-                  {/* Payment History */}
-                  {payments.length > 0 && (
-                    <div className="space-y-2">
-                      <h5 className="font-medium text-sm flex items-center gap-2">
-                        <CreditCard className="h-4 w-4 text-muted-foreground" />
-                        Payment History
-                      </h5>
-                      <div className="rounded-lg border">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Date</TableHead>
-                              <TableHead>Method</TableHead>
-                              <TableHead>Reference</TableHead>
-                              <TableHead className="text-right">Amount</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {payments.map((payment) => (
-                              <TableRow key={payment.id}>
-                                <TableCell>
-                                  {payment.paid_at 
-                                    ? format(new Date(payment.paid_at), 'MMM dd, yyyy')
-                                    : '—'
-                                  }
-                                </TableCell>
-                                <TableCell className="capitalize">
-                                  {payment.payment_method?.replace('_', ' ') || '—'}
-                                </TableCell>
-                                <TableCell className="font-mono text-sm">
-                                  {payment.stripe_payment_id || '—'}
-                                </TableCell>
-                                <TableCell className="text-right font-medium">
-                                  {CURRENCY_SYMBOLS[payment.currency || 'USD']}{Number(payment.amount).toFixed(2)}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    </div>
-                  )}
+            {/* Already Released Warning */}
+            {parcelData?.picked_up_at && (
+              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                <div className="text-sm">
+                  <span className="font-medium text-amber-700">Already Released:</span>{' '}
+                  <span className="text-amber-600">{format(new Date(parcelData.picked_up_at), 'PPp')}</span>
                 </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p>No invoice found for this shipment</p>
-                </div>
-              )}
-
-              {/* Already Released Warning */}
-              {parcelData?.picked_up_at && (
-                <>
-                  <Separator />
-                  <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center gap-3">
-                    <AlertCircle className="h-5 w-5 text-amber-600 shrink-0" />
-                    <div>
-                      <p className="font-medium text-amber-700">Already Released</p>
-                      <p className="text-sm text-amber-600">
-                        This parcel was released on {format(new Date(parcelData.picked_up_at), 'PPp')}
-                      </p>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          </ScrollArea>
+              </div>
+            )}
+          </div>
 
           {/* Footer Actions */}
-          <div className="flex justify-between items-center pt-4 border-t flex-shrink-0">
+          <div className="flex justify-between items-center pt-3 border-t">
             <div className="flex gap-2">
               {invoice && (
                 <Button variant="outline" size="sm" onClick={() => handlePrint()}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Download Invoice
+                  <Download className="h-4 w-4 mr-1" />
+                  Download
                 </Button>
               )}
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={closeDialog}>
+              <Button variant="outline" size="sm" onClick={closeDialog}>
                 Close
               </Button>
               {invoice && !isPaid && (
-                <Button variant="outline" onClick={() => setPaymentDialogOpen(true)}>
-                  <CreditCard className="h-4 w-4 mr-2" />
+                <Button variant="outline" size="sm" onClick={() => setPaymentDialogOpen(true)}>
+                  <CreditCard className="h-4 w-4 mr-1" />
                   Record Payment
                 </Button>
               )}
               {!parcelData?.picked_up_at && (
                 <Button 
+                  size="sm"
                   onClick={releaseParcel} 
                   className="bg-emerald-600 hover:bg-emerald-700"
                   disabled={isLoading}
                 >
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                  Release to Customer
+                  <CheckCircle2 className="h-4 w-4 mr-1" />
+                  Release
                 </Button>
               )}
             </div>
