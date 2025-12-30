@@ -257,6 +257,9 @@ export function useRecordPayment() {
       }
 
       if (isSplitPayment) {
+        console.log('Processing split payment with splits:', params.splits);
+        console.log('Bank account chart map:', bankAccountChartMap);
+        
         // Process each split as a separate journal entry
         for (const split of params.splits!) {
           const splitAmountInTzs = params.paymentCurrency === 'TZS' && currentInvoice.currency !== 'TZS'
@@ -265,6 +268,7 @@ export function useRecordPayment() {
 
           // Get the chart_account_id for this bank account
           const chartAccountId = bankAccountChartMap[split.accountId] || split.accountId;
+          console.log(`Split: accountId=${split.accountId}, chartAccountId=${chartAccountId}, amount=${split.amount}`);
 
           try {
             if (isB2BAgentPayment) {
