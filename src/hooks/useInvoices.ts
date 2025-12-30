@@ -235,12 +235,36 @@ export function useRecordPayment() {
       // Handle split payments or single payment
       const isSplitPayment = params.splits && params.splits.length > 0;
 
+      // Pre-fetch bank accounts with chart_account_ids for all splits
+      let bankAccountChartMap: Record<string, string> = {};
+      const allAccountIds = isSplitPayment 
+        ? params.splits!.map(s => s.accountId) 
+        : (params.depositAccountId ? [params.depositAccountId] : []);
+      
+      if (allAccountIds.length > 0) {
+        const { data: bankAccountsForMapping } = await supabase
+          .from('bank_accounts')
+          .select('id, chart_account_id')
+          .in('id', allAccountIds);
+        
+        if (bankAccountsForMapping) {
+          bankAccountsForMapping.forEach(ba => {
+            if (ba.chart_account_id) {
+              bankAccountChartMap[ba.id] = ba.chart_account_id;
+            }
+          });
+        }
+      }
+
       if (isSplitPayment) {
         // Process each split as a separate journal entry
         for (const split of params.splits!) {
           const splitAmountInTzs = params.paymentCurrency === 'TZS' && currentInvoice.currency !== 'TZS'
             ? split.amount  // Already in TZS
             : split.amount * invoiceCurrencyRate;
+
+          // Get the chart_account_id for this bank account
+          const chartAccountId = bankAccountChartMap[split.accountId] || split.accountId;
 
           try {
             if (isB2BAgentPayment) {
@@ -251,7 +275,7 @@ export function useRecordPayment() {
                 currency: params.paymentCurrency || currentInvoice.currency || 'USD',
                 exchangeRate: invoiceCurrencyRate,
                 paymentCurrency: params.paymentCurrency,
-                sourceAccountId: split.accountId,
+                sourceAccountId: chartAccountId,
                 amountInTzs: splitAmountInTzs,
               });
             } else {
@@ -262,7 +286,7 @@ export function useRecordPayment() {
                 currency: params.paymentCurrency || currentInvoice.currency || 'USD',
                 exchangeRate: invoiceCurrencyRate,
                 paymentCurrency: params.paymentCurrency,
-                depositAccountId: split.accountId,
+                depositAccountId: chartAccountId,
               });
             }
           } catch (journalError) {
@@ -289,6 +313,9 @@ export function useRecordPayment() {
           ? params.amount * invoiceCurrencyRate
           : params.amount;
 
+        // Get the chart_account_id for this bank account
+        const chartAccountId = params.depositAccountId ? bankAccountChartMap[params.depositAccountId] || params.depositAccountId : undefined;
+
         try {
           if (isB2BAgentPayment) {
             await createAgentPaymentJournalEntry({
@@ -298,7 +325,7 @@ export function useRecordPayment() {
               currency: params.paymentCurrency || currentInvoice.currency || 'USD',
               exchangeRate: invoiceCurrencyRate,
               paymentCurrency: params.paymentCurrency,
-              sourceAccountId: params.depositAccountId,
+              sourceAccountId: chartAccountId,
               amountInTzs: paymentAmountInTzs,
             });
           } else {
@@ -309,7 +336,7 @@ export function useRecordPayment() {
               currency: params.paymentCurrency || currentInvoice.currency || 'USD',
               exchangeRate: invoiceCurrencyRate,
               paymentCurrency: params.paymentCurrency,
-              depositAccountId: params.depositAccountId,
+              depositAccountId: chartAccountId,
             });
           }
         } catch (journalError) {
@@ -330,16 +357,13 @@ export function useRecordPayment() {
       }
 
       // Update bank account balances by recalculating from journal lines
-      const accountIds = isSplitPayment 
-        ? params.splits!.map(s => s.accountId) 
-        : (params.depositAccountId ? [params.depositAccountId] : []);
-      
-      if (accountIds.length > 0) {
+      // Reuse allAccountIds from earlier  
+      if (allAccountIds.length > 0) {
         // Get chart account IDs for the bank accounts
         const { data: bankAccounts } = await supabase
           .from('bank_accounts')
           .select('id, chart_account_id, opening_balance')
-          .in('id', accountIds);
+          .in('id', allAccountIds);
 
         if (bankAccounts) {
           for (const ba of bankAccounts) {
