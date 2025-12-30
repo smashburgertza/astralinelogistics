@@ -319,6 +319,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
           currency: data.currency,
           weight_kg: item.weight_kg ? Number(item.weight_kg) : null,
           unit_type: item.unit_type || 'fixed', // Store the unit type (fixed, percent, kg)
+          product_service_id: item.product_service_id || null,
         };
       });
 

@@ -15,6 +15,7 @@ export interface InvoiceItem {
   currency: string;
   weight_kg: number | null;
   unit_type: 'fixed' | 'percent' | 'kg' | null;
+  product_service_id: string | null;
   created_at: string;
 }
 
@@ -163,6 +164,7 @@ export function createFreightInvoiceItem(params: {
     currency: params.currency,
     weight_kg: params.weightKg,
     unit_type: 'kg',
+    product_service_id: null,
   };
 }
 
@@ -182,6 +184,7 @@ export function createHandlingInvoiceItem(params: {
     currency: params.currency,
     weight_kg: null,
     unit_type: 'fixed',
+    product_service_id: null,
   };
 }
 
@@ -201,5 +204,6 @@ export function createTransitInvoiceItem(params: {
     currency: params.currency,
     weight_kg: null,
     unit_type: 'fixed',
+    product_service_id: null,
   };
 }

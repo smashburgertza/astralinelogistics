@@ -1133,6 +1133,7 @@ export type Database = {
           id: string
           invoice_id: string
           item_type: string
+          product_service_id: string | null
           quantity: number
           unit_price: number
           unit_type: string | null
@@ -1146,6 +1147,7 @@ export type Database = {
           id?: string
           invoice_id: string
           item_type: string
+          product_service_id?: string | null
           quantity?: number
           unit_price?: number
           unit_type?: string | null
@@ -1159,6 +1161,7 @@ export type Database = {
           id?: string
           invoice_id?: string
           item_type?: string
+          product_service_id?: string | null
           quantity?: number
           unit_price?: number
           unit_type?: string | null
@@ -1170,6 +1173,13 @@ export type Database = {
             columns: ["invoice_id"]
             isOneToOne: false
             referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_items_product_service_id_fkey"
+            columns: ["product_service_id"]
+            isOneToOne: false
+            referencedRelation: "products_services"
             referencedColumns: ["id"]
           },
         ]

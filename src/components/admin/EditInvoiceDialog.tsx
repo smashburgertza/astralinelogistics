@@ -127,10 +127,10 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange }: EditInvoiceDi
       let lineItems;
       
       if (invoiceItems && invoiceItems.length > 0) {
-        // Use existing invoice items
+        // Use existing invoice items - preserve the product_service_id
         lineItems = invoiceItems.map(item => ({
           id: item.id,
-          product_service_id: '',
+          product_service_id: item.product_service_id || '',
           description: item.description || '',
           tracking_number: '',
           quantity: item.quantity,
@@ -280,6 +280,7 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange }: EditInvoiceDi
             currency: data.currency,
             weight_kg: null,
             unit_type: (item.unit_type || 'fixed') as 'fixed' | 'percent' | 'kg',
+            product_service_id: item.product_service_id || null,
           });
         }
       }
