@@ -91,6 +91,10 @@ export function useCreateInvoice() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['trial-balance'] });
+      queryClient.invalidateQueries({ queryKey: ['income-statement'] });
+      queryClient.invalidateQueries({ queryKey: ['balance-sheet'] });
       toast.success('Invoice created successfully');
     },
     onError: (error) => {
@@ -270,6 +274,10 @@ export function useRecordPayment() {
       queryClient.invalidateQueries({ queryKey: ['accounting-summary'] });
       queryClient.invalidateQueries({ queryKey: ['agent-balance'] });
       queryClient.invalidateQueries({ queryKey: ['all-agent-balances'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['trial-balance'] });
+      queryClient.invalidateQueries({ queryKey: ['income-statement'] });
+      queryClient.invalidateQueries({ queryKey: ['balance-sheet'] });
       toast.success('Payment recorded successfully');
     },
     onError: (error) => {

@@ -385,6 +385,66 @@ export async function createInvoiceJournalEntry({
 }
 
 /**
+ * Create journal entry when agent submits an invoice to us (from_agent)
+ * This creates a liability (we owe the agent) and an expense
+ * Accounting: Debit Agent Costs (expense), Credit Agent Payables (liability)
+ */
+export async function createAgentInvoiceJournalEntry({
+  invoiceId,
+  invoiceNumber,
+  amount,
+  currency,
+  exchangeRate = 1,
+  agentName,
+  originRegion,
+}: {
+  invoiceId: string;
+  invoiceNumber: string;
+  amount: number;
+  currency: string;
+  exchangeRate?: number;
+  agentName?: string;
+  originRegion?: string;
+}) {
+  // Map region to expense account code
+  const regionExpenseMap: Record<string, string> = {
+    europe: '5110',
+    dubai: '5120',
+    china: '5130',
+    india: '5140',
+    usa: '5150',
+    uk: '5160',
+  };
+  
+  const expenseAccountCode = originRegion ? (regionExpenseMap[originRegion.toLowerCase()] || '5100') : '5100';
+
+  return createJournalEntry({
+    description: `Agent invoice ${invoiceNumber}${agentName ? ` from ${agentName}` : ''}`,
+    referenceType: 'invoice',
+    referenceId: invoiceId,
+    autoPost: true,
+    lines: [
+      {
+        account_code: expenseAccountCode,
+        description: `Agent cost - Invoice ${invoiceNumber}`,
+        debit_amount: amount,
+        credit_amount: 0,
+        currency,
+        exchange_rate: exchangeRate,
+      },
+      {
+        account_code: ACCOUNT_CODES.AGENT_PAYABLES,
+        description: `Payable to agent - Invoice ${invoiceNumber}`,
+        debit_amount: 0,
+        credit_amount: amount,
+        currency,
+        exchange_rate: exchangeRate,
+      },
+    ],
+  });
+}
+
+/**
  * Create journal entry for paying an agent (B2B payment where we owe the agent)
  * This is for invoices with invoice_direction = 'from_agent'
  * Accounting: Debit Agent Payables (clearing liability), Credit Cash (money going out)
@@ -469,6 +529,52 @@ export async function createAgentPaymentJournalEntry({
         credit_amount: amount,
         currency: effectiveCurrency,
         exchange_rate: effectiveRate,
+      },
+    ],
+  });
+}
+
+/**
+ * Create journal entry when Astraline bills an agent (to_agent)
+ * This creates a receivable (agent owes us) and revenue
+ * Accounting: Debit Agent Receivables (or AR), Credit Service Revenue
+ */
+export async function createAgentBillingJournalEntry({
+  invoiceId,
+  invoiceNumber,
+  amount,
+  currency,
+  exchangeRate = 1,
+  agentName,
+}: {
+  invoiceId: string;
+  invoiceNumber: string;
+  amount: number;
+  currency: string;
+  exchangeRate?: number;
+  agentName?: string;
+}) {
+  return createJournalEntry({
+    description: `Agent invoice ${invoiceNumber}${agentName ? ` to ${agentName}` : ''} (clearing services)`,
+    referenceType: 'invoice',
+    referenceId: invoiceId,
+    autoPost: true,
+    lines: [
+      {
+        account_code: ACCOUNT_CODES.ACCOUNTS_RECEIVABLE,
+        description: `Receivable from agent - Invoice ${invoiceNumber}`,
+        debit_amount: amount,
+        credit_amount: 0,
+        currency,
+        exchange_rate: exchangeRate,
+      },
+      {
+        account_code: ACCOUNT_CODES.SHIPPING_REVENUE,
+        description: `Clearing service revenue - Invoice ${invoiceNumber}`,
+        debit_amount: 0,
+        credit_amount: amount,
+        currency,
+        exchange_rate: exchangeRate,
       },
     ],
   });

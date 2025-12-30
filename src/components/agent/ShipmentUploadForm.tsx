@@ -33,6 +33,7 @@ import { useTransitRoutesByRegion, TRANSIT_POINT_LABELS, TransitPointType } from
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { createAgentInvoiceJournalEntry } from '@/lib/journalEntryUtils';
 import { PrintableLabels } from './PrintableLabels';
 import { useGetOrCreateBatch, useCurrentBatch } from '@/hooks/useCargoBatches';
 import { Database } from '@/integrations/supabase/types';
@@ -608,6 +609,21 @@ export function ShipmentUploadForm() {
           }
 
           await supabase.from('invoice_items').insert(lineItems);
+
+          // Create journal entry for agent invoice (creates liability: we owe the agent)
+          try {
+            await createAgentInvoiceJournalEntry({
+              invoiceId: invoice.id,
+              invoiceNumber: invoice.invoice_number,
+              amount: totalAmount,
+              currency: currency,
+              exchangeRate: 1,
+              agentName: undefined, // Agent submitting their own invoice
+              originRegion: selectedRegion,
+            });
+          } catch (journalError) {
+            console.error('Failed to create journal entry for agent invoice:', journalError);
+          }
         }
 
         if (invoiceError) {
