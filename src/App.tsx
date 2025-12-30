@@ -60,6 +60,7 @@ const AdminProfilePage = lazy(() => import("./pages/admin/Profile"));
 const AdminNotificationsPage = lazy(() => import("./pages/admin/Notifications"));
 const AdminBatchProfitabilityPage = lazy(() => import("./pages/admin/BatchProfitability"));
 const AdminSettlementsPage = lazy(() => import("./pages/admin/Settlements"));
+const AdminApprovalsPage = lazy(() => import("./pages/admin/Approvals"));
 
 const queryClient = new QueryClient();
 
@@ -134,6 +135,7 @@ const App = () => (
             
             {/* Billing - requires manage_invoices */}
             <Route path="/admin/billing" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="manage_invoices"><AdminBillingPage /></PermissionGate></Suspense>} />
+            <Route path="/admin/approvals" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="manage_invoices"><AdminApprovalsPage /></PermissionGate></Suspense>} />
             <Route path="/admin/settlements" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="manage_invoices"><AdminSettlementsPage /></PermissionGate></Suspense>} />
             
             {/* Expenses - requires manage_expenses */}

@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, PackageSearch, UsersRound, FileStack, Wallet,
   ChartSpline, Settings2, LogOut, ChevronDown, UserCircle2,
-  Container, UserCog, ReceiptText, TrendingUp, ShoppingCart, FileText, User, Calculator, BarChart3, PiggyBank
+  Container, UserCog, TrendingUp, ShoppingCart, FileText, User, Calculator, BarChart3, PiggyBank, ClipboardCheck
 } from 'lucide-react';
 import astralineLogo from '@/assets/astraline-logo-horizontal.svg';
 import { Button } from '@/components/ui/button';
@@ -60,6 +60,7 @@ const mainNavItems: NavItem[] = [
   { label: 'Shipments', href: '/admin/shipments', icon: PackageSearch, permission: 'manage_shipments', countKey: 'shipments' },
   { label: 'Customers', href: '/admin/customers', icon: UsersRound, permission: 'manage_customers', countKey: 'customers' },
   { label: 'Billing', href: '/admin/billing', icon: FileStack, permission: 'manage_invoices', countKey: 'invoices' },
+  { label: 'Approvals', href: '/admin/approvals', icon: ClipboardCheck, permission: 'manage_invoices', countKey: 'approvals' },
   { label: 'Shop Orders', href: '/admin/orders', icon: ShoppingCart, permission: 'manage_shipments', countKey: 'orders' },
 ];
 
