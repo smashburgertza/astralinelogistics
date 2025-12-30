@@ -137,11 +137,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    // Clear state first to prevent any race conditions
     setUser(null);
     setSession(null);
     setProfile(null);
     setRoles([]);
+    
+    // Then sign out from Supabase
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.error('Error signing out:', error);
+    }
   };
 
   const hasRole = (role: AppRole) => roles.some(r => r.role === role);
