@@ -99,7 +99,7 @@ const defaultCompany = {
   address: '',
   website: '',
   tax_id: '',
-  currency: 'USD',
+  currency: 'TZS',
   timezone: 'Asia/Dubai',
 };
 

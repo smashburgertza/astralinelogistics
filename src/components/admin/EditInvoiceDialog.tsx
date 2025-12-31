@@ -34,7 +34,7 @@ const lineItemSchema = z.object({
 
 const invoiceSchema = z.object({
   customer_id: z.string().min(1, 'Customer is required'),
-  currency: z.string().default('USD'),
+  currency: z.string().default('TZS'),
   shipment_ids: z.array(z.string()).optional(),
   discount: z.string().optional(),
   payment_terms: z.string().default('net_30'),

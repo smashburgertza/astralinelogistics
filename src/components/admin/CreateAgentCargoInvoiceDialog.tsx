@@ -44,7 +44,7 @@ const lineItemSchema = z.object({
 });
 
 const formSchema = z.object({
-  currency: z.string().default("USD"),
+  currency: z.string().default("TZS"),
   due_date: z.string().optional(),
   notes: z.string().optional(),
   line_items: z.array(lineItemSchema).min(1, "At least one line item is required"),
@@ -97,7 +97,7 @@ export function CreateAgentCargoInvoiceDialog({
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      currency: "USD",
+      currency: "TZS",
       due_date: "",
       notes: "",
       line_items: [],

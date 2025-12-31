@@ -26,7 +26,7 @@ const lineItemSchema = z.object({
 const estimateSchema = z.object({
   customer_id: z.string().min(1, 'Customer is required'),
   origin_region: z.string().min(1, 'Region is required'),
-  currency: z.string().default('USD'),
+  currency: z.string().default('TZS'),
   valid_until: z.string().optional(),
   notes: z.string().optional(),
   line_items: z.array(lineItemSchema).min(1, 'At least one line item is required'),
@@ -52,7 +52,7 @@ export function EditEstimateDialog({ estimate, open, onOpenChange }: EditEstimat
     defaultValues: {
       customer_id: estimate.customer_id || '',
       origin_region: estimate.origin_region || '',
-      currency: estimate.currency || 'USD',
+      currency: estimate.currency || 'TZS',
       valid_until: estimate.valid_until || '',
       notes: estimate.notes || '',
       line_items: [],

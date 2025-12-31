@@ -36,7 +36,7 @@ const lineItemSchema = z.object({
 const invoiceSchema = z.object({
   customer_id: z.string().min(1, 'Customer is required'),
   shipment_ids: z.array(z.string()).optional(),
-  currency: z.string().default('USD'),
+  currency: z.string().default('TZS'),
   payment_terms: z.string().default('net_30'),
   discount: z.string().optional(),
   tax_rate: z.coerce.number().min(0).max(100).default(0),
@@ -93,7 +93,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
     defaultValues: {
       customer_id: '',
       shipment_ids: [],
-      currency: 'USD',
+      currency: 'TZS',
       payment_terms: 'net_30',
       discount: '',
       tax_rate: 0,
@@ -110,7 +110,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
       form.reset({
         customer_id: '',
         shipment_ids: [],
-        currency: 'USD',
+        currency: 'TZS',
         payment_terms: 'net_30',
         discount: '',
         tax_rate: 0,
