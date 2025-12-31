@@ -304,10 +304,14 @@ export function useRecordPayment() {
       };
 
       const updateBankBalances = async () => {
+        // For outgoing payments (to agent), we subtract from balance
+        // For incoming payments (from agent or customer), we add to balance
+        const balanceMultiplier = isB2BPaymentToAgent ? -1 : 1;
+        
         if (isSplitPayment && params.splits) {
           const updatePromises = params.splits.map(async (split) => {
             const currentBalance = bankAccountBalanceMap[split.accountId] || 0;
-            const newBalance = currentBalance + split.amount;
+            const newBalance = currentBalance + (split.amount * balanceMultiplier);
             return supabase
               .from('bank_accounts')
               .update({ current_balance: newBalance })
@@ -316,7 +320,7 @@ export function useRecordPayment() {
           return Promise.all(updatePromises);
         } else if (params.depositAccountId && bankAccountBalanceMap[params.depositAccountId] !== undefined) {
           const currentBalance = bankAccountBalanceMap[params.depositAccountId];
-          const newBalance = currentBalance + params.amount;
+          const newBalance = currentBalance + (params.amount * balanceMultiplier);
           return supabase
             .from('bank_accounts')
             .update({ current_balance: newBalance })
