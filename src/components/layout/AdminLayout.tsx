@@ -67,7 +67,7 @@ const mainNavItems: NavItem[] = [
 const financeNavItems: NavItem[] = [
   { label: 'Accounting', href: '/admin/accounting', icon: Calculator, permission: 'view_reports' },
   { label: 'Analytics', href: '/admin/analytics', icon: BarChart3, permission: 'view_reports' },
-  { label: 'Settlements', href: '/admin/settlements', icon: TrendingUp, permission: 'manage_invoices', countKey: 'settlements' },
+  { label: 'B2B Agent', href: '/admin/settlements', icon: TrendingUp, permission: 'manage_invoices', countKey: 'settlements' },
   { label: 'Expenses', href: '/admin/expenses', icon: Wallet, permission: 'manage_expenses', countKey: 'expenses' },
   { label: 'Commissions', href: '/admin/commissions', icon: TrendingUp, permission: 'view_reports' },
 ];
