@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
-import { createInvoicePaymentJournalEntry, createInvoiceJournalEntry, createAgentPaymentJournalEntry, createPurchaseInvoiceJournalEntry } from '@/lib/journalEntryUtils';
+import { createInvoicePaymentJournalEntry, createInvoiceJournalEntry, createAgentPaymentJournalEntry, createAgentPaymentReceivedJournalEntry, createPurchaseInvoiceJournalEntry } from '@/lib/journalEntryUtils';
 
 export type InvoiceType = 'shipping' | 'purchase_shipping';
 
@@ -234,7 +234,11 @@ export function useRecordPayment() {
       const currentPaid = Number(currentInvoice.amount_paid || 0);
       const newTotalPaid = currentPaid + params.amount;
       const isFullyPaid = newTotalPaid >= totalAmount;
-      const isB2BAgentPayment = currentInvoice.invoice_direction === 'from_agent' && currentInvoice.agent_id;
+      // Determine payment type based on invoice direction
+      // from_agent: Agent is billing us (we pay OUT to agent) - use createAgentPaymentJournalEntry
+      // to_agent: We are billing agent (agent pays us, we receive IN) - use createAgentPaymentReceivedJournalEntry
+      const isB2BPaymentToAgent = currentInvoice.invoice_direction === 'from_agent' && currentInvoice.agent_id;
+      const isB2BPaymentFromAgent = currentInvoice.invoice_direction === 'to_agent' && currentInvoice.agent_id;
 
       // Build bank account chart map
       const bankAccountChartMap: Record<string, string> = {};
@@ -339,7 +343,8 @@ export function useRecordPayment() {
                 : split.amount * invoiceCurrencyRate;
               const chartAccountId = bankAccountChartMap[split.accountId] || split.accountId;
 
-              if (isB2BAgentPayment) {
+              if (isB2BPaymentToAgent) {
+                // We are paying OUT to agent (from_agent invoice)
                 await createAgentPaymentJournalEntry({
                   invoiceId: invoiceUpdateResult.data.id,
                   invoiceNumber: currentInvoice.invoice_number,
@@ -348,6 +353,18 @@ export function useRecordPayment() {
                   exchangeRate: invoiceCurrencyRate,
                   paymentCurrency: params.paymentCurrency,
                   sourceAccountId: chartAccountId,
+                  amountInTzs: splitAmountInTzs,
+                });
+              } else if (isB2BPaymentFromAgent) {
+                // We are receiving payment FROM agent (to_agent invoice)
+                await createAgentPaymentReceivedJournalEntry({
+                  invoiceId: invoiceUpdateResult.data.id,
+                  invoiceNumber: currentInvoice.invoice_number,
+                  amount: split.amount,
+                  currency: params.paymentCurrency || currentInvoice.currency || 'USD',
+                  exchangeRate: invoiceCurrencyRate,
+                  paymentCurrency: params.paymentCurrency,
+                  depositAccountId: chartAccountId,
                   amountInTzs: splitAmountInTzs,
                 });
               } else {
@@ -370,7 +387,8 @@ export function useRecordPayment() {
               ? bankAccountChartMap[params.depositAccountId] || params.depositAccountId 
               : undefined;
 
-            if (isB2BAgentPayment) {
+            if (isB2BPaymentToAgent) {
+              // We are paying OUT to agent (from_agent invoice)
               await createAgentPaymentJournalEntry({
                 invoiceId: invoiceUpdateResult.data.id,
                 invoiceNumber: currentInvoice.invoice_number,
@@ -379,6 +397,18 @@ export function useRecordPayment() {
                 exchangeRate: invoiceCurrencyRate,
                 paymentCurrency: params.paymentCurrency,
                 sourceAccountId: chartAccountId,
+                amountInTzs: paymentAmountInTzs,
+              });
+            } else if (isB2BPaymentFromAgent) {
+              // We are receiving payment FROM agent (to_agent invoice)
+              await createAgentPaymentReceivedJournalEntry({
+                invoiceId: invoiceUpdateResult.data.id,
+                invoiceNumber: currentInvoice.invoice_number,
+                amount: paymentAmountInTzs,
+                currency: params.paymentCurrency || currentInvoice.currency || 'USD',
+                exchangeRate: invoiceCurrencyRate,
+                paymentCurrency: params.paymentCurrency,
+                depositAccountId: chartAccountId,
                 amountInTzs: paymentAmountInTzs,
               });
             } else {
