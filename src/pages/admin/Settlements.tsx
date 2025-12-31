@@ -18,15 +18,59 @@ import {
   XCircle,
   Users,
   ShieldCheck,
+  Eye,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { usePaymentsPendingVerification, useVerifyPayment } from '@/hooks/useAgentInvoices';
 import { B2BInvoices } from '@/components/admin/B2BInvoices';
+import { VerifyPaymentDialog, VerifyPaymentData } from '@/components/admin/VerifyPaymentDialog';
 
 export default function SettlementsPage() {
   const [activeTab, setActiveTab] = useState('invoices');
   const { data: pendingVerifications, isLoading: verificationsLoading } = usePaymentsPendingVerification();
   const verifyPayment = useVerifyPayment();
+  
+  const [selectedPayment, setSelectedPayment] = useState<any | null>(null);
+  const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
+
+  const handleOpenVerify = (payment: any) => {
+    setSelectedPayment(payment);
+    setVerifyDialogOpen(true);
+  };
+
+  const handleVerify = (data: VerifyPaymentData) => {
+    verifyPayment.mutate({
+      paymentId: data.paymentId,
+      status: 'verified',
+      invoiceId: data.invoiceId,
+      depositAccountId: data.depositAccountId,
+      amount: data.amount,
+      currency: data.currency,
+      invoiceNumber: data.invoiceNumber,
+      amountInTzs: data.amountInTzs,
+      exchangeRate: data.exchangeRate,
+      isAgentPayment: data.isAgentPayment,
+    }, {
+      onSuccess: () => {
+        setVerifyDialogOpen(false);
+        setSelectedPayment(null);
+      },
+    });
+  };
+
+  const handleReject = (data: { paymentId: string; invoiceId: string }) => {
+    verifyPayment.mutate({
+      paymentId: data.paymentId,
+      status: 'rejected',
+      invoiceId: data.invoiceId,
+      isAgentPayment: selectedPayment?.invoices?.invoice_direction === 'to_agent',
+    }, {
+      onSuccess: () => {
+        setVerifyDialogOpen(false);
+        setSelectedPayment(null);
+      },
+    });
+  };
 
   return (
     <AdminLayout title="B2B Agent" subtitle="Manage agent invoices and payment verification">
@@ -61,7 +105,7 @@ export default function SettlementsPage() {
                 Pending Payment Verifications
               </CardTitle>
               <CardDescription>
-                Review and verify payments marked by agents
+                Review and verify payments marked by agents and customers
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -74,7 +118,8 @@ export default function SettlementsPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Invoice #</TableHead>
-                      <TableHead>Agent</TableHead>
+                      <TableHead>Payer</TableHead>
+                      <TableHead>Type</TableHead>
                       <TableHead className="text-right">Amount</TableHead>
                       <TableHead>Payment Method</TableHead>
                       <TableHead>Reference</TableHead>
@@ -83,69 +128,60 @@ export default function SettlementsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {pendingVerifications.map((payment: any) => (
-                      <TableRow key={payment.id}>
-                        <TableCell className="font-mono text-sm">
-                          {payment.invoices?.invoice_number}
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <div className="font-medium">
-                              {payment.agent?.company_name || payment.agent?.full_name || 'Unknown'}
+                    {pendingVerifications.map((payment: any) => {
+                      const isAgentPayment = payment.invoices?.invoice_direction === 'to_agent';
+                      const payerName = isAgentPayment
+                        ? payment.agent?.company_name || payment.agent?.full_name || 'Unknown Agent'
+                        : payment.customer?.company_name || payment.customer?.name || 'Unknown Customer';
+                      
+                      return (
+                        <TableRow key={payment.id}>
+                          <TableCell className="font-mono text-sm">
+                            {payment.invoices?.invoice_number}
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">{payerName}</div>
+                              {payment.agent?.agent_code && (
+                                <div className="text-xs text-muted-foreground">
+                                  {payment.agent.agent_code}
+                                </div>
+                              )}
                             </div>
-                            {payment.agent?.agent_code && (
-                              <div className="text-xs text-muted-foreground">
-                                {payment.agent.agent_code}
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right font-bold">
-                          {payment.currency} {payment.amount?.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="capitalize">
-                          {payment.payment_method?.replace('_', ' ')}
-                        </TableCell>
-                        <TableCell className="font-mono text-sm">
-                          {payment.stripe_payment_id || '-'}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {format(new Date(payment.paid_at), 'MMM d, yyyy')}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={
+                              isAgentPayment 
+                                ? "bg-blue-50 text-blue-700 border-blue-200" 
+                                : "bg-purple-50 text-purple-700 border-purple-200"
+                            }>
+                              {isAgentPayment ? 'Agent' : 'Customer'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-bold">
+                            {payment.currency} {payment.amount?.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="capitalize">
+                            {payment.payment_method?.replace('_', ' ')}
+                          </TableCell>
+                          <TableCell className="font-mono text-sm max-w-[150px] truncate">
+                            {payment.stripe_payment_id || '-'}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {format(new Date(payment.paid_at), 'MMM d, yyyy')}
+                          </TableCell>
+                          <TableCell className="text-right">
                             <Button
                               size="sm"
-                              variant="outline"
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                              onClick={() => verifyPayment.mutate({
-                                paymentId: payment.id,
-                                status: 'rejected',
-                                invoiceId: payment.invoice_id,
-                                isAgentPayment: payment.invoices?.invoice_direction === 'to_agent',
-                              })}
-                              disabled={verifyPayment.isPending}
+                              onClick={() => handleOpenVerify(payment)}
                             >
-                              <XCircle className="h-4 w-4 mr-1" />
-                              Reject
+                              <Eye className="h-4 w-4 mr-1" />
+                              Review
                             </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => verifyPayment.mutate({
-                                paymentId: payment.id,
-                                status: 'verified',
-                                invoiceId: payment.invoice_id,
-                                isAgentPayment: payment.invoices?.invoice_direction === 'to_agent',
-                              })}
-                              disabled={verifyPayment.isPending}
-                            >
-                              <CheckCircle className="h-4 w-4 mr-1" />
-                              Verify
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               ) : (
@@ -153,7 +189,7 @@ export default function SettlementsPage() {
                   <ShieldCheck className="w-12 h-12 mx-auto mb-3 opacity-40" />
                   <p>No payments pending verification</p>
                   <p className="text-sm mt-1">
-                    Agent payments will appear here for your review
+                    Agent and customer payments will appear here for your review
                   </p>
                 </div>
               )}
@@ -161,6 +197,16 @@ export default function SettlementsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Verify Payment Dialog */}
+      <VerifyPaymentDialog
+        payment={selectedPayment}
+        open={verifyDialogOpen}
+        onOpenChange={setVerifyDialogOpen}
+        onVerify={handleVerify}
+        onReject={handleReject}
+        isLoading={verifyPayment.isPending}
+      />
     </AdminLayout>
   );
 }
