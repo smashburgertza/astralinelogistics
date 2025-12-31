@@ -32,10 +32,23 @@ import {
   useReconciliationSummary,
   BankTransaction
 } from '@/hooks/useBankReconciliation';
+import { ImportBankStatementDialog } from './ImportBankStatementDialog';
+import { useBankAccounts, BankAccount } from '@/hooks/useAccounting';
+import { 
+  useBankTransactions, 
+  useUnreconciledJournalEntries,
+  useCreateBankTransaction,
+  useReconcileTransaction,
+  useUnreconcileTransaction,
+  useMarkReconciled,
+  useReconciliationSummary,
+  BankTransaction
+} from '@/hooks/useBankReconciliation';
 
 export function BankReconciliationTab() {
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [showAddTransaction, setShowAddTransaction] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
   const [showMatchDialog, setShowMatchDialog] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<BankTransaction | null>(null);
   const [filterReconciled, setFilterReconciled] = useState<string>('all');
@@ -91,10 +104,16 @@ export function BankReconciliationTab() {
               </Select>
             </div>
             {selectedAccountId && (
-              <Button onClick={() => setShowAddTransaction(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Transaction
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setShowImportDialog(true)}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Import CSV
+                </Button>
+                <Button onClick={() => setShowAddTransaction(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Transaction
+                </Button>
+              </div>
             )}
           </div>
         </CardContent>
@@ -180,6 +199,13 @@ export function BankReconciliationTab() {
       <AddTransactionDialog
         open={showAddTransaction}
         onOpenChange={setShowAddTransaction}
+        bankAccountId={selectedAccountId}
+      />
+
+      {/* Import CSV Dialog */}
+      <ImportBankStatementDialog
+        open={showImportDialog}
+        onOpenChange={setShowImportDialog}
         bankAccountId={selectedAccountId}
       />
 

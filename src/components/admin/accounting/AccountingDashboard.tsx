@@ -5,30 +5,18 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { usePendingExpenses } from '@/hooks/useExpenses';
 import { supabase } from '@/integrations/supabase/client';
-import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
+import { CashFlowChart } from './CashFlowChart';
+import { AccountBalancesWidget } from './AccountBalancesWidget';
+import { LatestTransactionsWidget } from './LatestTransactionsWidget';
+import { AgingSummaryWidget } from './AgingSummaryWidget';
 
 interface AccountingSummary {
   cashBalance: number;
-  cashCurrency: string;
   receivables: number;
-  receivablesCurrency: string;
   payables: number;
-  payablesCurrency: string;
   monthlyIncome: number;
-  monthlyIncomeCurrency: string;
   monthlyExpenses: number;
-  monthlyExpensesCurrency: string;
-  recentTransactions: Array<{
-    id: string;
-    date: string;
-    description: string;
-    amount: number;
-    amountInTzs: number;
-    currency: string;
-    type: 'income' | 'expense' | 'transfer';
-  }>;
-  exchangeRates: Map<string, number>;
 }
 
 function useAccountingSummary() {
@@ -45,14 +33,14 @@ function useAccountingSummary() {
       
       const ratesMap = new Map<string, number>();
       exchangeRates?.forEach(r => ratesMap.set(r.currency_code, r.rate_to_tzs));
-      ratesMap.set('TZS', 1); // TZS to TZS is 1
+      ratesMap.set('TZS', 1);
       
       const convertToTzs = (amount: number, currency: string): number => {
         const rate = ratesMap.get(currency) || 1;
         return amount * rate;
       };
       
-      // Get bank accounts for cash balance (already in TZS typically)
+      // Get bank accounts for cash balance
       const { data: bankAccounts } = await supabase
         .from('bank_accounts')
         .select('current_balance, currency')
@@ -63,7 +51,7 @@ function useAccountingSummary() {
         cashBalance += convertToTzs(acc.current_balance || 0, acc.currency || 'TZS');
       });
 
-      // Get unpaid invoices (receivables) - invoices TO agents that are pending
+      // Get unpaid invoices (receivables)
       const { data: receivables } = await supabase
         .from('invoices')
         .select('amount, currency')
@@ -110,77 +98,23 @@ function useAccountingSummary() {
         monthlyExpenses += convertToTzs(exp.amount || 0, exp.currency || 'USD');
       });
 
-      // Get recent transactions from journal entries
-      const { data: recentEntries } = await supabase
-        .from('journal_entries')
-        .select('id, entry_date, description, reference_type')
-        .eq('status', 'posted')
-        .order('entry_date', { ascending: false })
-        .limit(10);
-
-      // Get totals for each entry - use max of debit/credit totals since they should balance
-      const recentTransactions = await Promise.all(
-        (recentEntries || []).map(async (entry) => {
-          const { data: lines } = await supabase
-            .from('journal_lines')
-            .select('debit_amount, credit_amount, currency')
-            .eq('journal_entry_id', entry.id);
-          
-          const totalDebit = lines?.reduce((sum, l) => sum + (l.debit_amount || 0), 0) || 0;
-          const totalCredit = lines?.reduce((sum, l) => sum + (l.credit_amount || 0), 0) || 0;
-          const transactionAmount = Math.max(totalDebit, totalCredit);
-          // Get the currency from the first line (entries are typically in one currency)
-          const currency = lines?.[0]?.currency || 'TZS';
-          const amountInTzs = convertToTzs(transactionAmount, currency);
-          
-          return {
-            id: entry.id,
-            date: entry.entry_date,
-            description: entry.description,
-            amount: transactionAmount,
-            amountInTzs,
-            currency,
-            type: entry.reference_type === 'expense' ? 'expense' as const : 
-                  entry.reference_type === 'payment' ? 'income' as const : 'transfer' as const,
-          };
-        })
-      );
-
       return {
         cashBalance,
-        cashCurrency: 'TZS',
         receivables: receivablesTotal,
-        receivablesCurrency: 'TZS',
         payables: payablesTotal,
-        payablesCurrency: 'TZS',
         monthlyIncome,
-        monthlyIncomeCurrency: 'TZS',
         monthlyExpenses,
-        monthlyExpensesCurrency: 'TZS',
-        recentTransactions,
-        exchangeRates: ratesMap,
       };
     },
   });
 }
 
-const formatCurrency = (amount: number, currency: string = 'TZS') => {
-  // For TZS, use no decimals and proper formatting
-  if (currency === 'TZS') {
-    return new Intl.NumberFormat('en-TZ', {
-      style: 'currency',
-      currency: 'TZS',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  }
-  
-  // For other currencies
-  return new Intl.NumberFormat('en-US', {
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat('en-TZ', {
     style: 'currency',
-    currency: currency,
+    currency: 'TZS',
     minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
+    maximumFractionDigits: 0,
   }).format(amount);
 };
 
@@ -214,49 +148,49 @@ export function AccountingDashboard() {
   const stats = [
     {
       title: 'Cash Balance',
-      value: formatCurrency(data?.cashBalance || 0, data?.cashCurrency),
+      value: formatCurrency(data?.cashBalance || 0),
       icon: Wallet,
-      description: 'Total across all accounts (TZS)',
+      description: 'Total across all accounts',
       color: 'text-blue-600',
       bgColor: 'bg-blue-100',
     },
     {
       title: 'Accounts Receivable',
-      value: formatCurrency(data?.receivables || 0, data?.receivablesCurrency),
+      value: formatCurrency(data?.receivables || 0),
       icon: ArrowDownCircle,
-      description: 'Unpaid invoices (converted to TZS)',
+      description: 'Unpaid invoices',
       color: 'text-green-600',
       bgColor: 'bg-green-100',
     },
     {
       title: 'Accounts Payable',
-      value: formatCurrency(data?.payables || 0, data?.payablesCurrency),
+      value: formatCurrency(data?.payables || 0),
       icon: ArrowUpCircle,
-      description: 'Pending expenses (converted to TZS)',
+      description: 'Pending expenses',
       color: 'text-orange-600',
       bgColor: 'bg-orange-100',
     },
     {
       title: 'Income This Month',
-      value: formatCurrency(data?.monthlyIncome || 0, data?.monthlyIncomeCurrency),
+      value: formatCurrency(data?.monthlyIncome || 0),
       icon: TrendingUp,
-      description: 'Paid invoices (converted to TZS)',
+      description: 'Paid invoices',
       color: 'text-emerald-600',
       bgColor: 'bg-emerald-100',
     },
     {
       title: 'Expenses This Month',
-      value: formatCurrency(data?.monthlyExpenses || 0, data?.monthlyExpensesCurrency),
+      value: formatCurrency(data?.monthlyExpenses || 0),
       icon: CreditCard,
-      description: 'Approved expenses (converted to TZS)',
+      description: 'Approved expenses',
       color: 'text-red-600',
       bgColor: 'bg-red-100',
     },
     {
       title: 'Net Income',
-      value: formatCurrency(netIncome, 'TZS'),
+      value: formatCurrency(netIncome),
       icon: Receipt,
-      description: 'Income minus expenses (TZS)',
+      description: 'Income minus expenses',
       color: netIncome >= 0 ? 'text-green-600' : 'text-red-600',
       bgColor: netIncome >= 0 ? 'bg-green-100' : 'bg-red-100',
     },
@@ -290,80 +224,49 @@ export function AccountingDashboard() {
           </CardContent>
         </Card>
       )}
+
       {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {stats.map((stat) => (
           <Card key={stat.title}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+              <CardTitle className="text-xs font-medium text-muted-foreground">
                 {stat.title}
               </CardTitle>
-              <div className={`p-2 rounded-lg ${stat.bgColor}`}>
-                <stat.icon className={`h-4 w-4 ${stat.color}`} />
+              <div className={`p-1.5 rounded-lg ${stat.bgColor}`}>
+                <stat.icon className={`h-3 w-3 ${stat.color}`} />
               </div>
             </CardHeader>
             <CardContent>
-              <div className={`text-2xl font-bold ${stat.color}`}>{stat.value}</div>
+              <div className={`text-lg font-bold ${stat.color}`}>{stat.value}</div>
               <p className="text-xs text-muted-foreground mt-1">{stat.description}</p>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {/* Recent Transactions */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Recent Transactions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {data?.recentTransactions && data.recentTransactions.length > 0 ? (
-            <div className="space-y-3">
-              {data.recentTransactions.map((tx) => (
-                <div key={tx.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-full ${
-                      tx.type === 'income' ? 'bg-green-100' : 
-                      tx.type === 'expense' ? 'bg-red-100' : 'bg-blue-100'
-                    }`}>
-                      {tx.type === 'income' ? (
-                        <ArrowDownCircle className="h-4 w-4 text-green-600" />
-                      ) : tx.type === 'expense' ? (
-                        <ArrowUpCircle className="h-4 w-4 text-red-600" />
-                      ) : (
-                        <Receipt className="h-4 w-4 text-blue-600" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-medium text-sm">{tx.description}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {format(new Date(tx.date), 'MMM d, yyyy')}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className={`font-semibold ${
-                      tx.type === 'income' ? 'text-green-600' : 
-                      tx.type === 'expense' ? 'text-red-600' : ''
-                    }`}>
-                      {tx.type === 'expense' ? '-' : tx.type === 'income' ? '+' : ''}
-                      {formatCurrency(tx.amount, tx.currency)}
-                    </span>
-                    {tx.currency !== 'TZS' && (
-                      <p className="text-xs text-muted-foreground">
-                        ≈ TZS {tx.amountInTzs.toLocaleString('en-TZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-center text-muted-foreground py-8">
-              No recent transactions
-            </p>
-          )}
-        </CardContent>
-      </Card>
+      {/* Main Content Grid */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Cash Flow Chart - Takes 2 columns */}
+        <div className="lg:col-span-2">
+          <CashFlowChart />
+        </div>
+
+        {/* Account Balances Widget */}
+        <AccountBalancesWidget />
+      </div>
+
+      {/* Second Row */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {/* Latest Income */}
+        <LatestTransactionsWidget type="income" />
+
+        {/* Latest Expenses */}
+        <LatestTransactionsWidget type="expense" />
+
+        {/* Aging Summary */}
+        <AgingSummaryWidget />
+      </div>
     </div>
   );
 }
