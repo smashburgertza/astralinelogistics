@@ -1,7 +1,7 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { PublicNavbar } from './PublicNavbar';
 import { Mail, Phone, MapPin, Facebook, Twitter, Instagram, Linkedin } from 'lucide-react';
-import astralineLogoWhite from '@/assets/astraline-logo-white.svg';
+import astralineLogoWhite from '@/assets/astraline-logo-white-full.svg';
 import { useActiveRegions } from '@/hooks/useRegions';
 
 const scrollToSection = (sectionId: string, navigate: ReturnType<typeof useNavigate>, location: ReturnType<typeof useLocation>) => {
