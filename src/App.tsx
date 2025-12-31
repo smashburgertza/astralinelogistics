@@ -50,12 +50,10 @@ const AdminPageContentPage = lazy(() => import("./pages/admin/PageContent"));
 const AdminAgentsPage = lazy(() => import("./pages/admin/Agents"));
 const AdminEmployeesPage = lazy(() => import("./pages/admin/Employees"));
 const AdminSettingsPage = lazy(() => import("./pages/admin/Settings"));
-const AdminReportsPage = lazy(() => import("./pages/admin/Reports"));
 const AdminCommissionsPage = lazy(() => import("./pages/admin/Commissions"));
 const AdminEmployeeDashboard = lazy(() => import("./pages/admin/EmployeeDashboard"));
 const AdminAccountingPage = lazy(() => import("./pages/admin/Accounting"));
 const AdminAnalyticsPage = lazy(() => import("./pages/admin/Analytics"));
-const AdminFinancialSummaryPage = lazy(() => import("./pages/admin/FinancialSummary"));
 const AdminProfilePage = lazy(() => import("./pages/admin/Profile"));
 const AdminNotificationsPage = lazy(() => import("./pages/admin/Notifications"));
 
@@ -143,11 +141,8 @@ const App = () => (
             
             {/* Reports & Analytics - requires view_reports */}
             <Route path="/admin/accounting" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="view_reports"><AdminAccountingPage /></PermissionGate></Suspense>} />
-            <Route path="/admin/financial-summary" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="view_reports"><AdminFinancialSummaryPage /></PermissionGate></Suspense>} />
-            
-            <Route path="/admin/reports" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="view_reports"><AdminReportsPage /></PermissionGate></Suspense>} />
-            <Route path="/admin/commissions" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="view_reports"><AdminCommissionsPage /></PermissionGate></Suspense>} />
             <Route path="/admin/analytics" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="view_reports"><AdminAnalyticsPage /></PermissionGate></Suspense>} />
+            <Route path="/admin/commissions" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="view_reports"><AdminCommissionsPage /></PermissionGate></Suspense>} />
             
             {/* Agents - requires manage_agents */}
             <Route path="/admin/agents" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="manage_agents"><AdminAgentsPage /></PermissionGate></Suspense>} />
