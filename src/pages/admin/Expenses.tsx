@@ -43,6 +43,8 @@ export default function AdminExpensesPage() {
   const [category, setCategory] = useState('all');
   const [region, setRegion] = useState('all');
   const [status, setStatus] = useState('all');
+  const [dateFrom, setDateFrom] = useState<Date | null>(null);
+  const [dateTo, setDateTo] = useState<Date | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const debouncedSearch = useDebounce(search, 300);
@@ -52,7 +54,9 @@ export default function AdminExpensesPage() {
     region,
     search: debouncedSearch,
     status,
-  }), [category, region, debouncedSearch, status]);
+    dateFrom: dateFrom ? dateFrom.toISOString().split('T')[0] : undefined,
+    dateTo: dateTo ? dateTo.toISOString().split('T')[0] : undefined,
+  }), [category, region, debouncedSearch, status, dateFrom, dateTo]);
 
   const { data: expenses, isLoading } = useAllExpenses(filters);
   const { data: pendingExpenses, isLoading: pendingLoading } = usePendingExpenses();
@@ -86,6 +90,8 @@ export default function AdminExpensesPage() {
     setCategory('all');
     setRegion('all');
     setStatus('all');
+    setDateFrom(null);
+    setDateTo(null);
   };
 
   const pendingCount = (stats?.pendingCount || 0) + (stats?.needsClarificationCount || 0);
@@ -261,10 +267,14 @@ export default function AdminExpensesPage() {
             category={category}
             region={region}
             status={status}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
             onSearchChange={setSearch}
             onCategoryChange={setCategory}
             onRegionChange={setRegion}
             onStatusChange={setStatus}
+            onDateFromChange={setDateFrom}
+            onDateToChange={setDateTo}
             onClear={clearFilters}
           />
 

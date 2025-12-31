@@ -11,6 +11,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,12 +23,14 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { DollarSign, MoreHorizontal, Check, X, MessageSquare, Loader2, AlertCircle } from 'lucide-react';
-import { EXPENSE_CATEGORIES, useApproveExpense } from '@/hooks/useExpenses';
+import { DollarSign, MoreHorizontal, Check, X, MessageSquare, Loader2, AlertCircle, Pencil, FileText, ExternalLink } from 'lucide-react';
+import { EXPENSE_CATEGORIES, useApproveExpense, Expense } from '@/hooks/useExpenses';
 import { ExpenseStatusBadge } from './ExpenseStatusBadge';
 import { ExpenseApprovalDialog } from './ExpenseApprovalDialog';
+import { ExpenseDialog } from './ExpenseDialog';
 import { useRegions } from '@/hooks/useRegions';
 import { useExchangeRatesMap } from '@/hooks/useExchangeRates';
+import { useProfiles } from '@/hooks/useEmployees';
 
 interface ExpenseWithShipment {
   id: string;
@@ -40,6 +43,9 @@ interface ExpenseWithShipment {
   status?: string;
   denial_reason?: string | null;
   clarification_notes?: string | null;
+  receipt_url?: string | null;
+  submitted_by?: string | null;
+  approved_by?: string | null;
   shipments?: {
     tracking_number: string;
     origin_region: string;
@@ -50,6 +56,9 @@ interface ExpenseTableProps {
   expenses: ExpenseWithShipment[] | undefined;
   isLoading: boolean;
   showActions?: boolean;
+  showBulkActions?: boolean;
+  selectedIds?: string[];
+  onSelectionChange?: (ids: string[]) => void;
 }
 
 const getCategoryLabel = (value: string) => {
@@ -70,16 +79,33 @@ const getCategoryColor = (category: string) => {
   return colors[category] || colors.other;
 };
 
-export function ExpenseTable({ expenses, isLoading, showActions = true }: ExpenseTableProps) {
+export function ExpenseTable({ 
+  expenses, 
+  isLoading, 
+  showActions = true,
+  showBulkActions = false,
+  selectedIds = [],
+  onSelectionChange,
+}: ExpenseTableProps) {
   const [dialogState, setDialogState] = useState<{
     open: boolean;
     expenseId: string;
     mode: 'deny' | 'clarification';
   }>({ open: false, expenseId: '', mode: 'deny' });
 
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+
   const approveExpense = useApproveExpense();
   const { data: regions = [] } = useRegions();
   const { getRate } = useExchangeRatesMap();
+  const { data: profiles = [] } = useProfiles();
+
+  const getProfileName = (userId: string | null | undefined) => {
+    if (!userId) return null;
+    const profile = profiles.find(p => p.id === userId);
+    return profile?.full_name || profile?.email || userId.slice(0, 8);
+  };
 
   const formatTZS = (amount: number) => {
     return `TZS ${amount.toLocaleString('en-TZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -102,15 +128,41 @@ export function ExpenseTable({ expenses, isLoading, showActions = true }: Expens
     setDialogState({ open: true, expenseId, mode: 'clarification' });
   };
 
+  const handleEdit = (expense: ExpenseWithShipment) => {
+    setEditingExpense(expense as Expense);
+    setEditDialogOpen(true);
+  };
+
+  const toggleSelection = (id: string) => {
+    if (!onSelectionChange) return;
+    if (selectedIds.includes(id)) {
+      onSelectionChange(selectedIds.filter(i => i !== id));
+    } else {
+      onSelectionChange([...selectedIds, id]);
+    }
+  };
+
+  const toggleAll = () => {
+    if (!onSelectionChange || !expenses) return;
+    const pendingExpenses = expenses.filter(e => e.status === 'pending' || e.status === 'needs_clarification');
+    if (selectedIds.length === pendingExpenses.length) {
+      onSelectionChange([]);
+    } else {
+      onSelectionChange(pendingExpenses.map(e => e.id));
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="rounded-lg border bg-card">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
+              {showBulkActions && <TableHead className="w-[40px]" />}
               <TableHead>Category</TableHead>
-              <TableHead>Amount</TableHead>
+              <TableHead>Amount (TZS)</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Submitted By</TableHead>
               <TableHead>Shipment</TableHead>
               <TableHead>Region</TableHead>
               <TableHead>Description</TableHead>
@@ -121,9 +173,11 @@ export function ExpenseTable({ expenses, isLoading, showActions = true }: Expens
           <TableBody>
             {[...Array(5)].map((_, i) => (
               <TableRow key={i}>
+                {showBulkActions && <TableCell><Skeleton className="h-4 w-4" /></TableCell>}
                 <TableCell><Skeleton className="h-6 w-24" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                 <TableCell><Skeleton className="h-6 w-24" /></TableCell>
+                <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-28" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-32" /></TableCell>
@@ -143,11 +197,13 @@ export function ExpenseTable({ expenses, isLoading, showActions = true }: Expens
         <DollarSign className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
         <h3 className="text-lg font-semibold mb-1">No expenses found</h3>
         <p className="text-muted-foreground">
-          Expenses will appear here once added to shipments.
+          Expenses will appear here once added.
         </p>
       </div>
     );
   }
+
+  const pendingExpenses = expenses.filter(e => e.status === 'pending' || e.status === 'needs_clarification');
 
   return (
     <>
@@ -155,12 +211,21 @@ export function ExpenseTable({ expenses, isLoading, showActions = true }: Expens
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50 hover:bg-muted/50">
+              {showBulkActions && (
+                <TableHead className="w-[40px]">
+                  <Checkbox 
+                    checked={pendingExpenses.length > 0 && selectedIds.length === pendingExpenses.length}
+                    onCheckedChange={toggleAll}
+                  />
+                </TableHead>
+              )}
               <TableHead className="font-semibold">Category</TableHead>
               <TableHead className="font-semibold">Amount (TZS)</TableHead>
               <TableHead className="font-semibold">Status</TableHead>
+              <TableHead className="font-semibold">Submitted By</TableHead>
               <TableHead className="font-semibold">Shipment</TableHead>
               <TableHead className="font-semibold">Region</TableHead>
-              <TableHead className="font-semibold">Description</TableHead>
+              <TableHead className="font-semibold">Receipt</TableHead>
               <TableHead className="font-semibold">Date</TableHead>
               {showActions && <TableHead className="font-semibold w-[100px]">Actions</TableHead>}
             </TableRow>
@@ -173,9 +238,20 @@ export function ExpenseTable({ expenses, isLoading, showActions = true }: Expens
               const canTakeAction = isPending || needsClarification;
               const currency = expense.currency || 'TZS';
               const amountInTZS = convertToTZS(Number(expense.amount), currency);
+              const submitterName = getProfileName(expense.submitted_by);
               
               return (
                 <TableRow key={expense.id}>
+                  {showBulkActions && (
+                    <TableCell>
+                      {canTakeAction && (
+                        <Checkbox 
+                          checked={selectedIds.includes(expense.id)}
+                          onCheckedChange={() => toggleSelection(expense.id)}
+                        />
+                      )}
+                    </TableCell>
+                  )}
                   <TableCell>
                     <Badge className={getCategoryColor(expense.category)} variant="secondary">
                       {getCategoryLabel(expense.category)}
@@ -219,12 +295,19 @@ export function ExpenseTable({ expenses, isLoading, showActions = true }: Expens
                     </div>
                   </TableCell>
                   <TableCell>
+                    {submitterName ? (
+                      <span className="text-sm">{submitterName}</span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
                     {expense.shipments ? (
                       <code className="font-mono text-sm text-brand-gold">
                         {expense.shipments.tracking_number}
                       </code>
                     ) : (
-                      <span className="text-muted-foreground">—</span>
+                      <span className="text-muted-foreground text-xs">Not linked</span>
                     )}
                   </TableCell>
                   <TableCell>
@@ -238,53 +321,69 @@ export function ExpenseTable({ expenses, isLoading, showActions = true }: Expens
                     )}
                   </TableCell>
                   <TableCell>
-                    <span className="text-muted-foreground max-w-[200px] truncate block">
-                      {expense.description || '—'}
-                    </span>
+                    {expense.receipt_url ? (
+                      <a 
+                        href={expense.receipt_url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-primary hover:underline"
+                      >
+                        <FileText className="h-4 w-4" />
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {expense.created_at ? format(new Date(expense.created_at), 'MMM d, yyyy') : '—'}
                   </TableCell>
                   {showActions && (
                     <TableCell>
-                      {canTakeAction && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              {approveExpense.isPending ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <MoreHorizontal className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => handleApprove(expense.id)}
-                              className="text-green-600"
-                            >
-                              <Check className="h-4 w-4 mr-2" />
-                              Approve
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => openDenyDialog(expense.id)}
-                              className="text-red-600"
-                            >
-                              <X className="h-4 w-4 mr-2" />
-                              Deny
-                            </DropdownMenuItem>
-                            {isPending && (
-                              <DropdownMenuItem
-                                onClick={() => openClarificationDialog(expense.id)}
-                                className="text-orange-600"
-                              >
-                                <MessageSquare className="h-4 w-4 mr-2" />
-                                Request Clarification
-                              </DropdownMenuItem>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            {approveExpense.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <MoreHorizontal className="h-4 w-4" />
                             )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {canTakeAction && (
+                            <>
+                              <DropdownMenuItem
+                                onClick={() => handleApprove(expense.id)}
+                                className="text-green-600"
+                              >
+                                <Check className="h-4 w-4 mr-2" />
+                                Approve
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => openDenyDialog(expense.id)}
+                                className="text-red-600"
+                              >
+                                <X className="h-4 w-4 mr-2" />
+                                Deny
+                              </DropdownMenuItem>
+                              {isPending && (
+                                <DropdownMenuItem
+                                  onClick={() => openClarificationDialog(expense.id)}
+                                  className="text-orange-600"
+                                >
+                                  <MessageSquare className="h-4 w-4 mr-2" />
+                                  Request Clarification
+                                </DropdownMenuItem>
+                              )}
+                            </>
+                          )}
+                          <DropdownMenuItem onClick={() => handleEdit(expense)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   )}
                 </TableRow>
@@ -299,6 +398,12 @@ export function ExpenseTable({ expenses, isLoading, showActions = true }: Expens
         onOpenChange={(open) => setDialogState((prev) => ({ ...prev, open }))}
         expenseId={dialogState.expenseId}
         mode={dialogState.mode}
+      />
+
+      <ExpenseDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        expense={editingExpense}
       />
     </>
   );
