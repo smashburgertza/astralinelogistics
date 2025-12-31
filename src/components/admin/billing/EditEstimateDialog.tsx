@@ -250,7 +250,7 @@ export function EditEstimateDialog({ estimate, open, onOpenChange }: EditEstimat
                         <SelectItem value="EUR">EUR (€)</SelectItem>
                         <SelectItem value="CNY">CNY (¥)</SelectItem>
                         <SelectItem value="AED">AED (د.إ)</SelectItem>
-                        <SelectItem value="TZS">TZS (TSh)</SelectItem>
+                        <SelectItem value="TZS">TZS</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />

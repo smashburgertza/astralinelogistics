@@ -277,7 +277,7 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
                             <SelectItem value="GBP">GBP (£)</SelectItem>
                             <SelectItem value="EUR">EUR (€)</SelectItem>
                             <SelectItem value="AED">AED (د.إ)</SelectItem>
-                            <SelectItem value="TZS">TZS (TSh)</SelectItem>
+                            <SelectItem value="TZS">TZS</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
