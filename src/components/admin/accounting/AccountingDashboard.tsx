@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { usePendingExpenses } from '@/hooks/useExpenses';
+import { useBankAccounts } from '@/hooks/useAccounting';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CashFlowChart } from './CashFlowChart';
@@ -20,8 +21,11 @@ interface AccountingSummary {
 }
 
 function useAccountingSummary() {
+  // Use the same hook that AccountBalancesWidget uses for consistent calculations
+  const { data: calculatedBankAccounts = [] } = useBankAccounts();
+  
   return useQuery({
-    queryKey: ['accounting-summary'],
+    queryKey: ['accounting-summary', calculatedBankAccounts],
     queryFn: async (): Promise<AccountingSummary> => {
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
@@ -40,14 +44,11 @@ function useAccountingSummary() {
         return amount * rate;
       };
       
-      // Get bank accounts for cash balance
-      const { data: bankAccounts } = await supabase
-        .from('bank_accounts')
-        .select('current_balance, currency')
-        .eq('is_active', true);
-      
+      // Use the calculated bank account balances from useBankAccounts hook
+      // This ensures consistency between the Cash Balance card and Account Balances widget
       let cashBalance = 0;
-      bankAccounts?.forEach(acc => {
+      calculatedBankAccounts.filter(acc => acc.is_active).forEach(acc => {
+        // current_balance is already calculated correctly by useBankAccounts (including TZS conversion for foreign deposits)
         cashBalance += convertToTzs(acc.current_balance || 0, acc.currency || 'TZS');
       });
 
