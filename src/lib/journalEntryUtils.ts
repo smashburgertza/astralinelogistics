@@ -343,6 +343,56 @@ export async function createExpenseApprovalJournalEntry({
   });
 }
 
+/**
+ * Create journal entry when expense is approved and paid from a bank account
+ * This directly debits expense and credits the bank account (no AP involved)
+ * Accounting: Debit Expense Account, Credit Bank Account
+ */
+export async function createExpensePaymentJournalEntry({
+  expenseId,
+  category,
+  amount,
+  currency,
+  description,
+  exchangeRate = 1,
+  bankAccountChartId,
+}: {
+  expenseId: string;
+  category: string;
+  amount: number;
+  currency: string;
+  description?: string;
+  exchangeRate?: number;
+  bankAccountChartId: string;
+}) {
+  const expenseAccountCode = ACCOUNT_CODES.EXPENSES[category] || ACCOUNT_CODES.EXPENSES.other;
+
+  return createJournalEntryWithAccountIds({
+    description: `Expense paid: ${description || category}`,
+    referenceType: 'expense',
+    referenceId: expenseId,
+    autoPost: true,
+    lines: [
+      {
+        account_code: expenseAccountCode,
+        description: description || `${category} expense`,
+        debit_amount: amount,
+        credit_amount: 0,
+        currency,
+        exchange_rate: exchangeRate,
+      },
+      {
+        account_id: bankAccountChartId,
+        description: `Paid from bank - ${description || category}`,
+        debit_amount: 0,
+        credit_amount: amount,
+        currency,
+        exchange_rate: exchangeRate,
+      },
+    ],
+  });
+}
+
 export async function createInvoiceJournalEntry({
   invoiceId,
   invoiceNumber,
