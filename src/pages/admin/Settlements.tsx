@@ -50,6 +50,7 @@ export default function SettlementsPage() {
       amountInTzs: data.amountInTzs,
       exchangeRate: data.exchangeRate,
       isAgentPayment: data.isAgentPayment,
+      invoiceDirection: data.invoiceDirection,
     }, {
       onSuccess: () => {
         setVerifyDialogOpen(false);

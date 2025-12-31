@@ -85,6 +85,7 @@ export interface VerifyPaymentData {
   amountInTzs?: number;
   exchangeRate?: number;
   isAgentPayment: boolean;
+  invoiceDirection?: 'from_agent' | 'to_agent';
   notes?: string;
 }
 
@@ -144,6 +145,7 @@ export function VerifyPaymentDialog({
       amountInTzs,
       exchangeRate,
       isAgentPayment,
+      invoiceDirection: payment.invoices.invoice_direction,
       notes: notes.trim() || undefined,
     });
   };

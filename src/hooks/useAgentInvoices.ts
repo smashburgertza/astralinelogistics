@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from './useAuth';
-import { createAgentPaymentJournalEntry, createInvoicePaymentJournalEntry } from '@/lib/journalEntryUtils';
+import { createAgentPaymentJournalEntry, createAgentPaymentReceivedJournalEntry, createInvoicePaymentJournalEntry } from '@/lib/journalEntryUtils';
 
 export interface AgentInvoice {
   id: string;
@@ -239,6 +239,7 @@ export function useVerifyPayment() {
       amountInTzs,
       exchangeRate,
       isAgentPayment = false,
+      invoiceDirection,
     }: { 
       paymentId: string; 
       status: 'verified' | 'rejected';
@@ -250,6 +251,7 @@ export function useVerifyPayment() {
       amountInTzs?: number;
       exchangeRate?: number;
       isAgentPayment?: boolean;
+      invoiceDirection?: 'from_agent' | 'to_agent';
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
@@ -289,8 +291,9 @@ export function useVerifyPayment() {
 
         // Create journal entry if deposit account is specified
         if (depositAccountId && amount) {
-          if (isAgentPayment) {
-            // Agent payment: money going OUT (credit bank, debit agent payables)
+          if (isAgentPayment && invoiceDirection === 'from_agent') {
+            // Agent billed us (from_agent), we're paying OUT to agent
+            // Debit Agent Payables, Credit Bank
             await createAgentPaymentJournalEntry({
               invoiceId,
               invoiceNumber: invoiceNumber || 'Unknown',
@@ -300,7 +303,18 @@ export function useVerifyPayment() {
               amountInTzs,
               exchangeRate,
             });
-
+          } else if (isAgentPayment && invoiceDirection === 'to_agent') {
+            // We billed agent (to_agent), agent is paying us - money coming IN
+            // Debit Bank, Credit Accounts Receivable
+            await createAgentPaymentReceivedJournalEntry({
+              invoiceId,
+              invoiceNumber: invoiceNumber || 'Unknown',
+              amount,
+              currency: currency || 'USD',
+              depositAccountId,
+              amountInTzs,
+              exchangeRate,
+            });
           } else {
             // Customer payment: money coming IN (debit bank, credit accounts receivable)
             await createInvoicePaymentJournalEntry({
