@@ -481,13 +481,15 @@ export function useBankAccounts() {
         return bankAccounts as BankAccount[];
       }
 
-      // Get all posted journal lines for these accounts
+      // Get all posted journal lines for these accounts including currency info
       const { data: journalLines, error: linesError } = await supabase
         .from('journal_lines')
         .select(`
           account_id,
           debit_amount,
           credit_amount,
+          currency,
+          amount_in_tzs,
           journal_entry:journal_entries!inner(status)
         `)
         .in('account_id', chartAccountIds);
@@ -499,13 +501,38 @@ export function useBankAccounts() {
         (line: any) => line.journal_entry?.status === 'posted'
       );
 
+      // Build a map of chart_account_id to bank account currency
+      const accountCurrencyMap: Record<string, string> = {};
+      bankAccounts.forEach(acc => {
+        if (acc.chart_account_id) {
+          accountCurrencyMap[acc.chart_account_id] = acc.currency || 'TZS';
+        }
+      });
+
       const accountTotals: Record<string, { debits: number; credits: number }> = {};
       for (const line of postedLines) {
         if (!accountTotals[line.account_id]) {
           accountTotals[line.account_id] = { debits: 0, credits: 0 };
         }
-        accountTotals[line.account_id].debits += Number(line.debit_amount) || 0;
-        accountTotals[line.account_id].credits += Number(line.credit_amount) || 0;
+        
+        const bankCurrency = accountCurrencyMap[line.account_id] || 'TZS';
+        const lineCurrency = line.currency || 'TZS';
+        
+        // If bank account is TZS but journal line is in foreign currency, use amount_in_tzs
+        // Otherwise use the direct debit/credit amounts
+        if (bankCurrency === 'TZS' && lineCurrency !== 'TZS' && line.amount_in_tzs) {
+          // For TZS accounts with foreign currency entries, use amount_in_tzs
+          if (Number(line.debit_amount) > 0) {
+            accountTotals[line.account_id].debits += Number(line.amount_in_tzs) || 0;
+          }
+          if (Number(line.credit_amount) > 0) {
+            accountTotals[line.account_id].credits += Number(line.amount_in_tzs) || 0;
+          }
+        } else {
+          // Same currency or non-TZS bank account - use direct amounts
+          accountTotals[line.account_id].debits += Number(line.debit_amount) || 0;
+          accountTotals[line.account_id].credits += Number(line.credit_amount) || 0;
+        }
       }
 
       // Calculate current balance for each bank account
