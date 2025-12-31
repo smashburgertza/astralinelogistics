@@ -361,7 +361,7 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange }: EditInvoiceDi
                               <SelectItem value="GBP">GBP (£)</SelectItem>
                               <SelectItem value="EUR">EUR (€)</SelectItem>
                               <SelectItem value="AED">AED (د.إ)</SelectItem>
-                              <SelectItem value="TZS">TZS (TSh)</SelectItem>
+                              <SelectItem value="TZS">TZS</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
