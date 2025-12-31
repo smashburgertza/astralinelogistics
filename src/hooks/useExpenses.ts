@@ -55,6 +55,8 @@ export function useAllExpenses(filters?: {
   region?: string;
   search?: string;
   status?: string;
+  dateFrom?: string;
+  dateTo?: string;
 }) {
   return useQuery({
     queryKey: ['expenses', filters],
@@ -75,6 +77,12 @@ export function useAllExpenses(filters?: {
       }
       if (filters?.search) {
         query = query.or(`description.ilike.%${filters.search}%`);
+      }
+      if (filters?.dateFrom) {
+        query = query.gte('created_at', filters.dateFrom);
+      }
+      if (filters?.dateTo) {
+        query = query.lte('created_at', filters.dateTo + 'T23:59:59');
       }
 
       const { data, error } = await query;

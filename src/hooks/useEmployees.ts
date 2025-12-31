@@ -260,3 +260,19 @@ export function useDeleteEmployee() {
     },
   });
 }
+
+// Hook to fetch all profiles for displaying names
+export function useProfiles() {
+  return useQuery({
+    queryKey: ['profiles'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, email, full_name');
+
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+}
