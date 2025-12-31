@@ -13,6 +13,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 import { 
   Loader2, 
   Package, 
@@ -23,7 +25,9 @@ import {
   Globe,
   Route,
   DollarSign,
-  Save
+  Save,
+  Users,
+  Briefcase
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useCustomers } from '@/hooks/useShipments';
@@ -127,6 +131,10 @@ export function ShipmentUploadForm() {
   
   // Agent's consolidated cargo (not tracked individually)
   const [agentCargoWeight, setAgentCargoWeight] = useState<number>(0);
+  const [agentCargoDescription, setAgentCargoDescription] = useState<string>('');
+  
+  // Mode: 'customer' for customer shipments, 'agent_only' for agent's own cargo
+  const [uploadMode, setUploadMode] = useState<'customer' | 'agent_only'>('customer');
   
   // Agent-defined pricing
   const [ratePerKg, setRatePerKg] = useState<number>(0);
@@ -253,13 +261,20 @@ export function ShipmentUploadForm() {
     return (weight * ratePerKg) + transitAdditionalCost;
   };
 
-  // Calculate totals
+  // Calculate totals (for customer mode)
   const totals = useMemo(() => {
     const totalWeight = lines.reduce((sum, line) => sum + (line.weight_kg || 0), 0);
     const totalAmount = lines.reduce((sum, line) => sum + calculateLineAmount(line.weight_kg), 0);
-    const validLines = lines.filter(l => l.customer_id && l.weight_kg > 0);
+    const validLines = lines.filter(l => (l.customer_id || l.customer_name) && l.weight_kg > 0);
     return { totalWeight, totalAmount, validLines: validLines.length };
   }, [lines, ratePerKg, transitAdditionalCost]);
+
+  // Calculate agent-only totals
+  const agentOnlyTotals = useMemo(() => {
+    const totalWeight = agentCargoWeight || 0;
+    const totalAmount = calculateLineAmount(agentCargoWeight);
+    return { totalWeight, totalAmount };
+  }, [agentCargoWeight, ratePerKg, transitAdditionalCost]);
 
   // Add new line
   const addLine = () => {
@@ -296,7 +311,9 @@ export function ShipmentUploadForm() {
     setTransitPoint('direct');
     setRatePerKg(0);
     setAgentCargoWeight(0);
+    setAgentCargoDescription('');
     setEditingDraftId(null);
+    setUploadMode('customer');
     // Clear draft from URL
     if (draftId) {
       setSearchParams({});
@@ -307,9 +324,17 @@ export function ShipmentUploadForm() {
   const onSaveAsDraft = async () => {
     const validLines = lines.filter(l => (l.customer_id || l.customer_name) && l.weight_kg > 0);
     
-    if (validLines.length === 0 && (!canHaveConsolidatedCargo || agentCargoWeight <= 0)) {
-      toast.error('Please add at least one shipment to save as draft');
-      return;
+    // Validation based on mode
+    if (uploadMode === 'agent_only') {
+      if (agentCargoWeight <= 0) {
+        toast.error('Please enter your cargo weight');
+        return;
+      }
+    } else {
+      if (validLines.length === 0 && (!canHaveConsolidatedCargo || agentCargoWeight <= 0)) {
+        toast.error('Please add at least one shipment to save as draft');
+        return;
+      }
     }
 
     if (!selectedRegion) {
@@ -373,25 +398,31 @@ export function ShipmentUploadForm() {
 
       // Create ONE draft shipment with all parcels
       const trackingNumber = generateTrackingNumber();
-      const totalWeight = validLines.reduce((sum, l) => sum + l.weight_kg, 0) + agentCargoWeight;
-      const totalAmount = validLines.reduce((sum, l) => sum + calculateLineAmount(l.weight_kg), 0) +
-        (canHaveConsolidatedCargo && agentCargoWeight > 0 ? (agentCargoWeight * (ratePerKg || 0)) + transitAdditionalCost : 0);
       
-      // Use first customer info for the draft shipment header
+      // Calculate totals based on mode
+      const isAgentOnlyMode = uploadMode === 'agent_only';
+      const totalWeight = isAgentOnlyMode 
+        ? agentCargoWeight 
+        : validLines.reduce((sum, l) => sum + l.weight_kg, 0) + agentCargoWeight;
+      const totalAmount = isAgentOnlyMode
+        ? calculateLineAmount(agentCargoWeight)
+        : validLines.reduce((sum, l) => sum + calculateLineAmount(l.weight_kg), 0) +
+          (canHaveConsolidatedCargo && agentCargoWeight > 0 ? (agentCargoWeight * (ratePerKg || 0)) + transitAdditionalCost : 0);
+      
+      // Use first customer info for the draft shipment header (only in customer mode)
       const firstLine = validLines[0];
       const firstCustomer = firstLine ? customers?.find(c => c.id === firstLine.customer_id) : null;
       
-      // Build description from all lines
-      const descriptions = validLines
-        .map(l => l.description || l.customer_name)
-        .filter(Boolean)
-        .join(', ');
+      // Build description from all lines or use agent cargo description
+      const descriptions = isAgentOnlyMode
+        ? agentCargoDescription || "Agent's Own Cargo"
+        : validLines.map(l => l.description || l.customer_name).filter(Boolean).join(', ');
 
       const { data: shipment, error: shipmentError } = await supabase
         .from('shipments')
         .insert({
-          customer_id: firstLine?.customer_id || null,
-          customer_name: firstLine?.customer_name || firstCustomer?.name || null,
+          customer_id: isAgentOnlyMode ? null : (firstLine?.customer_id || null),
+          customer_name: isAgentOnlyMode ? null : (firstLine?.customer_name || firstCustomer?.name || null),
           origin_region: selectedRegion,
           total_weight_kg: totalWeight,
           description: descriptions || null,
@@ -400,7 +431,7 @@ export function ShipmentUploadForm() {
           agent_id: user?.id,
           tracking_number: trackingNumber,
           batch_id: batchId,
-          billing_party: agentCargoWeight > 0 ? 'agent_collect' as BillingPartyType : 'customer_direct' as BillingPartyType,
+          billing_party: 'agent_collect' as BillingPartyType,
           transit_point: transitPoint,
           rate_per_kg: ratePerKg || 0,
           total_revenue: totalAmount,
@@ -412,22 +443,37 @@ export function ShipmentUploadForm() {
 
       if (shipmentError) throw shipmentError;
 
-      // Create parcels for each line
-      const parcelsToInsert = validLines.map(line => ({
-        shipment_id: shipment.id,
-        barcode: generateBarcode(),
-        weight_kg: line.weight_kg,
-        description: line.description || line.customer_name || null,
-      }));
-
-      // Add agent cargo parcel if present
-      if (canHaveConsolidatedCargo && agentCargoWeight > 0) {
+      // Create parcels based on mode
+      const parcelsToInsert: { shipment_id: string; barcode: string; weight_kg: number; description: string | null }[] = [];
+      
+      if (isAgentOnlyMode) {
+        // Agent-only mode: single parcel for agent cargo
         parcelsToInsert.push({
           shipment_id: shipment.id,
           barcode: generateBarcode(),
           weight_kg: agentCargoWeight,
-          description: "Agent's Consolidated Cargo",
+          description: agentCargoDescription || "Agent's Own Cargo",
         });
+      } else {
+        // Customer mode: parcels for each line
+        validLines.forEach(line => {
+          parcelsToInsert.push({
+            shipment_id: shipment.id,
+            barcode: generateBarcode(),
+            weight_kg: line.weight_kg,
+            description: line.description || line.customer_name || null,
+          });
+        });
+        
+        // Add agent cargo parcel if present
+        if (canHaveConsolidatedCargo && agentCargoWeight > 0) {
+          parcelsToInsert.push({
+            shipment_id: shipment.id,
+            barcode: generateBarcode(),
+            weight_kg: agentCargoWeight,
+            description: "Agent's Consolidated Cargo",
+          });
+        }
       }
 
       if (parcelsToInsert.length > 0) {
@@ -451,10 +497,18 @@ export function ShipmentUploadForm() {
     // Allow lines with either customer_id OR customer_name, and valid weight
     const validLines = lines.filter(l => (l.customer_id || l.customer_name) && l.weight_kg > 0);
     
-    // Must have at least one customer shipment OR agent cargo (if permitted)
-    if (validLines.length === 0 && (!canHaveConsolidatedCargo || agentCargoWeight <= 0)) {
-      toast.error('Please add at least one shipment with customer and weight');
-      return;
+    // Validation based on mode
+    if (uploadMode === 'agent_only') {
+      if (agentCargoWeight <= 0) {
+        toast.error('Please enter your cargo weight');
+        return;
+      }
+    } else {
+      // Customer mode: Must have at least one customer shipment OR agent cargo (if permitted)
+      if (validLines.length === 0 && (!canHaveConsolidatedCargo || agentCargoWeight <= 0)) {
+        toast.error('Please add at least one shipment with customer and weight');
+        return;
+      }
     }
 
     if (!selectedRegion) {
@@ -495,64 +549,69 @@ export function ShipmentUploadForm() {
       let totalWeight = 0;
       let totalAmount = 0;
 
+      const isAgentOnlyMode = uploadMode === 'agent_only';
+
       // Create each shipment (NO individual invoices - one consolidated invoice at the end)
-      for (const line of validLines) {
-        const parcelBarcode = generateBarcode();
-        const trackingNumber = generateTrackingNumber();
-        const customer = customers?.find(c => c.id === line.customer_id);
-        const lineAmount = calculateLineAmount(line.weight_kg);
+      // Skip this loop in agent-only mode
+      if (!isAgentOnlyMode) {
+        for (const line of validLines) {
+          const parcelBarcode = generateBarcode();
+          const trackingNumber = generateTrackingNumber();
+          const customer = customers?.find(c => c.id === line.customer_id);
+          const lineAmount = calculateLineAmount(line.weight_kg);
 
-        const { data: shipment, error: shipmentError } = await supabase
-          .from('shipments')
-          .insert({
-            customer_id: line.customer_id || null,
-            customer_name: line.customer_name || customer?.name || null,
+          const { data: shipment, error: shipmentError } = await supabase
+            .from('shipments')
+            .insert({
+              customer_id: line.customer_id || null,
+              customer_name: line.customer_name || customer?.name || null,
+              origin_region: selectedRegion,
+              total_weight_kg: line.weight_kg,
+              description: line.description || null,
+              warehouse_location: null,
+              created_by: user?.id,
+              agent_id: user?.id,
+              tracking_number: trackingNumber,
+              batch_id: batchId,
+              billing_party: 'customer_direct' as BillingPartyType,
+              transit_point: transitPoint,
+              rate_per_kg: ratePerKg,
+              total_revenue: lineAmount,
+            })
+            .select()
+            .single();
+
+          if (shipmentError) throw shipmentError;
+
+          const { error: parcelError } = await supabase
+            .from('parcels')
+            .insert({
+              shipment_id: shipment.id,
+              barcode: parcelBarcode,
+              weight_kg: line.weight_kg,
+              description: line.description || null,
+            });
+
+          if (parcelError) throw parcelError;
+
+          createdShipmentIds.push(shipment.id);
+          totalWeight += line.weight_kg;
+          totalAmount += lineAmount;
+
+          createdShipments.push({
+            tracking_number: shipment.tracking_number,
+            customer_name: customer?.name || line.customer_name,
+            customer_phone: customer?.phone || '',
             origin_region: selectedRegion,
-            total_weight_kg: line.weight_kg,
-            description: line.description || null,
-            warehouse_location: null,
-            created_by: user?.id,
-            agent_id: user?.id,
-            tracking_number: trackingNumber,
-            batch_id: batchId,
-            billing_party: 'customer_direct' as BillingPartyType,
-            transit_point: transitPoint,
-            rate_per_kg: ratePerKg,
-            total_revenue: lineAmount,
-          })
-          .select()
-          .single();
-
-        if (shipmentError) throw shipmentError;
-
-        const { error: parcelError } = await supabase
-          .from('parcels')
-          .insert({
-            shipment_id: shipment.id,
-            barcode: parcelBarcode,
-            weight_kg: line.weight_kg,
-            description: line.description || null,
+            created_at: shipment.created_at || new Date().toISOString(),
+            parcels: [{
+              id: crypto.randomUUID(),
+              barcode: parcelBarcode,
+              weight_kg: line.weight_kg,
+              description: line.description
+            }]
           });
-
-        if (parcelError) throw parcelError;
-
-        createdShipmentIds.push(shipment.id);
-        totalWeight += line.weight_kg;
-        totalAmount += lineAmount;
-
-        createdShipments.push({
-          tracking_number: shipment.tracking_number,
-          customer_name: customer?.name || line.customer_name,
-          customer_phone: customer?.phone || '',
-          origin_region: selectedRegion,
-          created_at: shipment.created_at || new Date().toISOString(),
-          parcels: [{
-            id: crypto.randomUUID(),
-            barcode: parcelBarcode,
-            weight_kg: line.weight_kg,
-            description: line.description
-          }]
-        });
+        }
       }
 
       // Create ONE consolidated invoice FROM agent TO Astraline for all customer shipments
@@ -640,11 +699,13 @@ export function ShipmentUploadForm() {
           .from('shipments')
           .insert({
             customer_id: null,
-            customer_name: 'Agent Cargo (Consolidated)',
+            customer_name: isAgentOnlyMode ? "Agent's Own Cargo" : 'Agent Cargo (Consolidated)',
             origin_region: selectedRegion,
             total_weight_kg: agentCargoWeight,
             agent_cargo_weight_kg: agentCargoWeight,
-            description: 'Consolidated agent cargo - not tracked individually',
+            description: isAgentOnlyMode 
+              ? (agentCargoDescription || "Agent's own cargo for clearing")
+              : 'Consolidated agent cargo - not tracked individually',
             warehouse_location: null,
             created_by: user?.id,
             agent_id: user?.id,
@@ -661,14 +722,31 @@ export function ShipmentUploadForm() {
 
         if (agentShipmentError) {
           console.error('Failed to create agent cargo shipment:', agentShipmentError);
+        } else if (isAgentOnlyMode && agentShipment) {
+          // Add to completed shipments for agent-only mode
+          createdShipments.push({
+            tracking_number: agentShipment.tracking_number,
+            customer_name: "Agent's Own Cargo",
+            customer_phone: '',
+            origin_region: selectedRegion,
+            created_at: agentShipment.created_at || new Date().toISOString(),
+            parcels: [{
+              id: crypto.randomUUID(),
+              barcode: generateBarcode(),
+              weight_kg: agentCargoWeight,
+              description: agentCargoDescription || "Agent's cargo"
+            }]
+          });
         }
         // NOTE: Invoice will be created by admin via B2B Invoices page
         // Admin creates "to_agent" invoice to bill agent for clearing services
       }
 
       setCompletedShipments(createdShipments);
-      const agentCargoMsg = agentCargoWeight > 0 ? ` + agent cargo (${agentCargoWeight}kg)` : '';
-      toast.success(`${createdShipments.length} shipment(s)${agentCargoMsg} created successfully`);
+      const successMsg = isAgentOnlyMode 
+        ? `Agent cargo (${agentCargoWeight}kg) submitted successfully`
+        : `${createdShipments.length} shipment(s)${agentCargoWeight > 0 ? ` + agent cargo (${agentCargoWeight}kg)` : ''} created successfully`;
+      toast.success(successMsg);
     } catch (error: any) {
       toast.error(`Failed to create shipments: ${error.message}`);
     } finally {
@@ -793,6 +871,32 @@ export function ShipmentUploadForm() {
         </Card>
       )}
 
+      {/* Mode Toggle - Customer Shipments vs Agent's Own Cargo */}
+      {canHaveConsolidatedCargo && (
+        <Card className="shadow-lg border-0">
+          <CardContent className="p-4">
+            <Tabs value={uploadMode} onValueChange={(value) => setUploadMode(value as 'customer' | 'agent_only')}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="customer" className="gap-2">
+                  <Users className="w-4 h-4" />
+                  Customer Shipments
+                </TabsTrigger>
+                <TabsTrigger value="agent_only" className="gap-2">
+                  <Briefcase className="w-4 h-4" />
+                  My Cargo Only
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <p className="text-sm text-muted-foreground mt-3 text-center">
+              {uploadMode === 'customer' 
+                ? 'Create shipments for your customers (you can also add your own consolidated cargo)'
+                : 'Upload your own cargo for clearing without customer shipments'
+              }
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Pricing & Routing Card */}
       <Card className="shadow-lg border-0">
         <CardContent className="p-4">
@@ -855,7 +959,65 @@ export function ShipmentUploadForm() {
         </CardContent>
       </Card>
 
-      {/* Shipment Lines Table */}
+      {/* Agent Only Mode - Cargo Form */}
+      {uploadMode === 'agent_only' && (
+        <Card className="shadow-lg border-0">
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-900/30">
+                <Briefcase className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">Agent's Own Cargo</CardTitle>
+                <CardDescription>
+                  Cargo for clearing without customer shipments
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="agent-only-weight">Total Weight (kg) *</Label>
+                <Input
+                  id="agent-only-weight"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="Enter cargo weight"
+                  value={agentCargoWeight || ''}
+                  onChange={(e) => setAgentCargoWeight(parseFloat(e.target.value) || 0)}
+                  className="text-right"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Estimated Amount</Label>
+                <div className="h-10 px-3 py-2 rounded-md border bg-muted/50 flex items-center justify-end">
+                  <span className={cn(
+                    "font-bold text-lg tabular-nums",
+                    agentOnlyTotals.totalAmount > 0 ? "text-primary" : "text-muted-foreground"
+                  )}>
+                    {currencySymbol}{agentOnlyTotals.totalAmount.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="agent-only-description">Description / Contents</Label>
+              <Textarea
+                id="agent-only-description"
+                placeholder="Describe the cargo contents (e.g., Electronics, Clothing, Auto parts...)"
+                value={agentCargoDescription}
+                onChange={(e) => setAgentCargoDescription(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Shipment Lines Table - Only in Customer Mode */}
+      {uploadMode === 'customer' && (
       <Card className="shadow-lg border-0">
         <CardContent className="p-0">
           {/* Table Header */}
@@ -965,9 +1127,10 @@ export function ShipmentUploadForm() {
           </div>
         </CardContent>
       </Card>
+      )}
 
-      {/* Agent's Consolidated Cargo Section - Only shown if agent has permission */}
-      {canHaveConsolidatedCargo && (
+      {/* Agent's Consolidated Cargo Section - Only shown in customer mode if agent has permission */}
+      {uploadMode === 'customer' && canHaveConsolidatedCargo && (
         <Card className="shadow-lg border-0 bg-muted/30">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -1027,7 +1190,13 @@ export function ShipmentUploadForm() {
                 variant="outline"
                 size="lg"
                 className="h-12 px-6"
-                disabled={isSavingDraft || isSubmitting || (totals.validLines === 0 && (!canHaveConsolidatedCargo || agentCargoWeight <= 0))}
+                disabled={
+                  isSavingDraft || isSubmitting || 
+                  (uploadMode === 'agent_only' 
+                    ? agentCargoWeight <= 0 
+                    : (totals.validLines === 0 && (!canHaveConsolidatedCargo || agentCargoWeight <= 0))
+                  )
+                }
                 onClick={onSaveAsDraft}
               >
                 {isSavingDraft ? (
@@ -1048,7 +1217,13 @@ export function ShipmentUploadForm() {
                 type="button"
                 size="lg"
                 className="h-12 px-8 text-lg font-semibold"
-                disabled={isSubmitting || isSavingDraft || (totals.validLines === 0 && (!canHaveConsolidatedCargo || agentCargoWeight <= 0)) || !ratePerKg || ratePerKg <= 0}
+                disabled={
+                  isSubmitting || isSavingDraft || !ratePerKg || ratePerKg <= 0 ||
+                  (uploadMode === 'agent_only' 
+                    ? agentCargoWeight <= 0 
+                    : (totals.validLines === 0 && (!canHaveConsolidatedCargo || agentCargoWeight <= 0))
+                  )
+                }
                 onClick={onSubmit}
               >
                 {isSubmitting ? (
@@ -1059,7 +1234,10 @@ export function ShipmentUploadForm() {
                 ) : (
                   <>
                     <CheckCircle className="w-5 h-5 mr-2" />
-                    Finalize Shipment{totals.validLines + (canHaveConsolidatedCargo && agentCargoWeight > 0 ? 1 : 0) !== 1 ? 's' : ''}
+                    {uploadMode === 'agent_only' 
+                      ? 'Finalize Agent Cargo' 
+                      : `Finalize Shipment${totals.validLines + (canHaveConsolidatedCargo && agentCargoWeight > 0 ? 1 : 0) !== 1 ? 's' : ''}`
+                    }
                   </>
                 )}
               </Button>
