@@ -316,12 +316,18 @@ function PaymentVerificationApprovals() {
   const [useCustomRate, setUseCustomRate] = useState(false);
   const [customExchangeRate, setCustomExchangeRate] = useState<string>('');
 
-  // Filter chart accounts to show cash/bank accounts
+  // Get chart account IDs that are already linked to bank accounts to avoid duplicates
+  const linkedChartAccountIds = new Set(
+    bankAccounts?.filter(b => b.chart_account_id).map(b => b.chart_account_id) || []
+  );
+
+  // Filter chart accounts to show only cash/bank accounts NOT linked to a bank account
   const cashAccounts = chartAccounts?.filter(acc => 
-    acc.account_subtype === 'cash' || 
-    acc.account_subtype === 'bank' ||
-    acc.account_code.startsWith('1001') || // Cash accounts
-    acc.account_code.startsWith('1002')    // Bank accounts
+    (acc.account_subtype === 'cash' || 
+     acc.account_subtype === 'bank' ||
+     acc.account_code.startsWith('1001') || // Cash accounts
+     acc.account_code.startsWith('1002')) && // Bank accounts
+    !linkedChartAccountIds.has(acc.id) // Exclude accounts already linked to bank accounts
   ) || [];
 
   // Calculate system exchange rate for the currency
@@ -533,10 +539,10 @@ function PaymentVerificationApprovals() {
               {verifyAction === 'verified' && (
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="deposit-account">Credit to Account *</Label>
+                    <Label htmlFor="deposit-account">Deposit to Account *</Label>
                     <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
                       <SelectTrigger id="deposit-account">
-                        <SelectValue placeholder="Select account to credit..." />
+                        <SelectValue placeholder="Select account..." />
                       </SelectTrigger>
                       <SelectContent>
                         {bankAccounts && bankAccounts.filter(b => b.is_active && b.chart_account_id).length > 0 && (
