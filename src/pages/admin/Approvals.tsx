@@ -237,7 +237,7 @@ function ParcelReleaseApprovals() {
 
       {/* Review Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {reviewAction === 'approved' ? (
@@ -256,22 +256,75 @@ function ParcelReleaseApprovals() {
 
           {selectedRequest && (
             <div className="space-y-4">
+              {/* Customer & Parcel Info */}
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <p className="text-muted-foreground">Parcel</p>
-                  <p className="font-mono">{selectedRequest.parcels?.barcode}</p>
+                  <p className="text-muted-foreground">Customer</p>
+                  <p className="font-medium">{selectedRequest.customers?.name || '-'}</p>
+                  {selectedRequest.customers?.phone && (
+                    <p className="text-xs text-muted-foreground">{selectedRequest.customers.phone}</p>
+                  )}
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Customer</p>
-                  <p>{selectedRequest.customers?.name}</p>
+                  <p className="text-muted-foreground">Parcel</p>
+                  <p className="font-mono">{selectedRequest.parcels?.barcode || '-'}</p>
+                  {selectedRequest.parcels?.weight_kg && (
+                    <p className="text-xs text-muted-foreground">{selectedRequest.parcels.weight_kg} kg</p>
+                  )}
                 </div>
               </div>
 
+              {/* Invoice Details */}
+              {selectedRequest.invoices && (
+                <div className="rounded-lg border p-3 bg-muted/30">
+                  <div className="flex items-center gap-2 mb-2">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <p className="font-medium text-sm">Invoice Details</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-muted-foreground text-xs">Invoice Number</p>
+                      <p className="font-mono">{selectedRequest.invoices.invoice_number}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Total Amount</p>
+                      <p className="font-semibold">
+                        {CURRENCY_SYMBOLS[selectedRequest.invoices.currency || 'USD']}
+                        {selectedRequest.invoices.amount?.toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                  {selectedRequest.amount !== null && selectedRequest.amount !== undefined && (
+                    <div className="mt-2 pt-2 border-t">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Outstanding Balance</span>
+                        <span className="font-semibold text-amber-600">
+                          {CURRENCY_SYMBOLS[selectedRequest.currency || 'USD']}
+                          {selectedRequest.amount.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Reason */}
               <div>
-                <p className="text-sm text-muted-foreground mb-1">Reason for request</p>
+                <p className="text-sm text-muted-foreground mb-1">Reason for Request</p>
                 <p className="text-sm bg-muted p-2 rounded">{selectedRequest.reason}</p>
               </div>
 
+              {/* Requested By */}
+              <div className="flex items-center gap-2 text-sm">
+                <User className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Requested by:</span>
+                <span>{selectedRequest.requester?.full_name || selectedRequest.requester?.email || 'Unknown'}</span>
+                <span className="text-muted-foreground">
+                  on {format(new Date(selectedRequest.requested_at), 'MMM d, yyyy HH:mm')}
+                </span>
+              </div>
+
+              {/* Notes Input */}
               <div>
                 <label className="text-sm font-medium">Notes (optional)</label>
                 <Textarea
