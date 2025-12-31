@@ -117,8 +117,8 @@ export function SetupSalaryDialog({ open, onOpenChange, employeeId }: SetupSalar
               </SelectTrigger>
               <SelectContent>
                 {employees.map((emp) => (
-                  <SelectItem key={emp.id} value={emp.id}>
-                    {emp.full_name || emp.email}
+                  <SelectItem key={emp.user_id} value={emp.user_id}>
+                    {emp.profile?.full_name || emp.profile?.email}
                   </SelectItem>
                 ))}
               </SelectContent>

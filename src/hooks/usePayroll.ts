@@ -270,25 +270,19 @@ export function useApproveSalaryAdvance() {
       // Update bank balance if account specified
       if (bankAccountId) {
         const advance = data as SalaryAdvance;
-        await supabase.rpc('update_bank_balance', {
-          p_bank_account_id: bankAccountId,
-          p_amount: -advance.amount,
-        }).catch(() => {
-          // RPC may not exist, try direct update
-          supabase
+        // Get current balance and update
+        const { data: bankData } = await supabase
+          .from('bank_accounts')
+          .select('current_balance')
+          .eq('id', bankAccountId)
+          .single();
+          
+        if (bankData) {
+          await supabase
             .from('bank_accounts')
-            .select('current_balance')
-            .eq('id', bankAccountId)
-            .single()
-            .then(({ data: bankData }) => {
-              if (bankData) {
-                supabase
-                  .from('bank_accounts')
-                  .update({ current_balance: (bankData.current_balance || 0) - advance.amount })
-                  .eq('id', bankAccountId);
-              }
-            });
-        });
+            .update({ current_balance: (bankData.current_balance || 0) - advance.amount })
+            .eq('id', bankAccountId);
+        }
       }
 
       return data;

@@ -56,6 +56,7 @@ const AdminAccountingPage = lazy(() => import("./pages/admin/Accounting"));
 const AdminAnalyticsPage = lazy(() => import("./pages/admin/Analytics"));
 const AdminProfilePage = lazy(() => import("./pages/admin/Profile"));
 const AdminNotificationsPage = lazy(() => import("./pages/admin/Notifications"));
+const AdminPayrollPage = lazy(() => import("./pages/admin/Payroll"));
 
 const AdminSettlementsPage = lazy(() => import("./pages/admin/Settlements"));
 const AdminApprovalsPage = lazy(() => import("./pages/admin/Approvals"));
@@ -150,6 +151,7 @@ const App = () => (
             {/* Settings & Management - requires manage_settings */}
             <Route path="/admin/content" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="manage_settings"><AdminPageContentPage /></PermissionGate></Suspense>} />
             <Route path="/admin/employees" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="manage_settings"><AdminEmployeesPage /></PermissionGate></Suspense>} />
+            <Route path="/admin/payroll" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="manage_settings"><AdminPayrollPage /></PermissionGate></Suspense>} />
             <Route path="/admin/settings" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="manage_settings"><AdminSettingsPage /></PermissionGate></Suspense>} />
             
             <Route path="*" element={<NotFound />} />
