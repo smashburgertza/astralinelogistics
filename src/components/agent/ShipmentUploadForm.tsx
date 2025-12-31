@@ -692,8 +692,9 @@ export function ShipmentUploadForm() {
 
       // Create a separate shipment for agent's consolidated cargo if any
       // Agent's own cargo: Astraline bills the agent for clearing/handling services (to_agent)
-      if (agentCargoWeight > 0) {
+      if (agentCargoWeight > 0 && (canHaveConsolidatedCargo || isAgentOnlyMode)) {
         const agentTrackingNumber = generateTrackingNumber();
+        const agentParcelBarcode = generateBarcode();
         
         const { data: agentShipment, error: agentShipmentError } = await supabase
           .from('shipments')
@@ -705,7 +706,7 @@ export function ShipmentUploadForm() {
             agent_cargo_weight_kg: agentCargoWeight,
             description: isAgentOnlyMode 
               ? (agentCargoDescription || "Agent's own cargo for clearing")
-              : 'Consolidated agent cargo - not tracked individually',
+              : (agentCargoDescription || 'Consolidated agent cargo'),
             warehouse_location: null,
             created_by: user?.id,
             agent_id: user?.id,
@@ -722,17 +723,31 @@ export function ShipmentUploadForm() {
 
         if (agentShipmentError) {
           console.error('Failed to create agent cargo shipment:', agentShipmentError);
-        } else if (isAgentOnlyMode && agentShipment) {
-          // Add to completed shipments for agent-only mode
+        } else if (agentShipment) {
+          // Create parcel for agent cargo
+          const { error: agentParcelError } = await supabase
+            .from('parcels')
+            .insert({
+              shipment_id: agentShipment.id,
+              barcode: agentParcelBarcode,
+              weight_kg: agentCargoWeight,
+              description: agentCargoDescription || "Agent's Consolidated Cargo",
+            });
+
+          if (agentParcelError) {
+            console.error('Failed to create agent cargo parcel:', agentParcelError);
+          }
+
+          // Always add agent cargo to completed shipments for labels
           createdShipments.push({
             tracking_number: agentShipment.tracking_number,
-            customer_name: "Agent's Own Cargo",
+            customer_name: isAgentOnlyMode ? "Agent's Own Cargo" : "Agent Cargo (Consolidated)",
             customer_phone: '',
             origin_region: selectedRegion,
             created_at: agentShipment.created_at || new Date().toISOString(),
             parcels: [{
               id: crypto.randomUUID(),
-              barcode: generateBarcode(),
+              barcode: agentParcelBarcode,
               weight_kg: agentCargoWeight,
               description: agentCargoDescription || "Agent's cargo"
             }]
