@@ -161,6 +161,8 @@ export function ParcelCheckoutScanner() {
             `)
             .eq('shipment_id', shipmentData.id)
             .eq('invoice_type', 'shipping')
+            .order('created_at', { ascending: false })
+            .limit(1)
             .maybeSingle(),
           supabase
             .from('parcels')
