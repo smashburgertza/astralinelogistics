@@ -37,7 +37,7 @@ const formSchema = z.object({
     .number()
     .min(0.01, 'Amount must be greater than 0')
     .max(1000000, 'Amount cannot exceed 1,000,000'),
-  currency: z.string().default('USD'),
+  currency: z.string().default('TZS'),
   description: z.string().optional(),
   assigned_to: z.string().min(1, 'Please select an approver'),
 });
@@ -68,7 +68,7 @@ export function ExpenseDialog({
     defaultValues: {
       category: '',
       amount: 0,
-      currency: 'USD',
+      currency: 'TZS',
       description: '',
       assigned_to: '',
     },
@@ -80,7 +80,7 @@ export function ExpenseDialog({
         form.reset({
           category: expense.category,
           amount: Number(expense.amount),
-          currency: expense.currency || 'USD',
+          currency: expense.currency || 'TZS',
           description: expense.description || '',
           assigned_to: (expense as any).assigned_to || '',
         });
@@ -88,7 +88,7 @@ export function ExpenseDialog({
         form.reset({
           category: '',
           amount: 0,
-          currency: 'USD',
+          currency: 'TZS',
           description: '',
           assigned_to: '',
         });
