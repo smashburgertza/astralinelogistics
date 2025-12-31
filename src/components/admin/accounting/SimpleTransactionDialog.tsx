@@ -63,7 +63,7 @@ export function SimpleTransactionDialog({ open, onOpenChange }: SimpleTransactio
   const [transactionType, setTransactionType] = useState<TransactionType>('income');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState('USD');
+  const [currency, setCurrency] = useState('TZS');
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
   const [bankAccountId, setBankAccountId] = useState('');
