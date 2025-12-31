@@ -1,12 +1,13 @@
 import { supabase } from '@/integrations/supabase/client';
 
 // Account code mappings for automatic journal entries
-const ACCOUNT_CODES = {
+export const ACCOUNT_CODES = {
   // Assets
   CASH_TZS: '1120',
   CASH_USD: '1130',
   CASH_GBP: '1140',
   ACCOUNTS_RECEIVABLE: '1210',
+  PURCHASES_FOR_CUSTOMERS: '1230', // Product costs paid on behalf of customers
   
   // Liabilities
   ACCOUNTS_PAYABLE: '2110',
@@ -15,6 +16,7 @@ const ACCOUNT_CODES = {
   // Revenue
   SHIPPING_REVENUE: '4110',
   HANDLING_FEE_REVENUE: '4120',
+  PURCHASE_FEE_REVENUE: '4130', // Fees charged for purchasing on behalf of customers
   
   // Expenses by category
   EXPENSES: {
@@ -621,6 +623,170 @@ export async function createAgentBillingJournalEntry({
       {
         account_code: ACCOUNT_CODES.SHIPPING_REVENUE,
         description: `Clearing service revenue - Invoice ${invoiceNumber}`,
+        debit_amount: 0,
+        credit_amount: amount,
+        currency,
+        exchange_rate: exchangeRate,
+      },
+    ],
+  });
+}
+
+/**
+ * Create journal entry for purchase invoice (Shop For Me or office purchases)
+ * Uses Agency Model: Product cost is an asset (pass-through), purchase fee is revenue
+ * When invoice is ISSUED:
+ * - Debit Accounts Receivable (customer owes us total)
+ * - Credit Purchases for Customers (asset - we recover the product cost)
+ * - Credit Purchase Fee Revenue (our fee income)
+ * - Credit Shipping Revenue (if there's a shipping component)
+ */
+export async function createPurchaseInvoiceJournalEntry({
+  invoiceId,
+  invoiceNumber,
+  productCost,
+  purchaseFee,
+  shippingAmount,
+  currency,
+  exchangeRate = 1,
+  customerName,
+}: {
+  invoiceId: string;
+  invoiceNumber: string;
+  productCost: number;
+  purchaseFee: number;
+  shippingAmount: number;
+  currency: string;
+  exchangeRate?: number;
+  customerName?: string;
+}) {
+  const totalAmount = productCost + purchaseFee + shippingAmount;
+  
+  const lines: JournalLineInput[] = [
+    {
+      account_code: ACCOUNT_CODES.ACCOUNTS_RECEIVABLE,
+      description: `AR - Purchase Invoice ${invoiceNumber}`,
+      debit_amount: totalAmount,
+      credit_amount: 0,
+      currency,
+      exchange_rate: exchangeRate,
+    },
+  ];
+
+  // Credit product cost recovery (if there's a product cost)
+  if (productCost > 0) {
+    lines.push({
+      account_code: ACCOUNT_CODES.PURCHASES_FOR_CUSTOMERS,
+      description: `Product cost recovery - Invoice ${invoiceNumber}`,
+      debit_amount: 0,
+      credit_amount: productCost,
+      currency,
+      exchange_rate: exchangeRate,
+    });
+  }
+
+  // Credit purchase fee revenue (if there's a purchase fee)
+  if (purchaseFee > 0) {
+    lines.push({
+      account_code: ACCOUNT_CODES.PURCHASE_FEE_REVENUE,
+      description: `Purchase fee - Invoice ${invoiceNumber}`,
+      debit_amount: 0,
+      credit_amount: purchaseFee,
+      currency,
+      exchange_rate: exchangeRate,
+    });
+  }
+
+  // Credit shipping revenue (if there's a shipping amount)
+  if (shippingAmount > 0) {
+    lines.push({
+      account_code: ACCOUNT_CODES.SHIPPING_REVENUE,
+      description: `Shipping revenue - Invoice ${invoiceNumber}`,
+      debit_amount: 0,
+      credit_amount: shippingAmount,
+      currency,
+      exchange_rate: exchangeRate,
+    });
+  }
+
+  return createJournalEntry({
+    description: `Purchase invoice ${invoiceNumber}${customerName ? ` for ${customerName}` : ''}`,
+    referenceType: 'invoice',
+    referenceId: invoiceId,
+    autoPost: true,
+    lines,
+  });
+}
+
+/**
+ * Create journal entry when we PAY for products on behalf of customer (before invoice)
+ * This records the outflow of cash and creates an asset (we're owed this back)
+ * Accounting: Debit Purchases for Customers (asset), Credit Cash
+ */
+export async function createPurchasePaymentJournalEntry({
+  referenceId,
+  referenceDescription,
+  amount,
+  currency,
+  exchangeRate = 1,
+  bankAccountChartId,
+}: {
+  referenceId: string;
+  referenceDescription: string;
+  amount: number;
+  currency: string;
+  exchangeRate?: number;
+  bankAccountChartId?: string;
+}) {
+  // Determine cash account based on currency if no bank account specified
+  let cashAccountCode = ACCOUNT_CODES.CASH_TZS;
+  if (currency === 'USD') cashAccountCode = ACCOUNT_CODES.CASH_USD;
+  else if (currency === 'GBP') cashAccountCode = ACCOUNT_CODES.CASH_GBP;
+
+  if (bankAccountChartId) {
+    return createJournalEntryWithAccountIds({
+      description: `Purchase payment: ${referenceDescription}`,
+      referenceType: 'expense',
+      referenceId,
+      autoPost: true,
+      lines: [
+        {
+          account_code: ACCOUNT_CODES.PURCHASES_FOR_CUSTOMERS,
+          description: `Product purchase - ${referenceDescription}`,
+          debit_amount: amount,
+          credit_amount: 0,
+          currency,
+          exchange_rate: exchangeRate,
+        },
+        {
+          account_id: bankAccountChartId,
+          description: `Paid from bank - ${referenceDescription}`,
+          debit_amount: 0,
+          credit_amount: amount,
+          currency,
+          exchange_rate: exchangeRate,
+        },
+      ],
+    });
+  }
+
+  return createJournalEntry({
+    description: `Purchase payment: ${referenceDescription}`,
+    referenceType: 'expense',
+    referenceId,
+    autoPost: true,
+    lines: [
+      {
+        account_code: ACCOUNT_CODES.PURCHASES_FOR_CUSTOMERS,
+        description: `Product purchase - ${referenceDescription}`,
+        debit_amount: amount,
+        credit_amount: 0,
+        currency,
+        exchange_rate: exchangeRate,
+      },
+      {
+        account_code: cashAccountCode,
+        description: `Paid for products - ${referenceDescription}`,
         debit_amount: 0,
         credit_amount: amount,
         currency,
