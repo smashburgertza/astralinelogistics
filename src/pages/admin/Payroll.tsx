@@ -42,16 +42,8 @@ export default function Payroll() {
   const currentPayroll = payrollRuns.find(p => p.period_month === currentMonth && p.period_year === currentYear);
 
   return (
-    <AdminLayout>
+    <AdminLayout title="Payroll Management" subtitle="Manage employee salaries, advances, and monthly payroll">
       <div className="space-y-6">
-        {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold">Payroll Management</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage employee salaries, advances, and monthly payroll
-          </p>
-        </div>
-
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card>

@@ -70,6 +70,7 @@ export function SalaryAdvancesTab() {
       reason,
       status: 'pending',
       paid_from_account_id: null,
+      created_by: null,
     }, {
       onSuccess: () => {
         setShowCreateDialog(false);
@@ -98,8 +99,8 @@ export function SalaryAdvancesTab() {
   };
 
   const getEmployeeName = (employeeId: string) => {
-    const emp = employees.find(e => e.id === employeeId);
-    return emp?.full_name || emp?.email || 'Unknown';
+    const emp = employees.find(e => e.user_id === employeeId);
+    return emp?.profile?.full_name || emp?.profile?.email || 'Unknown';
   };
 
   const activeBankAccounts = bankAccounts.filter(b => b.is_active);
@@ -197,8 +198,8 @@ export function SalaryAdvancesTab() {
                 </SelectTrigger>
                 <SelectContent>
                   {employees.map((emp) => (
-                    <SelectItem key={emp.id} value={emp.id}>
-                      {emp.full_name || emp.email}
+                    <SelectItem key={emp.user_id} value={emp.user_id}>
+                      {emp.profile?.full_name || emp.profile?.email}
                     </SelectItem>
                   ))}
                 </SelectContent>

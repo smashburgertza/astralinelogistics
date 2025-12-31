@@ -70,6 +70,7 @@ const financeNavItems: NavItem[] = [
   { label: 'B2B Agent', href: '/admin/settlements', icon: TrendingUp, permission: 'manage_invoices', countKey: 'settlements' },
   { label: 'Expenses', href: '/admin/expenses', icon: Wallet, permission: 'manage_expenses', countKey: 'expenses' },
   { label: 'Commissions', href: '/admin/commissions', icon: TrendingUp, permission: 'view_reports' },
+  { label: 'Payroll', href: '/admin/payroll', icon: PiggyBank, permission: 'manage_settings' },
 ];
 
 const managementNavItems: NavItem[] = [

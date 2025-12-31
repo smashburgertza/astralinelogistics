@@ -27,12 +27,12 @@ export function EmployeeSalariesTab() {
 
   // Get employees with and without salary setup
   const employeesWithSalary = activeSalaries.map(s => {
-    const employee = employees.find(e => e.id === s.employee_id);
+    const employee = employees.find(e => e.user_id === s.employee_id);
     return { ...s, employee };
   });
 
   const employeesWithoutSalary = employees.filter(
-    e => !activeSalaries.some(s => s.employee_id === e.id)
+    e => !activeSalaries.some(s => s.employee_id === e.user_id)
   );
 
   return (
@@ -58,7 +58,7 @@ export function EmployeeSalariesTab() {
             <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800">
               <p className="text-sm text-amber-700 dark:text-amber-300">
                 <strong>{employeesWithoutSalary.length}</strong> employee(s) without salary setup: {' '}
-                {employeesWithoutSalary.slice(0, 3).map(e => e.full_name || e.email).join(', ')}
+                {employeesWithoutSalary.slice(0, 3).map(e => e.profile?.full_name || e.profile?.email || 'Unknown').join(', ')}
                 {employeesWithoutSalary.length > 3 && ` and ${employeesWithoutSalary.length - 3} more`}
               </p>
             </div>
@@ -94,7 +94,7 @@ export function EmployeeSalariesTab() {
                 employeesWithSalary.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell className="font-medium">
-                      {item.employee?.full_name || item.employee?.email || 'Unknown'}
+                      {item.employee?.profile?.full_name || item.employee?.profile?.email || 'Unknown'}
                     </TableCell>
                     <TableCell className="text-right">
                       {formatAmount(item.base_salary, item.currency)}
