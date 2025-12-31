@@ -1,13 +1,23 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { ScanLine, Package, User, Phone, Mail, CheckCircle2, AlertCircle, Clock, X, Volume2 } from 'lucide-react';
+import { ScanLine, Package, User, Phone, Mail, CheckCircle2, AlertCircle, Clock, X, Volume2, ShieldCheck, ShieldAlert, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useParcelCheckout } from '@/hooks/useParcelCheckout';
+import { useCreateApprovalRequest } from '@/hooks/useApprovalRequests';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { playSuccessBeep, playErrorBeep } from '@/lib/audioFeedback';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 export function ParcelCheckout() {
   const [barcode, setBarcode] = useState('');
@@ -16,6 +26,11 @@ export function ParcelCheckout() {
   const inputRef = useRef<HTMLInputElement>(null);
   const { isLoading, scannedParcel, recentCheckouts, lookupParcel, releaseParcel, clearScannedParcel } = useParcelCheckout();
   const [error, setError] = useState<string | null>(null);
+  
+  // Approval request dialog state
+  const [showApprovalDialog, setShowApprovalDialog] = useState(false);
+  const [approvalReason, setApprovalReason] = useState('');
+  const createApprovalRequest = useCreateApprovalRequest();
 
   // Auto-focus input on mount and after any action
   useEffect(() => {
@@ -65,6 +80,29 @@ export function ParcelCheckout() {
     }
   }, [scannedParcel, releaseParcel]);
 
+  const handleRequestApproval = useCallback(async () => {
+    if (!scannedParcel || !approvalReason.trim()) return;
+
+    try {
+      await createApprovalRequest.mutateAsync({
+        approval_type: 'parcel_release',
+        reference_type: 'parcel',
+        reference_id: scannedParcel.id,
+        reason: approvalReason,
+        parcel_id: scannedParcel.id,
+        customer_id: scannedParcel.shipment?.customer?.id,
+        invoice_id: undefined,
+      });
+      
+      setShowApprovalDialog(false);
+      setApprovalReason('');
+      // Re-lookup to get updated approval status
+      await lookupParcel(scannedParcel.barcode);
+    } catch (error) {
+      console.error('Failed to submit approval request:', error);
+    }
+  }, [scannedParcel, approvalReason, createApprovalRequest, lookupParcel]);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'arrived': return 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20';
@@ -73,6 +111,98 @@ export function ParcelCheckout() {
       case 'delivered': return 'bg-purple-500/10 text-purple-600 border-purple-500/20';
       default: return 'bg-muted text-muted-foreground';
     }
+  };
+
+  const getApprovalStatusDisplay = () => {
+    if (!scannedParcel) return null;
+    
+    switch (scannedParcel.approvalStatus) {
+      case 'approved':
+        return (
+          <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-3">
+            <ShieldCheck className="h-5 w-5 text-emerald-600 shrink-0" />
+            <div>
+              <p className="font-medium text-emerald-700">Release Approved</p>
+              <p className="text-sm text-emerald-600">
+                This parcel has been approved for release. Click the button below to complete the release.
+              </p>
+            </div>
+          </div>
+        );
+      case 'pending':
+        return (
+          <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center gap-3">
+            <Clock className="h-5 w-5 text-amber-600 shrink-0" />
+            <div>
+              <p className="font-medium text-amber-700">Approval Pending</p>
+              <p className="text-sm text-amber-600">
+                A release request has been submitted and is awaiting approval. Please wait for manager approval before releasing.
+              </p>
+            </div>
+          </div>
+        );
+      case 'rejected':
+        return (
+          <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20 flex items-center gap-3">
+            <ShieldAlert className="h-5 w-5 text-destructive shrink-0" />
+            <div>
+              <p className="font-medium text-destructive">Release Rejected</p>
+              <p className="text-sm text-destructive/80">
+                The previous release request was rejected. You can submit a new request with additional justification.
+              </p>
+            </div>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const renderActionButton = () => {
+    if (!scannedParcel || scannedParcel.picked_up_at) return null;
+
+    // If approved, show release button
+    if (scannedParcel.approvalStatus === 'approved') {
+      return (
+        <Button 
+          onClick={handleRelease} 
+          size="lg" 
+          className="w-full h-14 text-lg bg-emerald-600 hover:bg-emerald-700"
+          disabled={isLoading}
+        >
+          <CheckCircle2 className="h-5 w-5 mr-2" />
+          Release Parcel to Customer
+        </Button>
+      );
+    }
+
+    // If pending, show waiting message (no button)
+    if (scannedParcel.approvalStatus === 'pending') {
+      return (
+        <Button 
+          size="lg" 
+          className="w-full h-14 text-lg"
+          disabled
+          variant="outline"
+        >
+          <Clock className="h-5 w-5 mr-2" />
+          Awaiting Manager Approval
+        </Button>
+      );
+    }
+
+    // No approval or rejected - show request approval button
+    return (
+      <Button 
+        onClick={() => setShowApprovalDialog(true)} 
+        size="lg" 
+        className="w-full h-14 text-lg"
+        disabled={isLoading}
+      >
+        <ShieldCheck className="h-5 w-5 mr-2" />
+        Request Release Approval
+      </Button>
+    );
   };
 
   return (
@@ -149,7 +279,11 @@ export function ParcelCheckout() {
           "border-2 transition-all duration-300",
           scannedParcel.picked_up_at 
             ? "border-amber-500/50 bg-amber-500/5" 
-            : "border-emerald-500/50 bg-emerald-500/5"
+            : scannedParcel.approvalStatus === 'approved'
+            ? "border-emerald-500/50 bg-emerald-500/5"
+            : scannedParcel.approvalStatus === 'pending'
+            ? "border-amber-500/50 bg-amber-500/5"
+            : "border-border"
         )}>
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
@@ -218,6 +352,9 @@ export function ParcelCheckout() {
               )}
             </div>
 
+            {/* Approval Status Display */}
+            {getApprovalStatusDisplay()}
+
             {/* Action Buttons */}
             {scannedParcel.picked_up_at ? (
               <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center gap-3">
@@ -230,15 +367,7 @@ export function ParcelCheckout() {
                 </div>
               </div>
             ) : (
-              <Button 
-                onClick={handleRelease} 
-                size="lg" 
-                className="w-full h-14 text-lg bg-emerald-600 hover:bg-emerald-700"
-                disabled={isLoading}
-              >
-                <CheckCircle2 className="h-5 w-5 mr-2" />
-                Release Parcel to Customer
-              </Button>
+              renderActionButton()
             )}
           </CardContent>
         </Card>
@@ -280,6 +409,52 @@ export function ParcelCheckout() {
           </CardContent>
         </Card>
       )}
+
+      {/* Approval Request Dialog */}
+      <Dialog open={showApprovalDialog} onOpenChange={setShowApprovalDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Request Parcel Release Approval</DialogTitle>
+            <DialogDescription>
+              Provide a reason for releasing this parcel. A manager will review your request.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {scannedParcel && (
+              <div className="p-3 rounded-lg bg-muted">
+                <p className="text-sm text-muted-foreground">Parcel</p>
+                <p className="font-mono font-medium">{scannedParcel.barcode}</p>
+                {scannedParcel.shipment?.customer && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Customer: {scannedParcel.shipment.customer.name}
+                  </p>
+                )}
+              </div>
+            )}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Reason for Release</label>
+              <Textarea
+                placeholder="e.g., Customer paid cash, VIP customer, emergency release..."
+                value={approvalReason}
+                onChange={(e) => setApprovalReason(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowApprovalDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleRequestApproval} 
+              disabled={!approvalReason.trim() || createApprovalRequest.isPending}
+            >
+              {createApprovalRequest.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Submit Request
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

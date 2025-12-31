@@ -20,12 +20,17 @@ interface ParcelWithShipment {
       email: string | null;
     } | null;
   } | null;
+  // Approval status for parcel release
+  approvalStatus?: 'none' | 'pending' | 'approved' | 'rejected';
+  approvalId?: string;
 }
 
 interface CheckoutResult {
   success: boolean;
   parcel?: ParcelWithShipment;
   error?: string;
+  requiresApproval?: boolean;
+  approvalPending?: boolean;
 }
 
 export function useParcelCheckout() {
@@ -84,7 +89,30 @@ export function useParcelCheckout() {
         return { success: false, error: 'Parcel not found. Please check the barcode.' };
       }
 
-      const parcel = data as unknown as ParcelWithShipment;
+      // Check for existing approval request for this parcel
+      const { data: approvalData } = await supabase
+        .from('approval_requests')
+        .select('id, status')
+        .eq('parcel_id', data.id)
+        .eq('approval_type', 'parcel_release')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      let approvalStatus: 'none' | 'pending' | 'approved' | 'rejected' = 'none';
+      let approvalId: string | undefined;
+
+      if (approvalData) {
+        approvalStatus = approvalData.status as 'pending' | 'approved' | 'rejected';
+        approvalId = approvalData.id;
+      }
+
+      const parcel: ParcelWithShipment = {
+        ...(data as unknown as ParcelWithShipment),
+        approvalStatus,
+        approvalId,
+      };
+      
       setScannedParcel(parcel);
       return { success: true, parcel };
     } catch (error: any) {
