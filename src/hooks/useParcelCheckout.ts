@@ -35,9 +35,26 @@ export function useParcelCheckout() {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const lookupParcel = useCallback(async (barcode: string): Promise<CheckoutResult> => {
+  const lookupParcel = useCallback(async (barcodeInput: string): Promise<CheckoutResult> => {
     setIsLoading(true);
+    
+    let barcodeToSearch = barcodeInput.trim();
+    
+    // Check if the scanned value is JSON (from a QR code with embedded data)
+    if (barcodeToSearch.startsWith('{') && barcodeToSearch.endsWith('}')) {
+      try {
+        const parsedData = JSON.parse(barcodeToSearch);
+        // Extract barcode from common field names
+        barcodeToSearch = parsedData.BARCODE || parsedData.barcode || 
+                          parsedData.TRACKING || parsedData.tracking ||
+                          parsedData.CODE || parsedData.code || barcodeToSearch;
+      } catch {
+        // Not valid JSON, use as-is
+      }
+    }
+    
     try {
+      // Use ilike for case-insensitive matching
       const { data, error } = await supabase
         .from('parcels')
         .select(`
@@ -58,7 +75,7 @@ export function useParcelCheckout() {
             )
           )
         `)
-        .eq('barcode', barcode.trim())
+        .ilike('barcode', barcodeToSearch)
         .maybeSingle();
 
       if (error) throw error;
