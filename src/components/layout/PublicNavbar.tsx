@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
-import astralineLogo from '@/assets/astraline-logo.svg';
+import astralineLogo from '@/assets/astraline-logo-full.svg';
 import astralineLogoWhite from '@/assets/astraline-logo-white.svg';
 
 export function PublicNavbar() {
