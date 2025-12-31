@@ -193,20 +193,9 @@ export function useReviewApprovalRequest() {
 
       if (error) throw error;
 
-      // If it's a parcel release approval and approved, mark parcel as released
-      if (status === 'approved' && data.approval_type === 'parcel_release' && data.parcel_id) {
-        const { error: parcelError } = await supabase
-          .from('parcels')
-          .update({
-            picked_up_at: new Date().toISOString(),
-            picked_up_by: user.id,
-          })
-          .eq('id', data.parcel_id);
-
-        if (parcelError) {
-          console.error('Failed to update parcel:', parcelError);
-        }
-      }
+      // Note: Parcel release approval only marks the request as approved.
+      // The actual parcel release (picked_up_at) will be done by the requester
+      // when they scan the parcel for pickup.
 
       return data;
     },
