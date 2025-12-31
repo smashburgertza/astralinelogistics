@@ -211,18 +211,38 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
     // Calculate with cascading percentages - each % applies to all items above it
     let runningTotal = 0;
     const lineItemAmounts: number[] = [];
+    let productCostTotal = 0;
+    let purchaseFeeTotal = 0;
 
-    watchLineItems.forEach((item) => {
+    watchLineItems.forEach((item, index) => {
+      // Find the product/service to check its type
+      const productService = productsServices?.find(p => p.id === item.product_service_id);
+      const isPurchasingType = productService?.service_type === 'purchasing';
+      // Check if this is product cost (linked to asset account 1230) or purchase fee (linked to revenue 4130)
+      const isProductCost = productService?.account_id === 'd50368b8-1c95-43b6-80e1-34be5f399b85';
+      
       if (item.unit_type === 'percent') {
         // Apply percentage to the running total (everything above)
         const percentageAmount = runningTotal * (item.unit_price / 100);
         lineItemAmounts.push(percentageAmount);
         runningTotal += percentageAmount;
+        // Percentage fees on purchasing are purchase fees
+        if (isPurchasingType && !isProductCost) {
+          purchaseFeeTotal += percentageAmount;
+        }
       } else {
         // Regular item - add to running total
         const itemAmount = item.quantity * item.unit_price;
         lineItemAmounts.push(itemAmount);
         runningTotal += itemAmount;
+        // Track product costs and purchase fees
+        if (isPurchasingType) {
+          if (isProductCost) {
+            productCostTotal += itemAmount;
+          } else {
+            purchaseFeeTotal += itemAmount;
+          }
+        }
       }
     });
 
@@ -263,8 +283,10 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
       tzsTax,
       tzsTotal,
       lineItemAmounts, // Individual amounts for each line item (including calculated % amounts)
+      productCost: productCostTotal,
+      purchaseFee: purchaseFeeTotal,
     };
-  }, [watchLineItems, watchDiscount, watchTaxRate, watchCurrency, exchangeRates]);
+  }, [watchLineItems, watchDiscount, watchTaxRate, watchCurrency, exchangeRates, productsServices]);
 
   const currencySymbol = CURRENCY_SYMBOLS[watchCurrency] || '$';
 
@@ -302,6 +324,8 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
       notes: data.notes || null,
       status: 'pending',
       invoice_direction: null, // Customer invoice - not B2B agent invoice
+      product_cost: calculations.productCost || 0,
+      purchase_fee: calculations.purchaseFee || 0,
     });
 
     // Save line items if invoice was created successfully

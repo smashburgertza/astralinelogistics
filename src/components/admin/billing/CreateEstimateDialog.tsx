@@ -119,9 +119,37 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
 
   // Calculate totals
   const calculations = useMemo(() => {
-    const subtotal = watchLineItems.reduce((sum, item) => {
-      return sum + (item.quantity * item.unit_price);
-    }, 0);
+    let runningTotal = 0;
+    let productCostTotal = 0;
+    let purchaseFeeTotal = 0;
+    
+    watchLineItems.forEach((item) => {
+      // Find the product/service to check its type
+      const productService = productsServices?.find(p => p.id === item.product_service_id);
+      const isPurchasingType = productService?.service_type === 'purchasing';
+      // Check if this is product cost (linked to asset account 1230) or purchase fee (linked to revenue 4130)
+      const isProductCost = productService?.account_id === 'd50368b8-1c95-43b6-80e1-34be5f399b85';
+      
+      if (item.unit_type === 'percent') {
+        const percentageAmount = runningTotal * (item.unit_price / 100);
+        runningTotal += percentageAmount;
+        if (isPurchasingType && !isProductCost) {
+          purchaseFeeTotal += percentageAmount;
+        }
+      } else {
+        const itemAmount = item.quantity * item.unit_price;
+        runningTotal += itemAmount;
+        if (isPurchasingType) {
+          if (isProductCost) {
+            productCostTotal += itemAmount;
+          } else {
+            purchaseFeeTotal += itemAmount;
+          }
+        }
+      }
+    });
+
+    const subtotal = runningTotal;
 
     let discountAmount = 0;
     if (watchDiscount) {
@@ -157,8 +185,10 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
       tzsDiscount,
       tzsTax,
       tzsTotal,
+      productCost: productCostTotal,
+      purchaseFee: purchaseFeeTotal,
     };
-  }, [watchLineItems, watchDiscount, watchTaxRate, watchCurrency, exchangeRates]);
+  }, [watchLineItems, watchDiscount, watchTaxRate, watchCurrency, exchangeRates, productsServices]);
 
   const currencySymbol = CURRENCY_SYMBOLS[watchCurrency] || '$';
 
@@ -167,6 +197,10 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
     // Using the first line item as the primary description
     const totalWeight = data.line_items.reduce((sum, item) => sum + item.quantity, 0);
     const avgRate = calculations.subtotal / totalWeight || 0;
+    
+    // Determine estimate type based on whether it includes product costs
+    const hasPurchaseItems = calculations.productCost > 0 || calculations.purchaseFee > 0;
+    const estimateType = hasPurchaseItems ? 'purchase_shipping' : 'shipping';
 
     await createEstimate.mutateAsync({
       customer_id: data.customer_id,
@@ -178,9 +212,9 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
       currency: data.currency,
       notes: data.notes || `Line Items: ${data.line_items.map(i => `${i.description} (${i.quantity} x ${currencySymbol}${i.unit_price})`).join(', ')}`,
       valid_days: data.valid_days,
-      estimate_type: 'shipping',
-      product_cost: 0,
-      purchase_fee: 0,
+      estimate_type: estimateType,
+      product_cost: calculations.productCost,
+      purchase_fee: calculations.purchaseFee,
     });
 
     form.reset();

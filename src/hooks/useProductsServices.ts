@@ -24,6 +24,7 @@ export const SERVICE_TYPES = {
   customs: { label: 'Customs', color: 'bg-purple-100 text-purple-800' },
   insurance: { label: 'Insurance', color: 'bg-green-100 text-green-800' },
   transit: { label: 'Transit', color: 'bg-yellow-100 text-yellow-800' },
+  purchasing: { label: 'Purchasing', color: 'bg-pink-100 text-pink-800' },
   other: { label: 'Other', color: 'bg-gray-100 text-gray-800' },
 } as const;
 

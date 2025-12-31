@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
-import { createInvoicePaymentJournalEntry, createInvoiceJournalEntry, createAgentPaymentJournalEntry } from '@/lib/journalEntryUtils';
+import { createInvoicePaymentJournalEntry, createInvoiceJournalEntry, createAgentPaymentJournalEntry, createPurchaseInvoiceJournalEntry } from '@/lib/journalEntryUtils';
 
 export type InvoiceType = 'shipping' | 'purchase_shipping';
 
@@ -74,14 +74,34 @@ export function useCreateInvoice() {
       // Fire-and-forget: Create journal entry in background (don't block UI)
       const createJournalAsync = async () => {
         try {
-          await createInvoiceJournalEntry({
-            invoiceId: data.id,
-            invoiceNumber: data.invoice_number,
-            amount: Number(data.amount),
-            currency: data.currency || 'USD',
-            exchangeRate: data.amount_in_tzs ? Number(data.amount_in_tzs) / Number(data.amount) : 1,
-            customerName: (data as any).customers?.name,
-          });
+          const productCost = Number(data.product_cost || 0);
+          const purchaseFee = Number(data.purchase_fee || 0);
+          const isPurchaseInvoice = productCost > 0 || purchaseFee > 0;
+          
+          if (isPurchaseInvoice) {
+            // Use purchase invoice journal entry (agency model)
+            const shippingAmount = Number(data.amount) - productCost - purchaseFee;
+            await createPurchaseInvoiceJournalEntry({
+              invoiceId: data.id,
+              invoiceNumber: data.invoice_number,
+              productCost,
+              purchaseFee,
+              shippingAmount: Math.max(0, shippingAmount),
+              currency: data.currency || 'USD',
+              exchangeRate: data.amount_in_tzs ? Number(data.amount_in_tzs) / Number(data.amount) : 1,
+              customerName: (data as any).customers?.name,
+            });
+          } else {
+            // Standard shipping invoice journal entry
+            await createInvoiceJournalEntry({
+              invoiceId: data.id,
+              invoiceNumber: data.invoice_number,
+              amount: Number(data.amount),
+              currency: data.currency || 'USD',
+              exchangeRate: data.amount_in_tzs ? Number(data.amount_in_tzs) / Number(data.amount) : 1,
+              customerName: (data as any).customers?.name,
+            });
+          }
         } catch (journalError) {
           console.error('Background journal entry creation failed:', journalError);
         }
