@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Building, Scale, Edit } from 'lucide-react';
-import { useBankAccounts, useCreateBankAccount, useChartOfAccounts, BankAccount } from '@/hooks/useAccounting';
+import { useBankAccounts, useCreateBankAccount, useChartOfAccounts, useCreateAccount, BankAccount } from '@/hooks/useAccounting';
 import { BankReconciliationTab } from './BankReconciliationTab';
 import { EditBankAccountDialog } from './EditBankAccountDialog';
 import { useExchangeRatesMap } from '@/hooks/useExchangeRates';
@@ -174,17 +174,60 @@ function CreateBankAccountDialog({
   const [currency, setCurrency] = useState('TZS');
   const [chartAccountId, setChartAccountId] = useState('');
   const [openingBalance, setOpeningBalance] = useState(0);
+  const [showCreateChartAccount, setShowCreateChartAccount] = useState(false);
+  const [newAccountCode, setNewAccountCode] = useState('');
+  const [newAccountName, setNewAccountName] = useState('');
 
   const createBankAccount = useCreateBankAccount();
+  const { mutateAsync: createChartAccount } = useCreateAccount();
+
+  // Filter to show only Cash and Bank type accounts
+  const cashBankAccounts = chartAccounts.filter(
+    a => a.account_subtype === 'cash_and_bank' || 
+         a.account_name.toLowerCase().includes('bank') || 
+         a.account_name.toLowerCase().includes('cash')
+  );
+
+  const handleCreateChartAccount = async () => {
+    if (!newAccountCode || !newAccountName) return;
+    
+    try {
+      const result = await createChartAccount({
+        account_code: newAccountCode,
+        account_name: newAccountName,
+        account_type: 'asset',
+        account_subtype: 'cash_and_bank',
+        normal_balance: 'debit',
+        currency: currency,
+        description: `Bank account: ${bankName || newAccountName}`,
+        is_active: true,
+        parent_id: null,
+      });
+      
+      if (result?.id) {
+        setChartAccountId(result.id);
+        setShowCreateChartAccount(false);
+        setNewAccountCode('');
+        setNewAccountName('');
+      }
+    } catch (error) {
+      console.error('Failed to create chart account:', error);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!chartAccountId) {
+      return; // Don't submit without a chart account
+    }
+    
     createBankAccount.mutate({
       account_name: accountName,
       bank_name: bankName,
       account_number: accountNumber || null,
       currency,
-      chart_account_id: chartAccountId || null,
+      chart_account_id: chartAccountId,
       opening_balance: openingBalance,
       is_active: true,
     }, {
@@ -200,6 +243,17 @@ function CreateBankAccountDialog({
     });
   };
 
+  // Suggest account code based on existing accounts
+  const suggestAccountCode = () => {
+    const existingCodes = chartAccounts
+      .filter(a => a.account_code.startsWith('110'))
+      .map(a => parseInt(a.account_code))
+      .filter(n => !isNaN(n));
+    
+    const maxCode = existingCodes.length > 0 ? Math.max(...existingCodes) : 1100;
+    return String(maxCode + 1);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -213,7 +267,13 @@ function CreateBankAccountDialog({
             <Input
               id="account_name"
               value={accountName}
-              onChange={(e) => setAccountName(e.target.value)}
+              onChange={(e) => {
+                setAccountName(e.target.value);
+                // Auto-suggest for new chart account
+                if (!newAccountName) {
+                  setNewAccountName(e.target.value);
+                }
+              }}
               placeholder="e.g., Main Operating Account"
               required
             />
@@ -268,26 +328,97 @@ function CreateBankAccountDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="chart_account">Link to Chart Account</Label>
-            <Select value={chartAccountId} onValueChange={setChartAccountId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select account" />
+            <Label htmlFor="chart_account">Link to Chart of Accounts *</Label>
+            <Select value={chartAccountId} onValueChange={(val) => {
+              if (val === '__create_new__') {
+                setShowCreateChartAccount(true);
+                setNewAccountCode(suggestAccountCode());
+                setNewAccountName(accountName || '');
+              } else {
+                setChartAccountId(val);
+              }
+            }}>
+              <SelectTrigger className={!chartAccountId ? 'border-destructive' : ''}>
+                <SelectValue placeholder="Select or create account" />
               </SelectTrigger>
               <SelectContent>
-                {chartAccounts.map((account) => (
-                  <SelectItem key={account.id} value={account.id}>
-                    {account.account_code} - {account.account_name}
-                  </SelectItem>
-                ))}
+                <SelectItem value="__create_new__" className="text-primary font-medium">
+                  <span className="flex items-center gap-2">
+                    <Plus className="h-4 w-4" />
+                    Create New Account
+                  </span>
+                </SelectItem>
+                {cashBankAccounts.length > 0 && (
+                  <>
+                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                      Existing Cash & Bank Accounts
+                    </div>
+                    {cashBankAccounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        {account.account_code} - {account.account_name}
+                      </SelectItem>
+                    ))}
+                  </>
+                )}
               </SelectContent>
             </Select>
+            {!chartAccountId && (
+              <p className="text-xs text-destructive">
+                A Chart of Accounts entry is required for proper double-entry bookkeeping
+              </p>
+            )}
           </div>
+
+          {/* Quick Create Chart Account Section */}
+          {showCreateChartAccount && (
+            <div className="p-4 border rounded-lg bg-muted/50 space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Create New Chart Account</Label>
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setShowCreateChartAccount(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">Account Code</Label>
+                  <Input
+                    value={newAccountCode}
+                    onChange={(e) => setNewAccountCode(e.target.value)}
+                    placeholder="e.g., 1101"
+                    className="text-sm"
+                  />
+                </div>
+                <div className="col-span-2 space-y-1">
+                  <Label className="text-xs">Account Name</Label>
+                  <Input
+                    value={newAccountName}
+                    onChange={(e) => setNewAccountName(e.target.value)}
+                    placeholder="e.g., CRDB Bank TZS"
+                    className="text-sm"
+                  />
+                </div>
+              </div>
+              <Button 
+                type="button" 
+                size="sm" 
+                onClick={handleCreateChartAccount}
+                disabled={!newAccountCode || !newAccountName}
+              >
+                Create & Link Account
+              </Button>
+            </div>
+          )}
 
           <div className="flex justify-end gap-2 pt-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={createBankAccount.isPending}>
+            <Button type="submit" disabled={createBankAccount.isPending || !chartAccountId}>
               {createBankAccount.isPending ? 'Creating...' : 'Create'}
             </Button>
           </div>
