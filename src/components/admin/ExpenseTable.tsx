@@ -24,9 +24,10 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { DollarSign, MoreHorizontal, Check, X, MessageSquare, Loader2, AlertCircle, Pencil, FileText, ExternalLink } from 'lucide-react';
-import { EXPENSE_CATEGORIES, useApproveExpense, Expense } from '@/hooks/useExpenses';
+import { EXPENSE_CATEGORIES, Expense } from '@/hooks/useExpenses';
 import { ExpenseStatusBadge } from './ExpenseStatusBadge';
 import { ExpenseApprovalDialog } from './ExpenseApprovalDialog';
+import { ExpenseApproveDialog } from './ExpenseApproveDialog';
 import { ExpenseDialog } from './ExpenseDialog';
 import { useRegions } from '@/hooks/useRegions';
 import { useExchangeRatesMap } from '@/hooks/useExchangeRates';
@@ -93,10 +94,18 @@ export function ExpenseTable({
     mode: 'deny' | 'clarification';
   }>({ open: false, expenseId: '', mode: 'deny' });
 
+  const [approveDialogOpen, setApproveDialogOpen] = useState(false);
+  const [expenseToApprove, setExpenseToApprove] = useState<{
+    id: string;
+    amount: number;
+    currency: string | null;
+    category: string;
+    description: string | null;
+  } | null>(null);
+
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
 
-  const approveExpense = useApproveExpense();
   const { data: regions = [] } = useRegions();
   const { getRate } = useExchangeRatesMap();
   const { data: profiles = [] } = useProfiles();
@@ -116,8 +125,15 @@ export function ExpenseTable({
     return amount * rate;
   };
 
-  const handleApprove = (expenseId: string) => {
-    approveExpense.mutate(expenseId);
+  const handleApprove = (expense: ExpenseWithShipment) => {
+    setExpenseToApprove({
+      id: expense.id,
+      amount: expense.amount,
+      currency: expense.currency,
+      category: expense.category,
+      description: expense.description,
+    });
+    setApproveDialogOpen(true);
   };
 
   const openDenyDialog = (expenseId: string) => {
@@ -343,18 +359,14 @@ export function ExpenseTable({
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-8 w-8">
-                            {approveExpense.isPending ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <MoreHorizontal className="h-4 w-4" />
-                            )}
+                            <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           {canTakeAction && (
                             <>
                               <DropdownMenuItem
-                                onClick={() => handleApprove(expense.id)}
+                                onClick={() => handleApprove(expense)}
                                 className="text-green-600"
                               >
                                 <Check className="h-4 w-4 mr-2" />
@@ -398,6 +410,12 @@ export function ExpenseTable({
         onOpenChange={(open) => setDialogState((prev) => ({ ...prev, open }))}
         expenseId={dialogState.expenseId}
         mode={dialogState.mode}
+      />
+
+      <ExpenseApproveDialog
+        open={approveDialogOpen}
+        onOpenChange={setApproveDialogOpen}
+        expense={expenseToApprove}
       />
 
       <ExpenseDialog

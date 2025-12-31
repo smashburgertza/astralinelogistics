@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables, TablesInsert } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
-import { createExpenseApprovalJournalEntry } from '@/lib/journalEntryUtils';
+import { createExpensePaymentJournalEntry } from '@/lib/journalEntryUtils';
 
 export type Expense = Tables<'expenses'> & {
   status?: string;
@@ -254,20 +254,81 @@ export function useApproveExpense() {
         });
       }
 
-      // Auto-create journal entry for approved expense (Expense debit, AP credit)
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      queryClient.invalidateQueries({ queryKey: ['expense-stats'] });
+      toast.success('Expense approved');
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to approve expense: ' + error.message);
+    },
+  });
+}
+
+export function useApproveExpenseWithBankAccount() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ expenseId, bankAccountId }: { expenseId: string; bankAccountId: string }) => {
+      const { data: userData } = await supabase.auth.getUser();
+      
+      // Get bank account details including chart_account_id
+      const { data: bankAccount, error: bankError } = await supabase
+        .from('bank_accounts')
+        .select('id, chart_account_id, current_balance, currency')
+        .eq('id', bankAccountId)
+        .single();
+
+      if (bankError || !bankAccount) throw new Error('Bank account not found');
+      if (!bankAccount.chart_account_id) throw new Error('Bank account not linked to chart of accounts');
+
+      // Update expense status
+      const { data, error } = await supabase
+        .from('expenses')
+        .update({
+          status: 'approved',
+          approved_by: userData.user?.id,
+          approved_at: new Date().toISOString(),
+        })
+        .eq('id', expenseId)
+        .select('*, submitted_by')
+        .single();
+
+      if (error) throw error;
+
+      // Create notification for submitter
+      if (data.submitted_by) {
+        await supabase.from('notifications').insert({
+          user_id: data.submitted_by,
+          title: 'Expense Approved',
+          message: `Your expense of ${data.currency || 'USD'} ${Number(data.amount).toFixed(2)} has been approved and paid.`,
+          type: 'info',
+        });
+      }
+
+      // Create journal entry: Debit Expense, Credit Bank Account
       try {
-        await createExpenseApprovalJournalEntry({
+        await createExpensePaymentJournalEntry({
           expenseId: data.id,
           category: data.category,
           amount: Number(data.amount),
           currency: data.currency || 'USD',
           description: data.description || undefined,
-          exchangeRate: 1, // Could be enhanced to fetch from exchange rates table
+          exchangeRate: 1,
+          bankAccountChartId: bankAccount.chart_account_id,
         });
       } catch (journalError) {
         console.error('Failed to create expense journal entry:', journalError);
-        // Don't fail the approval if journal entry fails
       }
+
+      // Update bank account balance
+      const newBalance = (bankAccount.current_balance || 0) - Number(data.amount);
+      await supabase
+        .from('bank_accounts')
+        .update({ current_balance: newBalance })
+        .eq('id', bankAccountId);
 
       return data;
     },
@@ -279,7 +340,7 @@ export function useApproveExpense() {
       queryClient.invalidateQueries({ queryKey: ['trial-balance'] });
       queryClient.invalidateQueries({ queryKey: ['income-statement'] });
       queryClient.invalidateQueries({ queryKey: ['balance-sheet'] });
-      toast.success('Expense approved');
+      toast.success('Expense approved and paid');
     },
     onError: (error: Error) => {
       toast.error('Failed to approve expense: ' + error.message);
