@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,7 +7,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCreateJournalEntry, useChartOfAccounts, useBankAccounts } from '@/hooks/useAccounting';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
-import { ArrowDownCircle, ArrowUpCircle, RefreshCw } from 'lucide-react';
+import { ArrowDownCircle, ArrowUpCircle, RefreshCw, ArrowRight } from 'lucide-react';
+import { formatAmount } from '@/components/shared/CurrencyDisplay';
 
 export interface SimpleTransactionDialogProps {
   open: boolean;
@@ -70,6 +71,10 @@ export function SimpleTransactionDialog({ open, onOpenChange, preselectedAccount
   const [bankAccountId, setBankAccountId] = useState('');
   const [toAccountId, setToAccountId] = useState('');
   const [notes, setNotes] = useState('');
+  
+  // Transfer-specific state
+  const [destinationAmount, setDestinationAmount] = useState('');
+  const [destinationCurrency, setDestinationCurrency] = useState('TZS');
 
   const { data: accounts = [] } = useChartOfAccounts({ active: true });
   const { data: bankAccounts = [] } = useBankAccounts();
@@ -82,6 +87,38 @@ export function SimpleTransactionDialog({ open, onOpenChange, preselectedAccount
   const expenseAccounts = accounts.filter(a => a.account_type === 'expense');
 
   const exchangeRate = currency === 'TZS' ? 1 : exchangeRates.find(r => r.currency_code === currency)?.rate_to_tzs || 1;
+  const destinationExchangeRate = destinationCurrency === 'TZS' ? 1 : exchangeRates.find(r => r.currency_code === destinationCurrency)?.rate_to_tzs || 1;
+
+  // Get selected bank accounts for transfer
+  const fromBankAccount = bankAccounts.find(b => b.id === bankAccountId);
+  const toBankAccount = bankAccounts.find(b => b.id === toAccountId);
+
+  // Auto-calculate destination amount when source amount or currencies change
+  useEffect(() => {
+    if (transactionType === 'transfer' && amount) {
+      const numAmount = parseFloat(amount);
+      if (!isNaN(numAmount) && numAmount > 0) {
+        // Convert source to TZS, then to destination currency
+        const amountInTzs = numAmount * exchangeRate;
+        const convertedAmount = amountInTzs / destinationExchangeRate;
+        setDestinationAmount(convertedAmount.toFixed(2));
+      }
+    }
+  }, [amount, currency, destinationCurrency, exchangeRate, destinationExchangeRate, transactionType]);
+
+  // Update destination currency when selecting destination bank account
+  useEffect(() => {
+    if (toBankAccount?.currency) {
+      setDestinationCurrency(toBankAccount.currency);
+    }
+  }, [toBankAccount]);
+
+  // Update source currency when selecting source bank account
+  useEffect(() => {
+    if (fromBankAccount?.currency) {
+      setCurrency(fromBankAccount.currency);
+    }
+  }, [fromBankAccount]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,10 +152,65 @@ export function SimpleTransactionDialog({ open, onOpenChange, preselectedAccount
       debitAccountId = expenseAccounts.find(a => a.account_code.includes(category))?.id || expenseAccounts[0]?.id;
       if (!entryDescription) entryDescription = `Expense: ${EXPENSE_CATEGORIES.find(c => c.value === category)?.label || category}`;
     } else {
-      // Transfer: Debit destination, Credit source
-      debitAccountId = toAccountId;
-      creditAccountId = bankChartAccountId || cashAccounts[0]?.id;
-      if (!entryDescription) entryDescription = 'Transfer between accounts';
+      // Transfer between bank accounts
+      const toBank = bankAccounts.find(b => b.id === toAccountId);
+      const fromBank = bankAccounts.find(b => b.id === bankAccountId);
+      
+      if (!toBank?.chart_account_id || !fromBank?.chart_account_id) return;
+      
+      debitAccountId = toBank.chart_account_id;
+      creditAccountId = fromBank.chart_account_id;
+      
+      if (!entryDescription) {
+        entryDescription = `Transfer: ${fromBank.account_name} → ${toBank.account_name}`;
+      }
+
+      // For multi-currency transfers, create journal entry with both currencies
+      const numDestAmount = parseFloat(destinationAmount);
+      if (isNaN(numDestAmount) || numDestAmount <= 0) return;
+
+      const sourceAmountInTzs = numAmount * exchangeRate;
+      const destAmountInTzs = numDestAmount * destinationExchangeRate;
+
+      createEntry.mutate({
+        entry: {
+          entry_date: date,
+          description: entryDescription,
+          reference_type: 'transfer',
+          reference_id: null,
+          status: 'posted',
+          posted_at: new Date().toISOString(),
+          posted_by: null,
+          created_by: null,
+          notes: notes || null,
+        },
+        lines: [
+          {
+            account_id: debitAccountId,
+            description: `Received from ${fromBank.account_name}`,
+            debit_amount: numDestAmount,
+            credit_amount: 0,
+            currency: destinationCurrency,
+            exchange_rate: destinationExchangeRate,
+            amount_in_tzs: destAmountInTzs,
+          },
+          {
+            account_id: creditAccountId,
+            description: `Transferred to ${toBank.account_name}`,
+            debit_amount: 0,
+            credit_amount: numAmount,
+            currency: currency,
+            exchange_rate: exchangeRate,
+            amount_in_tzs: sourceAmountInTzs,
+          },
+        ],
+      }, {
+        onSuccess: () => {
+          onOpenChange(false);
+          resetForm();
+        },
+      });
+      return;
     }
 
     if (!debitAccountId || !creditAccountId) return;
@@ -169,16 +261,22 @@ export function SimpleTransactionDialog({ open, onOpenChange, preselectedAccount
     setTransactionType('income');
     setDate(new Date().toISOString().split('T')[0]);
     setAmount('');
-    setCurrency('USD');
+    setCurrency('TZS');
     setCategory('');
     setDescription('');
     setBankAccountId('');
     setToAccountId('');
     setNotes('');
+    setDestinationAmount('');
+    setDestinationCurrency('TZS');
   };
 
   const categories = transactionType === 'income' ? INCOME_CATEGORIES : 
                      transactionType === 'expense' ? EXPENSE_CATEGORIES : [];
+
+  // Filter bank accounts for transfers (exclude already selected)
+  const availableFromAccounts = bankAccounts.filter(b => b.is_active);
+  const availableToAccounts = bankAccounts.filter(b => b.is_active && b.id !== bankAccountId);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -221,36 +319,38 @@ export function SimpleTransactionDialog({ open, onOpenChange, preselectedAccount
                 required
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="amount">Amount</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="amount"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="0.00"
-                  required
-                  className="flex-1"
-                />
-                <Select value={currency} onValueChange={setCurrency}>
-                  <SelectTrigger className="w-24">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="USD">USD</SelectItem>
-                    <SelectItem value="TZS">TZS</SelectItem>
-                    {exchangeRates.map((rate) => (
-                      <SelectItem key={rate.currency_code} value={rate.currency_code}>
-                        {rate.currency_code}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            {transactionType !== 'transfer' && (
+              <div className="space-y-2">
+                <Label htmlFor="amount">Amount</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="amount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="0.00"
+                    required
+                    className="flex-1"
+                  />
+                  <Select value={currency} onValueChange={setCurrency}>
+                    <SelectTrigger className="w-24">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="TZS">TZS</SelectItem>
+                      <SelectItem value="USD">USD</SelectItem>
+                      {exchangeRates.filter(r => !['TZS', 'USD'].includes(r.currency_code)).map((rate) => (
+                        <SelectItem key={rate.currency_code} value={rate.currency_code}>
+                          {rate.currency_code}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {transactionType !== 'transfer' && (
@@ -271,40 +371,126 @@ export function SimpleTransactionDialog({ open, onOpenChange, preselectedAccount
             </div>
           )}
 
-          <div className="space-y-2">
-            <Label>
-              {transactionType === 'transfer' ? 'From Account' : 'Bank Account'}
-            </Label>
-            <Select value={bankAccountId} onValueChange={setBankAccountId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select account" />
-              </SelectTrigger>
-              <SelectContent>
-                {bankAccounts.filter(b => b.is_active).map((account) => (
-                  <SelectItem key={account.id} value={account.id}>
-                    {account.account_name} ({account.bank_name})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {transactionType === 'transfer' && (
+          {transactionType !== 'transfer' && (
             <div className="space-y-2">
-              <Label>To Account</Label>
-              <Select value={toAccountId} onValueChange={setToAccountId}>
+              <Label>Bank Account</Label>
+              <Select value={bankAccountId} onValueChange={setBankAccountId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select destination" />
+                  <SelectValue placeholder="Select account" />
                 </SelectTrigger>
                 <SelectContent>
-                  {cashAccounts.map((account) => (
+                  {bankAccounts.filter(b => b.is_active).map((account) => (
                     <SelectItem key={account.id} value={account.id}>
-                      {account.account_code} - {account.account_name}
+                      {account.account_name} ({account.bank_name}) - {account.currency}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+          )}
+
+          {transactionType === 'transfer' && (
+            <>
+              {/* From Account */}
+              <div className="space-y-2">
+                <Label>From Account</Label>
+                <Select value={bankAccountId} onValueChange={setBankAccountId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select source account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableFromAccounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        <div className="flex justify-between items-center gap-2">
+                          <span>{account.account_name} ({account.currency})</span>
+                          <span className="text-muted-foreground text-xs">
+                            Bal: {formatAmount(account.current_balance || 0, account.currency || 'TZS')}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Source Amount */}
+              <div className="space-y-2">
+                <Label>Amount to Transfer</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="0.00"
+                    required
+                    className="flex-1"
+                  />
+                  <div className="flex items-center px-3 bg-muted rounded-md border min-w-[80px] justify-center">
+                    <span className="text-sm font-medium">{fromBankAccount?.currency || 'TZS'}</span>
+                  </div>
+                </div>
+                {fromBankAccount && (
+                  <p className="text-xs text-muted-foreground">
+                    Available: {formatAmount(fromBankAccount.current_balance || 0, fromBankAccount.currency || 'TZS')}
+                  </p>
+                )}
+              </div>
+
+              {/* Visual Arrow */}
+              <div className="flex justify-center py-2">
+                <ArrowRight className="h-6 w-6 text-muted-foreground" />
+              </div>
+
+              {/* To Account */}
+              <div className="space-y-2">
+                <Label>To Account</Label>
+                <Select value={toAccountId} onValueChange={setToAccountId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select destination account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableToAccounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        <div className="flex justify-between items-center gap-2">
+                          <span>{account.account_name} ({account.currency})</span>
+                          <span className="text-muted-foreground text-xs">
+                            Bal: {formatAmount(account.current_balance || 0, account.currency || 'TZS')}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Destination Amount (calculated, but editable) */}
+              <div className="space-y-2">
+                <Label>Amount Received</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={destinationAmount}
+                    onChange={(e) => setDestinationAmount(e.target.value)}
+                    placeholder="0.00"
+                    required
+                    className="flex-1"
+                  />
+                  <div className="flex items-center px-3 bg-muted rounded-md border min-w-[80px] justify-center">
+                    <span className="text-sm font-medium">{toBankAccount?.currency || destinationCurrency}</span>
+                  </div>
+                </div>
+                {currency !== (toBankAccount?.currency || destinationCurrency) && amount && (
+                  <p className="text-xs text-muted-foreground">
+                    Rate: 1 {currency} = {(exchangeRate / destinationExchangeRate).toFixed(4)} {toBankAccount?.currency || destinationCurrency}
+                    <span className="ml-2 text-amber-600">(editable if bank rate differs)</span>
+                  </p>
+                )}
+              </div>
+            </>
           )}
 
           <div className="space-y-2">
