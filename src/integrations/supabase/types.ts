@@ -904,6 +904,57 @@ export type Database = {
         }
         Relationships: []
       }
+      employee_salaries: {
+        Row: {
+          base_salary: number
+          created_at: string | null
+          currency: string
+          effective_from: string
+          employee_id: string
+          health_insurance: number | null
+          id: string
+          is_active: boolean | null
+          nssf_employee_rate: number | null
+          nssf_employer_rate: number | null
+          other_allowances: number | null
+          pay_frequency: string
+          paye_rate: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          base_salary?: number
+          created_at?: string | null
+          currency?: string
+          effective_from?: string
+          employee_id: string
+          health_insurance?: number | null
+          id?: string
+          is_active?: boolean | null
+          nssf_employee_rate?: number | null
+          nssf_employer_rate?: number | null
+          other_allowances?: number | null
+          pay_frequency?: string
+          paye_rate?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          base_salary?: number
+          created_at?: string | null
+          currency?: string
+          effective_from?: string
+          employee_id?: string
+          health_insurance?: number | null
+          id?: string
+          is_active?: boolean | null
+          nssf_employee_rate?: number | null
+          nssf_employer_rate?: number | null
+          other_allowances?: number | null
+          pay_frequency?: string
+          paye_rate?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       estimates: {
         Row: {
           converted_to_invoice_id: string | null
@@ -1664,6 +1715,161 @@ export type Database = {
           },
         ]
       }
+      payroll_items: {
+        Row: {
+          advance_deduction: number | null
+          base_salary: number
+          created_at: string | null
+          currency: string
+          employee_id: string
+          employee_name: string | null
+          gross_salary: number
+          health_deduction: number | null
+          id: string
+          net_salary: number
+          notes: string | null
+          nssf_employee_deduction: number | null
+          nssf_employer_contribution: number | null
+          other_allowances: number | null
+          other_deductions: number | null
+          paye_deduction: number | null
+          payroll_run_id: string
+          status: string
+          total_deductions: number | null
+        }
+        Insert: {
+          advance_deduction?: number | null
+          base_salary?: number
+          created_at?: string | null
+          currency?: string
+          employee_id: string
+          employee_name?: string | null
+          gross_salary?: number
+          health_deduction?: number | null
+          id?: string
+          net_salary?: number
+          notes?: string | null
+          nssf_employee_deduction?: number | null
+          nssf_employer_contribution?: number | null
+          other_allowances?: number | null
+          other_deductions?: number | null
+          paye_deduction?: number | null
+          payroll_run_id: string
+          status?: string
+          total_deductions?: number | null
+        }
+        Update: {
+          advance_deduction?: number | null
+          base_salary?: number
+          created_at?: string | null
+          currency?: string
+          employee_id?: string
+          employee_name?: string | null
+          gross_salary?: number
+          health_deduction?: number | null
+          id?: string
+          net_salary?: number
+          notes?: string | null
+          nssf_employee_deduction?: number | null
+          nssf_employer_contribution?: number | null
+          other_allowances?: number | null
+          other_deductions?: number | null
+          paye_deduction?: number | null
+          payroll_run_id?: string
+          status?: string
+          total_deductions?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_items_payroll_run_id_fkey"
+            columns: ["payroll_run_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_runs: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          currency: string
+          id: string
+          journal_entry_id: string | null
+          notes: string | null
+          paid_at: string | null
+          paid_by: string | null
+          paid_from_account_id: string | null
+          payroll_number: string
+          period_month: number
+          period_year: number
+          run_date: string
+          status: string
+          total_deductions: number | null
+          total_employer_contributions: number | null
+          total_gross: number | null
+          total_net: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string
+          id?: string
+          journal_entry_id?: string | null
+          notes?: string | null
+          paid_at?: string | null
+          paid_by?: string | null
+          paid_from_account_id?: string | null
+          payroll_number: string
+          period_month: number
+          period_year: number
+          run_date?: string
+          status?: string
+          total_deductions?: number | null
+          total_employer_contributions?: number | null
+          total_gross?: number | null
+          total_net?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string
+          id?: string
+          journal_entry_id?: string | null
+          notes?: string | null
+          paid_at?: string | null
+          paid_by?: string | null
+          paid_from_account_id?: string | null
+          payroll_number?: string
+          period_month?: number
+          period_year?: number
+          run_date?: string
+          status?: string
+          total_deductions?: number | null
+          total_employer_contributions?: number | null
+          total_gross?: number | null
+          total_net?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_runs_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_runs_paid_from_account_id_fkey"
+            columns: ["paid_from_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products_services: {
         Row: {
           account_id: string | null
@@ -1897,6 +2103,65 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      salary_advances: {
+        Row: {
+          advance_date: string
+          amount: number
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string | null
+          created_by: string | null
+          currency: string
+          deducted_in_payroll_id: string | null
+          employee_id: string
+          id: string
+          paid_from_account_id: string | null
+          reason: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          advance_date?: string
+          amount: number
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string
+          deducted_in_payroll_id?: string | null
+          employee_id: string
+          id?: string
+          paid_from_account_id?: string | null
+          reason?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          advance_date?: string
+          amount?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string
+          deducted_in_payroll_id?: string | null
+          employee_id?: string
+          id?: string
+          paid_from_account_id?: string | null
+          reason?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "salary_advances_paid_from_account_id_fkey"
+            columns: ["paid_from_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       settings: {
         Row: {
@@ -2599,6 +2864,7 @@ export type Database = {
       generate_estimate_number: { Args: never; Returns: string }
       generate_invoice_number: { Args: never; Returns: string }
       generate_journal_number: { Args: never; Returns: string }
+      generate_payroll_number: { Args: never; Returns: string }
       generate_settlement_number: { Args: never; Returns: string }
       generate_tracking_number: { Args: never; Returns: string }
       get_next_sequence: { Args: { p_counter_key: string }; Returns: string }
