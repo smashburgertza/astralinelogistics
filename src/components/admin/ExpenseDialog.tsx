@@ -43,9 +43,14 @@ const formSchema = z.object({
     .max(1000000, 'Amount cannot exceed 1,000,000'),
   currency: z.string().default('TZS'),
   description: z.string().optional(),
-  assigned_to: z.string().min(1, 'Please select an approver'),
+  assigned_to: z.string().optional(), // Optional because it's only required for new expenses
   region: z.string().optional(),
 });
+
+const createFormSchema = formSchema.refine(
+  (data) => data.assigned_to && data.assigned_to.length > 0,
+  { message: 'Please select an approver', path: ['assigned_to'] }
+);
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -74,7 +79,7 @@ export function ExpenseDialog({
   const [existingReceiptUrl, setExistingReceiptUrl] = useState<string | null>(null);
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(isEditing ? formSchema : createFormSchema),
     defaultValues: {
       category: '',
       amount: 0,
