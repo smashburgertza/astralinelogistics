@@ -247,12 +247,16 @@ export function VerifyPaymentDialog({
               <div className="space-y-2">
                 <Label className="text-base font-semibold flex items-center gap-2">
                   <Building2 className="h-4 w-4" />
-                  {isAgentPayment ? 'Pay From Account (Debit)' : 'Deposit To Account (Credit)'}
+                  {/* For to_agent invoices (agent pays us) or customer payments: money comes IN (debit bank) */}
+                  {/* For from_agent invoices (we pay agent): money goes OUT (credit bank) */}
+                  {isAgentPayment && payment.invoices.invoice_direction === 'from_agent' 
+                    ? 'Pay From Account' 
+                    : 'Deposit To Account'}
                 </Label>
                 <p className="text-sm text-muted-foreground mb-2">
-                  {isAgentPayment 
+                  {isAgentPayment && payment.invoices.invoice_direction === 'from_agent'
                     ? 'Select the bank account from which this payment was made to the agent'
-                    : 'Select the bank account where this payment will be deposited'}
+                    : 'Select the bank account where this payment was received'}
                 </p>
                 <Select value={depositAccountId} onValueChange={setDepositAccountId}>
                   <SelectTrigger className="h-12">
