@@ -75,6 +75,8 @@ export function SimpleTransactionDialog({ open, onOpenChange, preselectedAccount
   // Transfer-specific state
   const [destinationAmount, setDestinationAmount] = useState('');
   const [destinationCurrency, setDestinationCurrency] = useState('TZS');
+  const [bankCharges, setBankCharges] = useState('');
+  const [chargesFromSource, setChargesFromSource] = useState(true); // Deduct from source account
 
   const { data: accounts = [] } = useChartOfAccounts({ active: true });
   const { data: bankAccounts = [] } = useBankAccounts();
@@ -85,6 +87,12 @@ export function SimpleTransactionDialog({ open, onOpenChange, preselectedAccount
   const cashAccounts = accounts.filter(a => a.account_type === 'asset' && a.account_subtype?.toLowerCase().includes('cash'));
   const revenueAccounts = accounts.filter(a => a.account_type === 'revenue');
   const expenseAccounts = accounts.filter(a => a.account_type === 'expense');
+  
+  // Find bank charges expense account
+  const bankChargesAccount = accounts.find(a => 
+    a.account_type === 'expense' && 
+    (a.account_code.toLowerCase().includes('bank') || a.account_name.toLowerCase().includes('bank charge'))
+  ) || expenseAccounts[0];
 
   const exchangeRate = currency === 'TZS' ? 1 : exchangeRates.find(r => r.currency_code === currency)?.rate_to_tzs || 1;
   const destinationExchangeRate = destinationCurrency === 'TZS' ? 1 : exchangeRates.find(r => r.currency_code === destinationCurrency)?.rate_to_tzs || 1;
@@ -171,11 +179,66 @@ export function SimpleTransactionDialog({ open, onOpenChange, preselectedAccount
 
       const sourceAmountInTzs = numAmount * exchangeRate;
       const destAmountInTzs = numDestAmount * destinationExchangeRate;
+      
+      // Handle bank charges
+      const numBankCharges = parseFloat(bankCharges) || 0;
+      const chargesCurrency = chargesFromSource ? (fromBank.currency || 'TZS') : (toBank.currency || 'TZS');
+      const chargesExchangeRate = chargesFromSource ? exchangeRate : destinationExchangeRate;
+      const chargesInTzs = numBankCharges * chargesExchangeRate;
+
+      // Build journal lines
+      const journalLines = [
+        {
+          account_id: debitAccountId,
+          description: `Received from ${fromBank.account_name}`,
+          debit_amount: numDestAmount,
+          credit_amount: 0,
+          currency: destinationCurrency,
+          exchange_rate: destinationExchangeRate,
+          amount_in_tzs: destAmountInTzs,
+        },
+        {
+          account_id: creditAccountId,
+          description: `Transferred to ${toBank.account_name}`,
+          debit_amount: 0,
+          credit_amount: numAmount,
+          currency: currency,
+          exchange_rate: exchangeRate,
+          amount_in_tzs: sourceAmountInTzs,
+        },
+      ];
+
+      // Add bank charges if any
+      if (numBankCharges > 0 && bankChargesAccount) {
+        // Debit bank charges expense
+        journalLines.push({
+          account_id: bankChargesAccount.id,
+          description: 'Bank transfer charges',
+          debit_amount: numBankCharges,
+          credit_amount: 0,
+          currency: chargesCurrency,
+          exchange_rate: chargesExchangeRate,
+          amount_in_tzs: chargesInTzs,
+        });
+        
+        // Credit the source account for charges (charges deducted from source)
+        if (chargesFromSource) {
+          journalLines.push({
+            account_id: creditAccountId,
+            description: 'Bank transfer charges',
+            debit_amount: 0,
+            credit_amount: numBankCharges,
+            currency: chargesCurrency,
+            exchange_rate: chargesExchangeRate,
+            amount_in_tzs: chargesInTzs,
+          });
+        }
+      }
 
       createEntry.mutate({
         entry: {
           entry_date: date,
-          description: entryDescription,
+          description: entryDescription + (numBankCharges > 0 ? ` (charges: ${formatAmount(numBankCharges, chargesCurrency)})` : ''),
           reference_type: 'transfer',
           reference_id: null,
           status: 'posted',
@@ -184,26 +247,7 @@ export function SimpleTransactionDialog({ open, onOpenChange, preselectedAccount
           created_by: null,
           notes: notes || null,
         },
-        lines: [
-          {
-            account_id: debitAccountId,
-            description: `Received from ${fromBank.account_name}`,
-            debit_amount: numDestAmount,
-            credit_amount: 0,
-            currency: destinationCurrency,
-            exchange_rate: destinationExchangeRate,
-            amount_in_tzs: destAmountInTzs,
-          },
-          {
-            account_id: creditAccountId,
-            description: `Transferred to ${toBank.account_name}`,
-            debit_amount: 0,
-            credit_amount: numAmount,
-            currency: currency,
-            exchange_rate: exchangeRate,
-            amount_in_tzs: sourceAmountInTzs,
-          },
-        ],
+        lines: journalLines,
       }, {
         onSuccess: () => {
           onOpenChange(false);
@@ -269,6 +313,8 @@ export function SimpleTransactionDialog({ open, onOpenChange, preselectedAccount
     setNotes('');
     setDestinationAmount('');
     setDestinationCurrency('TZS');
+    setBankCharges('');
+    setChargesFromSource(true);
   };
 
   const categories = transactionType === 'income' ? INCOME_CATEGORIES : 
@@ -487,6 +533,33 @@ export function SimpleTransactionDialog({ open, onOpenChange, preselectedAccount
                   <p className="text-xs text-muted-foreground">
                     Rate: 1 {currency} = {(exchangeRate / destinationExchangeRate).toFixed(4)} {toBankAccount?.currency || destinationCurrency}
                     <span className="ml-2 text-amber-600">(editable if bank rate differs)</span>
+                  </p>
+                )}
+              </div>
+
+              {/* Bank Charges Section */}
+              <div className="space-y-2 pt-2 border-t">
+                <Label>Bank Charges (optional)</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={bankCharges}
+                    onChange={(e) => setBankCharges(e.target.value)}
+                    placeholder="0.00"
+                    className="flex-1"
+                  />
+                  <div className="flex items-center px-3 bg-muted rounded-md border min-w-[80px] justify-center">
+                    <span className="text-sm font-medium">{fromBankAccount?.currency || 'TZS'}</span>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Fees charged by the bank for this transfer (deducted from source account)
+                </p>
+                {bankCharges && parseFloat(bankCharges) > 0 && fromBankAccount && (
+                  <p className="text-xs text-amber-600">
+                    Total from {fromBankAccount.account_name}: {formatAmount(parseFloat(amount || '0') + parseFloat(bankCharges), fromBankAccount.currency || 'TZS')}
                   </p>
                 )}
               </div>
