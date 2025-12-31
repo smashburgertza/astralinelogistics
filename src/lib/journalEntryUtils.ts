@@ -587,6 +587,95 @@ export async function createAgentPaymentJournalEntry({
 }
 
 /**
+ * Create journal entry when receiving payment from an agent (to_agent invoice payment)
+ * This is for invoices with invoice_direction = 'to_agent' (agent owes us, we receive payment)
+ * Accounting: Debit Cash (money coming in), Credit Accounts Receivable (clearing receivable)
+ */
+export async function createAgentPaymentReceivedJournalEntry({
+  invoiceId,
+  invoiceNumber,
+  amount,
+  currency,
+  exchangeRate = 1,
+  paymentCurrency,
+  depositAccountId,
+  amountInTzs,
+}: {
+  invoiceId: string;
+  invoiceNumber: string;
+  amount: number;
+  currency: string;
+  exchangeRate?: number;
+  paymentCurrency?: string;
+  depositAccountId?: string;
+  amountInTzs?: number;
+}) {
+  const effectiveCurrency = paymentCurrency || currency;
+  const effectiveRate = amountInTzs && amount ? (amountInTzs / amount) : (effectiveCurrency === 'TZS' ? 1 : exchangeRate);
+
+  // If a specific deposit account was selected, use it directly
+  if (depositAccountId) {
+    return createJournalEntryWithAccountIds({
+      description: `Payment received from agent for Invoice ${invoiceNumber}`,
+      referenceType: 'payment',
+      referenceId: invoiceId,
+      autoPost: true,
+      lines: [
+        {
+          account_id: depositAccountId,
+          description: `Cash received from agent - Invoice ${invoiceNumber}`,
+          debit_amount: amount,
+          credit_amount: 0,
+          currency: effectiveCurrency,
+          exchange_rate: effectiveRate,
+        },
+        {
+          account_code: ACCOUNT_CODES.ACCOUNTS_RECEIVABLE,
+          description: `Clear agent receivable - Invoice ${invoiceNumber}`,
+          debit_amount: 0,
+          credit_amount: amount,
+          currency: effectiveCurrency,
+          exchange_rate: effectiveRate,
+        },
+      ],
+    });
+  }
+
+  // Fallback: Determine which cash account to use based on payment currency
+  let cashAccountCode = ACCOUNT_CODES.CASH_TZS;
+  if (paymentCurrency === 'USD' || (currency === 'USD' && !paymentCurrency)) {
+    cashAccountCode = ACCOUNT_CODES.CASH_USD;
+  } else if (paymentCurrency === 'GBP' || (currency === 'GBP' && !paymentCurrency)) {
+    cashAccountCode = ACCOUNT_CODES.CASH_GBP;
+  }
+
+  return createJournalEntry({
+    description: `Payment received from agent for Invoice ${invoiceNumber}`,
+    referenceType: 'payment',
+    referenceId: invoiceId,
+    autoPost: true,
+    lines: [
+      {
+        account_code: cashAccountCode,
+        description: `Cash received from agent - Invoice ${invoiceNumber}`,
+        debit_amount: amount,
+        credit_amount: 0,
+        currency: effectiveCurrency,
+        exchange_rate: effectiveRate,
+      },
+      {
+        account_code: ACCOUNT_CODES.ACCOUNTS_RECEIVABLE,
+        description: `Clear agent receivable - Invoice ${invoiceNumber}`,
+        debit_amount: 0,
+        credit_amount: amount,
+        currency: effectiveCurrency,
+        exchange_rate: effectiveRate,
+      },
+    ],
+  });
+}
+
+/**
  * Create journal entry when Astraline bills an agent (to_agent)
  * This creates a receivable (agent owes us) and revenue
  * Accounting: Debit Agent Receivables (or AR), Credit Service Revenue
