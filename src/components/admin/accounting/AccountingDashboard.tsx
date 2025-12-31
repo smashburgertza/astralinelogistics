@@ -51,26 +51,44 @@ function useAccountingSummary() {
         cashBalance += convertToTzs(acc.current_balance || 0, acc.currency || 'TZS');
       });
 
-      // Get unpaid invoices (receivables)
-      const { data: receivables } = await supabase
+      // Get unpaid invoices (receivables) - customer invoices + to_agent invoices
+      const { data: customerReceivables } = await supabase
+        .from('invoices')
+        .select('amount, currency')
+        .eq('status', 'pending')
+        .not('customer_id', 'is', null);
+
+      const { data: agentReceivables } = await supabase
         .from('invoices')
         .select('amount, currency')
         .eq('status', 'pending')
         .eq('invoice_direction', 'to_agent');
 
       let receivablesTotal = 0;
-      receivables?.forEach(inv => {
+      customerReceivables?.forEach(inv => {
+        receivablesTotal += convertToTzs(inv.amount || 0, inv.currency || 'USD');
+      });
+      agentReceivables?.forEach(inv => {
         receivablesTotal += convertToTzs(inv.amount || 0, inv.currency || 'USD');
       });
 
-      // Get unpaid expenses (payables)
-      const { data: payables } = await supabase
+      // Get unpaid payables - from_agent invoices + pending/approved expenses
+      const { data: agentPayables } = await supabase
+        .from('invoices')
+        .select('amount, currency')
+        .eq('status', 'pending')
+        .eq('invoice_direction', 'from_agent');
+
+      const { data: expensePayables } = await supabase
         .from('expenses')
         .select('amount, currency')
         .in('status', ['pending', 'approved']);
 
       let payablesTotal = 0;
-      payables?.forEach(exp => {
+      agentPayables?.forEach(inv => {
+        payablesTotal += convertToTzs(inv.amount || 0, inv.currency || 'USD');
+      });
+      expensePayables?.forEach(exp => {
         payablesTotal += convertToTzs(exp.amount || 0, exp.currency || 'USD');
       });
 
