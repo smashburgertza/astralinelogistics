@@ -29,6 +29,7 @@ import {
 import { Loader2, Send } from 'lucide-react';
 import { Expense, EXPENSE_CATEGORIES, useCreateExpense, useUpdateExpense } from '@/hooks/useExpenses';
 import { useExpenseApprovers } from '@/hooks/useEmployees';
+import { useExchangeRates } from '@/hooks/useExchangeRates';
 
 const formSchema = z.object({
   category: z.string().min(1, 'Category is required'),
@@ -59,6 +60,7 @@ export function ExpenseDialog({
   const createExpense = useCreateExpense();
   const updateExpense = useUpdateExpense();
   const { data: approvers = [], isLoading: approversLoading } = useExpenseApprovers();
+  const { data: currencies = [] } = useExchangeRates();
   const isEditing = !!expense;
 
   const form = useForm<FormValues>({
@@ -195,12 +197,11 @@ export function ExpenseDialog({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="USD">USD</SelectItem>
-                        <SelectItem value="EUR">EUR</SelectItem>
-                        <SelectItem value="GBP">GBP</SelectItem>
-                        <SelectItem value="AED">AED</SelectItem>
-                        <SelectItem value="CNY">CNY</SelectItem>
-                        <SelectItem value="INR">INR</SelectItem>
+                        {currencies.map((currency) => (
+                          <SelectItem key={currency.currency_code} value={currency.currency_code}>
+                            {currency.currency_code} - {currency.currency_name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
