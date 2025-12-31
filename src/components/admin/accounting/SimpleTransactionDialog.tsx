@@ -9,9 +9,10 @@ import { useCreateJournalEntry, useChartOfAccounts, useBankAccounts } from '@/ho
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { ArrowDownCircle, ArrowUpCircle, RefreshCw } from 'lucide-react';
 
-interface SimpleTransactionDialogProps {
+export interface SimpleTransactionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  preselectedAccountId?: string;
 }
 
 type TransactionType = 'income' | 'expense' | 'transfer';
@@ -59,7 +60,7 @@ const INCOME_CATEGORIES = [
   { value: 'other_income', label: 'Other Income' },
 ];
 
-export function SimpleTransactionDialog({ open, onOpenChange }: SimpleTransactionDialogProps) {
+export function SimpleTransactionDialog({ open, onOpenChange, preselectedAccountId }: SimpleTransactionDialogProps) {
   const [transactionType, setTransactionType] = useState<TransactionType>('income');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [amount, setAmount] = useState('');
