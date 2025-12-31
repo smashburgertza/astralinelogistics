@@ -285,7 +285,14 @@ function CreateBankAccountDialog({
               <Input
                 id="bank_name"
                 value={bankName}
-                onChange={(e) => setBankName(e.target.value)}
+                onChange={(e) => {
+                  setBankName(e.target.value);
+                  // Auto-update chart account name when bank name changes
+                  if (showCreateChartAccount || !chartAccountId) {
+                    const suggestedName = `${e.target.value}${currency !== 'TZS' ? ` ${currency}` : ''}`;
+                    setNewAccountName(suggestedName);
+                  }
+                }}
                 placeholder="e.g., CRDB Bank"
                 required
               />
@@ -304,7 +311,14 @@ function CreateBankAccountDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="currency">Currency</Label>
-              <Select value={currency} onValueChange={setCurrency}>
+              <Select value={currency} onValueChange={(val) => {
+                setCurrency(val);
+                // Update chart account name when currency changes
+                if ((showCreateChartAccount || !chartAccountId) && bankName) {
+                  const suggestedName = `${bankName}${val !== 'TZS' ? ` ${val}` : ''}`;
+                  setNewAccountName(suggestedName);
+                }
+              }}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -333,7 +347,9 @@ function CreateBankAccountDialog({
               if (val === '__create_new__') {
                 setShowCreateChartAccount(true);
                 setNewAccountCode(suggestAccountCode());
-                setNewAccountName(accountName || '');
+                // Auto-generate name from bank name + currency
+                const suggestedName = bankName ? `${bankName}${currency !== 'TZS' ? ` ${currency}` : ''}` : accountName;
+                setNewAccountName(suggestedName);
               } else {
                 setChartAccountId(val);
               }
@@ -393,13 +409,12 @@ function CreateBankAccountDialog({
                     className="text-sm"
                   />
                 </div>
-                <div className="col-span-2 space-y-1">
-                  <Label className="text-xs">Account Name</Label>
+              <div className="col-span-2 space-y-1">
+                  <Label className="text-xs">Account Name (auto-generated)</Label>
                   <Input
                     value={newAccountName}
-                    onChange={(e) => setNewAccountName(e.target.value)}
-                    placeholder="e.g., CRDB Bank TZS"
-                    className="text-sm"
+                    readOnly
+                    className="text-sm bg-muted"
                   />
                 </div>
               </div>
