@@ -1,6 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Wallet, ArrowUpCircle, ArrowDownCircle, TrendingUp, Receipt, CreditCard } from 'lucide-react';
+import { Wallet, ArrowUpCircle, ArrowDownCircle, TrendingUp, Receipt, CreditCard, AlertCircle, ExternalLink } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { usePendingExpenses } from '@/hooks/useExpenses';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -183,6 +186,8 @@ const formatCurrency = (amount: number, currency: string = 'TZS') => {
 
 export function AccountingDashboard() {
   const { data, isLoading } = useAccountingSummary();
+  const { data: pendingExpenses } = usePendingExpenses();
+  const pendingExpenseCount = pendingExpenses?.length || 0;
 
   if (isLoading) {
     return (
@@ -259,6 +264,32 @@ export function AccountingDashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Pending Expenses Alert */}
+      {pendingExpenseCount > 0 && (
+        <Card className="border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950/30">
+          <CardContent className="flex items-center justify-between py-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-full bg-orange-100 dark:bg-orange-900">
+                <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+              </div>
+              <div>
+                <p className="font-medium text-orange-800 dark:text-orange-200">
+                  {pendingExpenseCount} expense{pendingExpenseCount !== 1 ? 's' : ''} pending approval
+                </p>
+                <p className="text-sm text-orange-600 dark:text-orange-400">
+                  Review and approve expenses to keep accounting up to date
+                </p>
+              </div>
+            </div>
+            <Button variant="outline" size="sm" asChild className="border-orange-300 text-orange-700 hover:bg-orange-100 dark:border-orange-700 dark:text-orange-300 dark:hover:bg-orange-900">
+              <Link to="/admin/expenses">
+                View Expenses
+                <ExternalLink className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
       {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {stats.map((stat) => (
