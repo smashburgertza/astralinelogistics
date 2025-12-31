@@ -1,11 +1,11 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { format, subDays, subMonths, startOfDay, endOfDay, parseISO, isWithinInterval, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, startOfWeek, endOfWeek, startOfMonth, endOfMonth, getMonth, getQuarter, differenceInDays } from 'date-fns';
+import { format, subDays, subMonths, startOfDay, endOfDay, parseISO, isWithinInterval, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, startOfWeek, endOfWeek, startOfMonth, endOfMonth, getMonth, differenceInDays, subYears } from 'date-fns';
 import { 
-  Download, Calendar, TrendingUp, Package, DollarSign, Users, 
-  FileSpreadsheet, ArrowUpRight, ArrowDownRight, Filter, RefreshCw,
-  BarChart3, PieChart as PieChartIcon, LineChart as LineChartIcon, MapPin,
-  Crown, Target, Snowflake, Sun, Leaf, Cloud, Zap, Award
+  Download, Calendar, TrendingUp, TrendingDown, Package, DollarSign, Users, 
+  ArrowUpRight, ArrowDownRight, Filter, BarChart3, PieChart as PieChartIcon, 
+  LineChart as LineChartIcon, MapPin, Crown, Target, Zap, Award, Wallet, Scale,
+  Coins, Receipt, PiggyBank, CalendarIcon, GitCompare
 } from 'lucide-react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,44 +16,45 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Progress } from '@/components/ui/progress';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { supabase } from '@/integrations/supabase/client';
 import { useRegions, regionsToMap } from '@/hooks/useRegions';
+import { useExchangeRates, convertToTZS } from '@/hooks/useExchangeRates';
 import { EXPENSE_CATEGORIES } from '@/hooks/useExpenses';
+import { CURRENCY_SYMBOLS } from '@/lib/constants';
 import { toast } from 'sonner';
 import {
   AreaChart, Area, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ComposedChart, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis
+  Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ComposedChart
 } from 'recharts';
 import { cn } from '@/lib/utils';
 import type { DateRange } from 'react-day-picker';
 
+// Color schemes
 const CHART_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4'];
+const PIE_COLORS = ['#D4AF37', '#1E3A5F', '#4A90A4', '#7C9885', '#8B6914', '#2C5282'];
+const REVENUE_COLORS = ['#10B981', '#34D399', '#6EE7B7', '#A7F3D0', '#D1FAE5'];
+const EXPENSE_COLORS = ['#F59E0B', '#FBBF24', '#FCD34D', '#FDE68A', '#FEF3C7'];
 const REGION_COLORS: Record<string, string> = {
-  europe: '#3B82F6',
-  uk: '#8B5CF6',
-  usa: '#EC4899',
-  dubai: '#F59E0B',
-  china: '#EF4444',
-  india: '#10B981',
+  europe: '#3B82F6', uk: '#8B5CF6', usa: '#EC4899',
+  dubai: '#F59E0B', china: '#EF4444', india: '#10B981',
 };
 
-const DATE_PRESETS = [
-  { label: 'Last 7 days', value: '7d', days: 7 },
-  { label: 'Last 30 days', value: '30d', days: 30 },
-  { label: 'Last 90 days', value: '90d', days: 90 },
-  { label: 'Last 6 months', value: '6m', days: 180 },
-  { label: 'Last 12 months', value: '12m', days: 365 },
-  { label: 'Custom', value: 'custom', days: 0 },
+type DatePreset = 'all' | 'today' | 'last7' | 'last30' | 'thisMonth' | 'lastMonth' | 'thisYear' | 'custom';
+type ComparisonMode = 'pop' | 'yoy';
+
+const DATE_PRESETS: { label: string; value: DatePreset }[] = [
+  { label: 'All Time', value: 'all' },
+  { label: 'Today', value: 'today' },
+  { label: 'Last 7 Days', value: 'last7' },
+  { label: 'Last 30 Days', value: 'last30' },
+  { label: 'This Month', value: 'thisMonth' },
+  { label: 'Last Month', value: 'lastMonth' },
+  { label: 'This Year', value: 'thisYear' },
+  { label: 'Custom', value: 'custom' },
 ];
 
-const SEASONS = [
-  { name: 'Winter', months: [11, 0, 1], icon: Snowflake, color: '#60A5FA' },
-  { name: 'Spring', months: [2, 3, 4], icon: Leaf, color: '#34D399' },
-  { name: 'Summer', months: [5, 6, 7], icon: Sun, color: '#FBBF24' },
-  { name: 'Fall', months: [8, 9, 10], icon: Cloud, color: '#F97316' },
-];
-
+// Tooltip components
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
@@ -64,8 +65,8 @@ const CustomTooltip = ({ active, payload, label }: any) => {
             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
             <span className="text-muted-foreground">{item.name}:</span>
             <span className="font-semibold">
-              {item.dataKey === 'revenue' || item.dataKey === 'expenses' || item.dataKey === 'profit' || item.dataKey === 'clv' || item.dataKey === 'avgOrderValue'
-                ? `$${item.value?.toLocaleString() ?? 0}` 
+              {item.dataKey === 'revenue' || item.dataKey === 'expenses' || item.dataKey === 'profit' || item.dataKey === 'netProfit'
+                ? `TZS ${item.value?.toLocaleString() ?? 0}` 
                 : item.value?.toLocaleString() ?? 0}
             </span>
           </p>
@@ -76,32 +77,60 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
+const CurrencyTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="bg-background/95 backdrop-blur-md border rounded-lg p-3 shadow-xl">
+        <p className="font-semibold">{data.currency}</p>
+        <p className="text-sm text-muted-foreground">
+          {data.symbol}{data.amount?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+        </p>
+        <p className="text-xs font-medium" style={{ color: data.type === 'revenue' ? '#10B981' : '#F59E0B' }}>
+          ≈ TZS {data.amountInTzs?.toLocaleString()}
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
+
+// Helper to get date range
+const getDateRange = (preset: DatePreset, customFrom?: Date, customTo?: Date): { from: Date | null; to: Date | null } => {
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  
+  switch (preset) {
+    case 'all': return { from: null, to: null };
+    case 'today':
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      return { from: startOfToday, to: today };
+    case 'last7': return { from: subDays(today, 7), to: today };
+    case 'last30': return { from: subDays(today, 30), to: today };
+    case 'thisMonth': return { from: startOfMonth(today), to: endOfMonth(today) };
+    case 'lastMonth':
+      const lastMonth = subMonths(today, 1);
+      return { from: startOfMonth(lastMonth), to: endOfMonth(lastMonth) };
+    case 'thisYear': return { from: new Date(today.getFullYear(), 0, 1), to: today };
+    case 'custom': return { from: customFrom || null, to: customTo || null };
+    default: return { from: null, to: null };
+  }
+};
+
 export default function AnalyticsPage() {
-  const [datePreset, setDatePreset] = useState('12m'); // Default to 12 months for better trend visibility
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: subDays(new Date(), 365),
-    to: new Date(),
-  });
+  const [datePreset, setDatePreset] = useState<DatePreset>('thisMonth');
+  const [customFromDate, setCustomFromDate] = useState<Date>();
+  const [customToDate, setCustomToDate] = useState<Date>();
+  const [comparisonMode, setComparisonMode] = useState<ComparisonMode>('pop');
   const [granularity, setGranularity] = useState<'day' | 'week' | 'month'>('month');
 
-  // Fetch regions from database
   const { data: regions } = useRegions();
-  const regionsMap = regionsToMap(regions);
+  const { data: exchangeRates } = useExchangeRates();
 
-  // Calculate date range based on preset
-  const effectiveDateRange = useMemo(() => {
-    if (datePreset === 'custom' && dateRange?.from && dateRange?.to) {
-      return { from: startOfDay(dateRange.from), to: endOfDay(dateRange.to) };
-    }
-    const preset = DATE_PRESETS.find(p => p.value === datePreset);
-    const days = preset?.days || 30;
-    return {
-      from: startOfDay(subDays(new Date(), days)),
-      to: endOfDay(new Date()),
-    };
-  }, [datePreset, dateRange]);
+  const dateRange = useMemo(() => getDateRange(datePreset, customFromDate, customToDate), [datePreset, customFromDate, customToDate]);
 
-  // Fetch all data
+  // Data fetching
   const { data: shipments, isLoading: shipmentsLoading } = useQuery({
     queryKey: ['analytics-shipments'],
     queryFn: async () => {
@@ -139,11 +168,11 @@ export default function AnalyticsPage() {
   });
 
   const { data: expenses, isLoading: expensesLoading } = useQuery({
-    queryKey: ['analytics-expenses'],
+    queryKey: ['analytics-expenses-approved'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('expenses')
-        .select('id, amount, category, created_at, status, region')
+        .select('id, amount, category, created_at, status, currency')
         .eq('status', 'approved')
         .order('created_at', { ascending: true });
       if (error) throw error;
@@ -151,355 +180,130 @@ export default function AnalyticsPage() {
     },
   });
 
-  const { data: parcels, isLoading: parcelsLoading } = useQuery({
-    queryKey: ['analytics-parcels'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('parcels')
-        .select('id, weight_kg, created_at, picked_up_at, shipment_id')
-        .order('created_at', { ascending: true });
-      if (error) throw error;
-      return data;
-    },
-  });
+  const isLoading = shipmentsLoading || invoicesLoading || customersLoading || expensesLoading;
 
-  const isLoading = shipmentsLoading || invoicesLoading || customersLoading || expensesLoading || parcelsLoading;
+  // Build rate map for currency conversion
+  const rateMap = useMemo(() => {
+    const map = new Map<string, number>();
+    map.set('TZS', 1);
+    exchangeRates?.forEach(r => map.set(r.currency_code, r.rate_to_tzs));
+    return map;
+  }, [exchangeRates]);
+
+  const convertToBaseCurrency = (amount: number, currency: string): number => {
+    const rate = rateMap.get(currency) || 1;
+    return amount * rate;
+  };
+
+  const formatTZS = (amount: number): string => {
+    return new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
+  };
 
   // Filter data by date range
-  const filteredData = useMemo(() => {
-    const filterByDate = <T extends { created_at?: string | null }>(items: T[] | null | undefined) => {
-      if (!items) return [];
-      return items.filter(item => {
-        if (!item.created_at) return false;
-        const date = parseISO(item.created_at);
-        return isWithinInterval(date, { start: effectiveDateRange.from, end: effectiveDateRange.to });
-      });
-    };
-
-    return {
-      shipments: filterByDate(shipments),
-      invoices: filterByDate(invoices),
-      customers: filterByDate(customers),
-      expenses: filterByDate(expenses),
-      parcels: filterByDate(parcels),
-    };
-  }, [shipments, invoices, customers, expenses, parcels, effectiveDateRange]);
-
-  // Calculate time series data
-  const timeSeriesData = useMemo(() => {
-    const { from, to } = effectiveDateRange;
-    
-    let intervals: Date[];
-    let formatStr: string;
-    
-    if (granularity === 'day') {
-      intervals = eachDayOfInterval({ start: from, end: to });
-      formatStr = 'MMM d';
-    } else if (granularity === 'week') {
-      intervals = eachWeekOfInterval({ start: from, end: to });
-      formatStr = "'W'w MMM";
-    } else {
-      intervals = eachMonthOfInterval({ start: from, end: to });
-      formatStr = 'MMM yyyy';
-    }
-
-    return intervals.map(interval => {
-      let periodStart: Date;
-      let periodEnd: Date;
-
-      if (granularity === 'day') {
-        periodStart = startOfDay(interval);
-        periodEnd = endOfDay(interval);
-      } else if (granularity === 'week') {
-        periodStart = startOfWeek(interval);
-        periodEnd = endOfWeek(interval);
-      } else {
-        periodStart = startOfMonth(interval);
-        periodEnd = endOfMonth(interval);
-      }
-
-      const periodShipments = filteredData.shipments.filter(s => {
-        const date = parseISO(s.created_at || '');
-        return isWithinInterval(date, { start: periodStart, end: periodEnd });
-      });
-
-      const periodInvoices = filteredData.invoices.filter(i => {
-        const date = parseISO(i.paid_at || i.created_at || '');
-        return isWithinInterval(date, { start: periodStart, end: periodEnd });
-      });
-
-      const periodExpenses = filteredData.expenses.filter(e => {
-        const date = parseISO(e.created_at || '');
-        return isWithinInterval(date, { start: periodStart, end: periodEnd });
-      });
-
-      const periodCustomers = filteredData.customers.filter(c => {
-        const date = parseISO(c.created_at || '');
-        return isWithinInterval(date, { start: periodStart, end: periodEnd });
-      });
-
-      const revenue = periodInvoices
-        .filter(i => i.status === 'paid')
-        .reduce((sum, i) => sum + (i.amount || 0), 0);
-
-      const expenseTotal = periodExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
-
-      return {
-        period: format(interval, formatStr),
-        fullDate: format(interval, 'PPP'),
-        shipments: periodShipments.length,
-        weight: periodShipments.reduce((sum, s) => sum + (s.total_weight_kg || 0), 0),
-        revenue,
-        expenses: expenseTotal,
-        profit: revenue - expenseTotal,
-        customers: periodCustomers.length,
-        delivered: periodShipments.filter(s => s.status === 'delivered').length,
-      };
-    });
-  }, [filteredData, effectiveDateRange, granularity]);
-
-  // Revenue by Region over time
-  const regionTrendData = useMemo(() => {
-    const { from, to } = effectiveDateRange;
-    const intervals = eachMonthOfInterval({ start: from, end: to });
-    
-    return intervals.map(interval => {
-      const periodStart = startOfMonth(interval);
-      const periodEnd = endOfMonth(interval);
-      
-      const periodShipments = (shipments || []).filter(s => {
-        if (!s.created_at) return false;
-        const date = parseISO(s.created_at);
-        return isWithinInterval(date, { start: periodStart, end: periodEnd });
-      });
-      
-      // Calculate revenue by region
-      const regionRevenue: Record<string, number> = {};
-      (regions || []).forEach(r => { regionRevenue[r.code] = 0; });
-      
-      periodShipments.forEach(shipment => {
-        const region = shipment.origin_region || 'unknown';
-        // Match invoices to shipments by customer
-        const shipmentInvoices = (invoices || []).filter(
-          i => i.customer_id === shipment.customer_id && 
-               i.status === 'paid' &&
-               i.paid_at &&
-               isWithinInterval(parseISO(i.paid_at), { start: periodStart, end: periodEnd })
-        );
-        const shipmentRevenue = shipmentInvoices.reduce((sum, i) => sum + (i.amount || 0), 0);
-        if (regionRevenue[region] !== undefined) {
-          regionRevenue[region] += shipmentRevenue;
-        }
-      });
-      
-      return {
-        period: format(interval, 'MMM yyyy'),
-        ...regionRevenue,
-      };
-    });
-  }, [shipments, invoices, effectiveDateRange, regions]);
-
-  // Customer Lifetime Value (CLV) analysis
-  const clvData = useMemo(() => {
-    if (!customers || !invoices || !shipments) return [];
-    
-    const customerStats = customers.map(customer => {
-      const customerInvoices = invoices.filter(
-        i => i.customer_id === customer.id && i.status === 'paid'
-      );
-      const customerShipments = shipments.filter(s => s.customer_id === customer.id);
-      
-      const totalRevenue = customerInvoices.reduce((sum, i) => sum + (i.amount || 0), 0);
-      const orderCount = customerShipments.length;
-      const avgOrderValue = orderCount > 0 ? totalRevenue / orderCount : 0;
-      
-      // Calculate customer tenure in days
-      const firstOrderDate = customerShipments.length > 0 
-        ? customerShipments.reduce((earliest, s) => {
-            const date = s.created_at ? parseISO(s.created_at) : new Date();
-            return date < earliest ? date : earliest;
-          }, new Date())
-        : new Date();
-      const tenure = differenceInDays(new Date(), firstOrderDate);
-      
-      // CLV = Average Order Value × Purchase Frequency × Customer Tenure (simplified)
-      const purchaseFrequency = tenure > 0 ? (orderCount / (tenure / 30)) : 0; // per month
-      const projectedCLV = avgOrderValue * purchaseFrequency * 12; // 12-month projection
-      
-      return {
-        id: customer.id,
-        name: customer.name,
-        totalRevenue,
-        orderCount,
-        avgOrderValue,
-        tenure,
-        purchaseFrequency,
-        clv: projectedCLV,
-      };
-    })
-    .filter(c => c.orderCount > 0)
-    .sort((a, b) => b.clv - a.clv);
-    
-    return customerStats;
-  }, [customers, invoices, shipments]);
-
-  // Top customers by CLV
-  const topCustomers = useMemo(() => {
-    return clvData.slice(0, 10);
-  }, [clvData]);
-
-  // CLV distribution buckets
-  const clvDistribution = useMemo(() => {
-    const buckets = [
-      { range: '$0 - $100', min: 0, max: 100, count: 0 },
-      { range: '$100 - $500', min: 100, max: 500, count: 0 },
-      { range: '$500 - $1K', min: 500, max: 1000, count: 0 },
-      { range: '$1K - $5K', min: 1000, max: 5000, count: 0 },
-      { range: '$5K+', min: 5000, max: Infinity, count: 0 },
-    ];
-    
-    clvData.forEach(customer => {
-      const bucket = buckets.find(b => customer.clv >= b.min && customer.clv < b.max);
-      if (bucket) bucket.count++;
-    });
-    
-    return buckets;
-  }, [clvData]);
-
-  // Seasonal patterns analysis
-  const seasonalData = useMemo(() => {
+  const filteredInvoices = useMemo(() => {
     if (!invoices) return [];
-    
-    const paidInvoices = invoices.filter(i => i.status === 'paid' && i.paid_at);
-    
-    return SEASONS.map(season => {
-      const seasonInvoices = paidInvoices.filter(invoice => {
-        const month = getMonth(parseISO(invoice.paid_at!));
-        return season.months.includes(month);
-      });
-      
-      const revenue = seasonInvoices.reduce((sum, i) => sum + (i.amount || 0), 0);
-      const orderCount = seasonInvoices.length;
-      const avgOrderValue = orderCount > 0 ? revenue / orderCount : 0;
-      
-      return {
-        season: season.name,
-        revenue,
-        orders: orderCount,
-        avgOrderValue,
-        color: season.color,
-      };
+    if (!dateRange.from && !dateRange.to) return invoices;
+    return invoices.filter(invoice => {
+      const invoiceDate = invoice.paid_at ? parseISO(invoice.paid_at) : parseISO(invoice.created_at || '');
+      if (!dateRange.from || !dateRange.to) return true;
+      return isWithinInterval(invoiceDate, { start: dateRange.from, end: dateRange.to });
     });
-  }, [invoices]);
+  }, [invoices, dateRange]);
 
-  // Monthly seasonal comparison (same month across years)
-  const monthlyPatterns = useMemo(() => {
-    if (!invoices) return [];
-    
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const paidInvoices = invoices.filter(i => i.status === 'paid' && i.paid_at);
-    
-    return months.map((month, index) => {
-      const monthInvoices = paidInvoices.filter(invoice => {
-        const invoiceMonth = getMonth(parseISO(invoice.paid_at!));
-        return invoiceMonth === index;
-      });
-      
-      const revenue = monthInvoices.reduce((sum, i) => sum + (i.amount || 0), 0);
-      const orders = monthInvoices.length;
-      
-      return { month, revenue, orders };
+  const filteredExpenses = useMemo(() => {
+    if (!expenses) return [];
+    if (!dateRange.from && !dateRange.to) return expenses;
+    return expenses.filter(expense => {
+      const expenseDate = parseISO(expense.created_at || '');
+      if (!dateRange.from || !dateRange.to) return true;
+      return isWithinInterval(expenseDate, { start: dateRange.from, end: dateRange.to });
     });
-  }, [invoices]);
+  }, [expenses, dateRange]);
 
-  // Calculate summary stats
-  const stats = useMemo(() => {
-    const totalShipments = filteredData.shipments.length;
-    const totalWeight = filteredData.shipments.reduce((sum, s) => sum + (s.total_weight_kg || 0), 0);
-    const totalRevenue = filteredData.invoices
-      .filter(i => i.status === 'paid')
-      .reduce((sum, i) => sum + (i.amount || 0), 0);
-    const totalExpenses = filteredData.expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
-    const totalCustomers = filteredData.customers.length;
-    const netProfit = totalRevenue - totalExpenses;
-    const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
-    const avgRevenuePerShipment = totalShipments > 0 ? totalRevenue / totalShipments : 0;
-    const deliveredShipments = filteredData.shipments.filter(s => s.status === 'delivered').length;
-    const deliveryRate = totalShipments > 0 ? (deliveredShipments / totalShipments) * 100 : 0;
-    
-    // CLV stats
-    const avgCLV = clvData.length > 0 ? clvData.reduce((sum, c) => sum + c.clv, 0) / clvData.length : 0;
-    const topCLV = clvData.length > 0 ? clvData[0]?.clv || 0 : 0;
-
-    return {
-      totalShipments,
-      totalWeight,
-      totalRevenue,
-      totalExpenses,
-      totalCustomers,
-      netProfit,
-      profitMargin,
-      avgRevenuePerShipment,
-      deliveredShipments,
-      deliveryRate,
-      avgCLV,
-      topCLV,
-    };
-  }, [filteredData, clvData]);
-
-  // Region breakdown
-  const regionData = useMemo(() => {
-    const regionCounts: Record<string, { shipments: number; weight: number; revenue: number }> = {};
-    
-    filteredData.shipments.forEach(s => {
-      const region = s.origin_region || 'unknown';
-      if (!regionCounts[region]) {
-        regionCounts[region] = { shipments: 0, weight: 0, revenue: 0 };
-      }
-      regionCounts[region].shipments += 1;
-      regionCounts[region].weight += s.total_weight_kg || 0;
+  const filteredShipments = useMemo(() => {
+    if (!shipments) return [];
+    if (!dateRange.from && !dateRange.to) return shipments;
+    return shipments.filter(shipment => {
+      const date = parseISO(shipment.created_at || '');
+      if (!dateRange.from || !dateRange.to) return true;
+      return isWithinInterval(date, { start: dateRange.from, end: dateRange.to });
     });
+  }, [shipments, dateRange]);
 
-    // Add revenue by matching shipments to invoices
-    filteredData.invoices
-      .filter(i => i.status === 'paid')
-      .forEach(invoice => {
-        const shipment = filteredData.shipments.find(s => s.customer_id === invoice.customer_id);
-        if (shipment) {
-          const region = shipment.origin_region || 'unknown';
-          if (regionCounts[region]) {
-            regionCounts[region].revenue += invoice.amount || 0;
-          }
-        }
-      });
+  const filteredCustomers = useMemo(() => {
+    if (!customers) return [];
+    if (!dateRange.from && !dateRange.to) return customers;
+    return customers.filter(customer => {
+      const date = parseISO(customer.created_at || '');
+      if (!dateRange.from || !dateRange.to) return true;
+      return isWithinInterval(date, { start: dateRange.from, end: dateRange.to });
+    });
+  }, [customers, dateRange]);
 
-    return Object.entries(regionCounts).map(([key, value]) => ({
-      name: regionsMap[key]?.name || key.charAt(0).toUpperCase() + key.slice(1),
-      region: key,
-      flag: regionsMap[key]?.flag_emoji || '',
-      ...value,
+  // Revenue by currency
+  const revenueBreakdown = useMemo(() => {
+    if (!filteredInvoices || !exchangeRates) return [];
+    const paidInvoices = filteredInvoices.filter(i => i.status === 'paid');
+    const byCurrency: Record<string, number> = {};
+    paidInvoices.forEach(invoice => {
+      const currency = invoice.currency || 'USD';
+      byCurrency[currency] = (byCurrency[currency] || 0) + Number(invoice.amount);
+    });
+    const breakdown = Object.entries(byCurrency).map(([currency, amount]) => ({
+      currency, amount,
+      amountInTzs: convertToTZS(amount, currency, exchangeRates),
+      symbol: CURRENCY_SYMBOLS[currency] || currency,
+      type: 'revenue' as const,
     }));
-  }, [filteredData, regionsMap]);
+    const total = breakdown.reduce((sum, item) => sum + item.amountInTzs, 0);
+    return breakdown.map(item => ({
+      ...item,
+      percentage: total > 0 ? (item.amountInTzs / total) * 100 : 0,
+    })).sort((a, b) => b.amountInTzs - a.amountInTzs);
+  }, [filteredInvoices, exchangeRates]);
 
-  // Expense breakdown
+  // Expenses by currency
   const expenseBreakdown = useMemo(() => {
+    if (!filteredExpenses || !exchangeRates) return [];
+    const byCurrency: Record<string, number> = {};
+    filteredExpenses.forEach(expense => {
+      const currency = expense.currency || 'USD';
+      byCurrency[currency] = (byCurrency[currency] || 0) + Number(expense.amount);
+    });
+    const breakdown = Object.entries(byCurrency).map(([currency, amount]) => ({
+      currency, amount,
+      amountInTzs: convertToTZS(amount, currency, exchangeRates),
+      symbol: CURRENCY_SYMBOLS[currency] || currency,
+      type: 'expense' as const,
+    }));
+    const total = breakdown.reduce((sum, item) => sum + item.amountInTzs, 0);
+    return breakdown.map(item => ({
+      ...item,
+      percentage: total > 0 ? (item.amountInTzs / total) * 100 : 0,
+    })).sort((a, b) => b.amountInTzs - a.amountInTzs);
+  }, [filteredExpenses, exchangeRates]);
+
+  // Expenses by category
+  const expensesByCategory = useMemo(() => {
+    if (!filteredExpenses) return [];
     const categoryCounts: Record<string, number> = {};
-    filteredData.expenses.forEach(e => {
+    filteredExpenses.forEach(e => {
       const category = e.category || 'other';
-      categoryCounts[category] = (categoryCounts[category] || 0) + (e.amount || 0);
+      const amountInTZS = convertToBaseCurrency(e.amount || 0, e.currency || 'USD');
+      categoryCounts[category] = (categoryCounts[category] || 0) + amountInTZS;
     });
     return Object.entries(categoryCounts)
       .map(([key, value]) => ({
-        name: EXPENSE_CATEGORIES.find(c => c.value === key)?.label || key,
+        name: EXPENSE_CATEGORIES.find(c => c.value === key)?.label || key.charAt(0).toUpperCase() + key.slice(1),
         value,
       }))
       .sort((a, b) => b.value - a.value);
-  }, [filteredData]);
+  }, [filteredExpenses, rateMap]);
 
-  // Status breakdown
-  const statusBreakdown = useMemo(() => {
+  // Status distribution
+  const statusDistribution = useMemo(() => {
     const statusCounts: Record<string, number> = {};
-    filteredData.shipments.forEach(s => {
+    filteredShipments.forEach(s => {
       const status = s.status || 'unknown';
       statusCounts[status] = (statusCounts[status] || 0) + 1;
     });
@@ -507,73 +311,203 @@ export default function AnalyticsPage() {
       name: name.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
       value,
     }));
-  }, [filteredData]);
+  }, [filteredShipments]);
 
-  // Export to CSV
-  const exportToCSV = (type: 'shipments' | 'revenue' | 'expenses' | 'summary' | 'clv' | 'regions') => {
-    let csvContent = '';
-    let filename = '';
+  // Region distribution
+  const regionDistribution = useMemo(() => {
+    const regionCounts: Record<string, number> = {};
+    filteredShipments.forEach(s => {
+      const region = s.origin_region || 'unknown';
+      regionCounts[region] = (regionCounts[region] || 0) + 1;
+    });
+    return Object.entries(regionCounts).map(([name, value]) => ({
+      name: name.charAt(0).toUpperCase() + name.slice(1),
+      value,
+    }));
+  }, [filteredShipments]);
 
-    if (type === 'shipments') {
-      csvContent = 'Period,Shipments,Weight (kg),Delivered\n';
-      timeSeriesData.forEach(row => {
-        csvContent += `"${row.period}",${row.shipments},${row.weight.toFixed(2)},${row.delivered}\n`;
-      });
-      filename = `shipments-analytics-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    } else if (type === 'revenue') {
-      csvContent = 'Period,Revenue ($),Expenses ($),Profit ($)\n';
-      timeSeriesData.forEach(row => {
-        csvContent += `"${row.period}",${row.revenue.toFixed(2)},${row.expenses.toFixed(2)},${row.profit.toFixed(2)}\n`;
-      });
-      filename = `revenue-analytics-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    } else if (type === 'expenses') {
-      csvContent = 'Category,Amount ($)\n';
-      expenseBreakdown.forEach(row => {
-        csvContent += `"${row.name}",${row.value.toFixed(2)}\n`;
-      });
-      filename = `expenses-breakdown-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    } else if (type === 'clv') {
-      csvContent = 'Customer,Total Revenue ($),Orders,Avg Order Value ($),CLV ($)\n';
-      clvData.forEach(row => {
-        csvContent += `"${row.name}",${row.totalRevenue.toFixed(2)},${row.orderCount},${row.avgOrderValue.toFixed(2)},${row.clv.toFixed(2)}\n`;
-      });
-      filename = `customer-lifetime-value-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    } else if (type === 'regions') {
-      csvContent = 'Region,Shipments,Weight (kg),Revenue ($)\n';
-      regionData.forEach(row => {
-        csvContent += `"${row.name}",${row.shipments},${row.weight.toFixed(2)},${row.revenue.toFixed(2)}\n`;
-      });
-      filename = `region-analytics-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    } else {
-      csvContent = 'Metric,Value\n';
-      csvContent += `Total Shipments,${stats.totalShipments}\n`;
-      csvContent += `Total Weight (kg),${stats.totalWeight.toFixed(2)}\n`;
-      csvContent += `Total Revenue ($),${stats.totalRevenue.toFixed(2)}\n`;
-      csvContent += `Total Expenses ($),${stats.totalExpenses.toFixed(2)}\n`;
-      csvContent += `Net Profit ($),${stats.netProfit.toFixed(2)}\n`;
-      csvContent += `Profit Margin (%),${stats.profitMargin.toFixed(2)}\n`;
-      csvContent += `Total Customers,${stats.totalCustomers}\n`;
-      csvContent += `Delivery Rate (%),${stats.deliveryRate.toFixed(2)}\n`;
-      csvContent += `Average CLV ($),${stats.avgCLV.toFixed(2)}\n`;
-      filename = `analytics-summary-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    }
+  // Calculate totals
+  const totalRevenueTzs = revenueBreakdown.reduce((sum, item) => sum + item.amountInTzs, 0);
+  const totalExpensesTzs = expenseBreakdown.reduce((sum, item) => sum + item.amountInTzs, 0);
+  const netProfitTzs = totalRevenueTzs - totalExpensesTzs;
+  const profitMargin = totalRevenueTzs > 0 ? (netProfitTzs / totalRevenueTzs) * 100 : 0;
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = filename;
-    link.click();
-    toast.success(`Exported ${filename}`);
+  // Comparison period calculations
+  const previousPeriodRange = useMemo(() => {
+    if (!dateRange.from || !dateRange.to) return { from: null, to: null };
+    const daysDiff = differenceInDays(dateRange.to, dateRange.from);
+    const prevTo = subDays(dateRange.from, 1);
+    const prevFrom = subDays(prevTo, daysDiff);
+    return { from: prevFrom, to: prevTo };
+  }, [dateRange]);
+
+  const yoyPeriodRange = useMemo(() => {
+    if (!dateRange.from || !dateRange.to) return { from: null, to: null };
+    return { from: subYears(dateRange.from, 1), to: subYears(dateRange.to, 1) };
+  }, [dateRange]);
+
+  const comparisonRange = comparisonMode === 'yoy' ? yoyPeriodRange : previousPeriodRange;
+
+  // Previous period totals
+  const prevFilteredInvoices = useMemo(() => {
+    if (!invoices || !comparisonRange.from || !comparisonRange.to) return [];
+    return invoices.filter(invoice => {
+      const invoiceDate = invoice.paid_at ? parseISO(invoice.paid_at) : parseISO(invoice.created_at || '');
+      return isWithinInterval(invoiceDate, { start: comparisonRange.from!, end: comparisonRange.to! });
+    });
+  }, [invoices, comparisonRange]);
+
+  const prevFilteredExpenses = useMemo(() => {
+    if (!expenses || !comparisonRange.from || !comparisonRange.to) return [];
+    return expenses.filter(expense => {
+      const expenseDate = parseISO(expense.created_at || '');
+      return isWithinInterval(expenseDate, { start: comparisonRange.from!, end: comparisonRange.to! });
+    });
+  }, [expenses, comparisonRange]);
+
+  const prevTotalRevenueTzs = useMemo(() => {
+    if (!prevFilteredInvoices || !exchangeRates) return 0;
+    return prevFilteredInvoices
+      .filter(i => i.status === 'paid')
+      .reduce((sum, inv) => sum + convertToTZS(Number(inv.amount), inv.currency || 'USD', exchangeRates), 0);
+  }, [prevFilteredInvoices, exchangeRates]);
+
+  const prevTotalExpensesTzs = useMemo(() => {
+    if (!prevFilteredExpenses || !exchangeRates) return 0;
+    return prevFilteredExpenses
+      .reduce((sum, exp) => sum + convertToTZS(Number(exp.amount), exp.currency || 'USD', exchangeRates), 0);
+  }, [prevFilteredExpenses, exchangeRates]);
+
+  const prevNetProfitTzs = prevTotalRevenueTzs - prevTotalExpensesTzs;
+  const prevProfitMargin = prevTotalRevenueTzs > 0 ? (prevNetProfitTzs / prevTotalRevenueTzs) * 100 : 0;
+
+  const calculateGrowth = (current: number, previous: number): number | null => {
+    if (previous === 0) return current > 0 ? 100 : null;
+    return ((current - previous) / Math.abs(previous)) * 100;
   };
+
+  const revenueGrowth = calculateGrowth(totalRevenueTzs, prevTotalRevenueTzs);
+  const expenseGrowth = calculateGrowth(totalExpensesTzs, prevTotalExpensesTzs);
+  const profitGrowth = calculateGrowth(netProfitTzs, prevNetProfitTzs);
+  const marginChange = profitMargin - prevProfitMargin;
+
+  // Monthly data for charts
+  const monthlyData = useMemo(() => {
+    if (!shipments || !invoices || !customers || !expenses) return [];
+    const now = new Date();
+    const sixMonthsAgo = subMonths(now, 5);
+    const months = eachMonthOfInterval({ start: startOfMonth(sixMonthsAgo), end: endOfMonth(now) });
+
+    return months.map(month => {
+      const monthStart = startOfMonth(month);
+      const monthEnd = endOfMonth(month);
+
+      const monthShipments = shipments.filter(s => {
+        const date = parseISO(s.created_at || '');
+        return isWithinInterval(date, { start: monthStart, end: monthEnd });
+      });
+
+      const monthInvoices = invoices.filter(i => {
+        const date = parseISO(i.created_at || '');
+        return isWithinInterval(date, { start: monthStart, end: monthEnd });
+      });
+
+      const monthCustomers = customers.filter(c => {
+        const date = parseISO(c.created_at || '');
+        return isWithinInterval(date, { start: monthStart, end: monthEnd });
+      });
+
+      const monthExpenses = expenses.filter(e => {
+        const date = parseISO(e.created_at || '');
+        return isWithinInterval(date, { start: monthStart, end: monthEnd });
+      });
+
+      const revenue = monthInvoices
+        .filter(i => i.status === 'paid')
+        .reduce((sum, i) => sum + convertToBaseCurrency(i.amount || 0, i.currency || 'USD'), 0);
+
+      const pending = monthInvoices
+        .filter(i => i.status === 'pending')
+        .reduce((sum, i) => sum + convertToBaseCurrency(i.amount || 0, i.currency || 'USD'), 0);
+
+      const totalExpenses = monthExpenses.reduce((sum, e) => 
+        sum + convertToBaseCurrency(e.amount || 0, e.currency || 'USD'), 0);
+
+      return {
+        month: format(month, 'MMM'),
+        shortMonth: format(month, 'MMM'),
+        fullMonth: format(month, 'MMMM yyyy'),
+        shipments: monthShipments.length,
+        weight: monthShipments.reduce((sum, s) => sum + (s.total_weight_kg || 0), 0),
+        revenue,
+        pending,
+        expenses: totalExpenses,
+        netProfit: revenue - totalExpenses,
+        profit: revenue - totalExpenses,
+        customers: monthCustomers.length,
+        delivered: monthShipments.filter(s => s.status === 'delivered').length,
+      };
+    });
+  }, [shipments, invoices, customers, expenses, rateMap]);
+
+  // Summary stats
+  const stats = useMemo(() => {
+    const totalShipments = filteredShipments.length;
+    const totalWeight = filteredShipments.reduce((sum, s) => sum + (s.total_weight_kg || 0), 0);
+    const totalCustomersCount = filteredCustomers.length;
+    
+    const currentMonth = monthlyData[monthlyData.length - 1];
+    const previousMonth = monthlyData[monthlyData.length - 2];
+
+    const shipmentGrowth = previousMonth?.shipments
+      ? ((currentMonth?.shipments - previousMonth.shipments) / previousMonth.shipments) * 100 : 0;
+    const customerGrowth = previousMonth?.customers
+      ? ((currentMonth?.customers - previousMonth.customers) / previousMonth.customers) * 100 : 0;
+
+    return {
+      totalShipments,
+      totalWeight,
+      totalCustomers: totalCustomersCount,
+      shipmentGrowth,
+      customerGrowth,
+    };
+  }, [filteredShipments, filteredCustomers, monthlyData]);
+
+  const GrowthBadge = ({ growth, inverted = false }: { growth: number | null; inverted?: boolean }) => {
+    if (growth === null) return null;
+    const isPositive = inverted ? growth < 0 : growth > 0;
+    const isNegative = inverted ? growth > 0 : growth < 0;
+    return (
+      <Badge variant="outline" className={cn(
+        "text-xs font-medium ml-2",
+        isPositive && "bg-emerald-500/10 text-emerald-600 border-emerald-500/30",
+        isNegative && "bg-red-500/10 text-red-600 border-red-500/30",
+        !isPositive && !isNegative && "bg-muted text-muted-foreground"
+      )}>
+        {growth > 0 ? '+' : ''}{growth.toFixed(1)}%
+      </Badge>
+    );
+  };
+
+  const getDateRangeLabel = () => {
+    if (datePreset === 'all') return 'All Time';
+    if (datePreset === 'custom' && customFromDate && customToDate) {
+      return `${format(customFromDate, 'MMM d, yyyy')} - ${format(customToDate, 'MMM d, yyyy')}`;
+    }
+    if (dateRange.from && dateRange.to) {
+      return `${format(dateRange.from, 'MMM d, yyyy')} - ${format(dateRange.to, 'MMM d, yyyy')}`;
+    }
+    return DATE_PRESETS.find(p => p.value === datePreset)?.label || '';
+  };
+
+  const getComparisonLabel = () => comparisonMode === 'yoy' ? 'same period last year' : 'prev period';
 
   if (isLoading) {
     return (
-      <AdminLayout title="Analytics" subtitle="Detailed reports with date range filters">
+      <AdminLayout title="Analytics" subtitle="Financial and operational insights">
         <div className="space-y-6">
           <div className="grid gap-4 md:grid-cols-4">
-            {[...Array(4)].map((_, i) => (
-              <Skeleton key={i} className="h-32" />
-            ))}
+            {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-32" />)}
           </div>
           <Skeleton className="h-[400px]" />
         </div>
@@ -582,668 +516,567 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <AdminLayout title="Analytics" subtitle="Advanced reports with CLV, regional trends, and seasonal analysis">
+    <AdminLayout title="Analytics" subtitle="Financial and operational insights">
       <div className="space-y-6">
-        {/* Filters Bar */}
+        {/* Date Range Filter */}
         <Card>
-          <CardContent className="p-4">
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-              <div className="flex flex-wrap gap-3 items-center">
-                <div className="flex items-center gap-2">
-                  <Filter className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">Date Range:</span>
-                </div>
-                
-                <Select value={datePreset} onValueChange={setDatePreset}>
-                  <SelectTrigger className="w-[160px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DATE_PRESETS.map(preset => (
-                      <SelectItem key={preset.value} value={preset.value}>
-                        {preset.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                {datePreset === 'custom' && (
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="gap-2">
-                        <Calendar className="w-4 h-4" />
-                        {dateRange?.from ? (
-                          dateRange.to ? (
-                            <>
-                              {format(dateRange.from, 'LLL dd')} - {format(dateRange.to, 'LLL dd, y')}
-                            </>
-                          ) : (
-                            format(dateRange.from, 'LLL dd, y')
-                          )
-                        ) : (
-                          'Pick dates'
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <CalendarComponent
-                        mode="range"
-                        selected={dateRange}
-                        onSelect={setDateRange}
-                        numberOfMonths={2}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                )}
-
-                <Select value={granularity} onValueChange={(v: 'day' | 'week' | 'month') => setGranularity(v)}>
-                  <SelectTrigger className="w-[120px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="day">Daily</SelectItem>
-                    <SelectItem value="week">Weekly</SelectItem>
-                    <SelectItem value="month">Monthly</SelectItem>
-                  </SelectContent>
-                </Select>
+          <CardContent className="pt-4">
+            <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+              <div className="flex flex-wrap gap-2">
+                {DATE_PRESETS.filter(p => p.value !== 'custom').map((preset) => (
+                  <Button
+                    key={preset.value}
+                    variant={datePreset === preset.value ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setDatePreset(preset.value)}
+                  >
+                    {preset.label}
+                  </Button>
+                ))}
               </div>
-
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => exportToCSV('summary')}>
-                  <Download className="w-4 h-4 mr-2" />
-                  Export Summary
-                </Button>
+              <div className="flex gap-2 items-center">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant={datePreset === 'custom' ? 'default' : 'outline'} size="sm">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {customFromDate ? format(customFromDate, 'MMM d, yyyy') : 'From'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <CalendarComponent
+                      mode="single"
+                      selected={customFromDate}
+                      onSelect={(date) => { setCustomFromDate(date); setDatePreset('custom'); }}
+                      initialFocus
+                      className="p-3 pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+                <span className="text-muted-foreground">to</span>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant={datePreset === 'custom' ? 'default' : 'outline'} size="sm">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {customToDate ? format(customToDate, 'MMM d, yyyy') : 'To'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <CalendarComponent
+                      mode="single"
+                      selected={customToDate}
+                      onSelect={(date) => { setCustomToDate(date); setDatePreset('custom'); }}
+                      initialFocus
+                      className="p-3 pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
-
-            <div className="flex gap-2 mt-3">
-              <Badge variant="secondary" className="text-xs">
-                {format(effectiveDateRange.from, 'MMM d, yyyy')} - {format(effectiveDateRange.to, 'MMM d, yyyy')}
-              </Badge>
-              <Badge variant="outline" className="text-xs">
-                {timeSeriesData.length} data points
-              </Badge>
+            <div className="mt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="text-sm text-muted-foreground">
+                Showing: <span className="font-medium text-foreground">{getDateRangeLabel()}</span>
+              </div>
+              {datePreset !== 'all' && (
+                <div className="flex items-center gap-2">
+                  <GitCompare className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">Compare:</span>
+                  <ToggleGroup type="single" value={comparisonMode} onValueChange={(v) => v && setComparisonMode(v as ComparisonMode)} size="sm">
+                    <ToggleGroupItem value="pop" className="text-xs px-3">Period over Period</ToggleGroupItem>
+                    <ToggleGroupItem value="yoy" className="text-xs px-3">Year over Year</ToggleGroupItem>
+                  </ToggleGroup>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Summary Stats */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Shipments</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalShipments.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">
-                {stats.totalWeight.toLocaleString()} kg total weight
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Revenue</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">${stats.totalRevenue.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">
-                ${stats.avgRevenuePerShipment.toFixed(2)} avg per shipment
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Net Profit</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className={cn("text-2xl font-bold", stats.netProfit >= 0 ? "text-green-600" : "text-red-600")}>
-                ${Math.abs(stats.netProfit).toLocaleString()}
+        {/* Key Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                  <TrendingUp className="h-6 w-6 text-emerald-600" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center">
+                    <p className="text-sm text-muted-foreground">Total Revenue</p>
+                    {datePreset !== 'all' && <GrowthBadge growth={revenueGrowth} />}
+                  </div>
+                  <p className="text-2xl font-bold text-emerald-600">TZS {formatTZS(totalRevenueTzs)}</p>
+                  {datePreset !== 'all' && prevTotalRevenueTzs > 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">vs TZS {formatTZS(prevTotalRevenueTzs)} {getComparisonLabel()}</p>
+                  )}
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                {stats.profitMargin.toFixed(1)}% profit margin
-              </p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Avg Customer CLV</CardTitle>
-              <Crown className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">${stats.avgCLV.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
-              <p className="text-xs text-muted-foreground">
-                Top: ${stats.topCLV.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-              </p>
+          <Card className="bg-gradient-to-br from-amber-500/10 to-amber-500/5 border-amber-500/20">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                  <TrendingDown className="h-6 w-6 text-amber-600" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center">
+                    <p className="text-sm text-muted-foreground">Total Expenses</p>
+                    {datePreset !== 'all' && <GrowthBadge growth={expenseGrowth} inverted />}
+                  </div>
+                  <p className="text-2xl font-bold text-amber-600">TZS {formatTZS(totalExpensesTzs)}</p>
+                  {datePreset !== 'all' && prevTotalExpensesTzs > 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">vs TZS {formatTZS(prevTotalExpensesTzs)} {getComparisonLabel()}</p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className={cn("bg-gradient-to-br", netProfitTzs >= 0 ? "from-blue-500/10 to-blue-500/5 border-blue-500/20" : "from-red-500/10 to-red-500/5 border-red-500/20")}>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center", netProfitTzs >= 0 ? "bg-blue-500/20" : "bg-red-500/20")}>
+                  <PiggyBank className={cn("h-6 w-6", netProfitTzs >= 0 ? "text-blue-600" : "text-red-600")} />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center">
+                    <p className="text-sm text-muted-foreground">Net Profit</p>
+                    {datePreset !== 'all' && <GrowthBadge growth={profitGrowth} />}
+                  </div>
+                  <p className={cn("text-2xl font-bold", netProfitTzs >= 0 ? "text-blue-600" : "text-red-600")}>
+                    TZS {formatTZS(netProfitTzs)}
+                  </p>
+                  {datePreset !== 'all' && (prevNetProfitTzs !== 0 || prevTotalRevenueTzs > 0) && (
+                    <p className="text-xs text-muted-foreground mt-1">vs TZS {formatTZS(prevNetProfitTzs)} {getComparisonLabel()}</p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-purple-500/10 to-purple-500/5 border-purple-500/20">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                  <Scale className="h-6 w-6 text-purple-600" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center">
+                    <p className="text-sm text-muted-foreground">Profit Margin</p>
+                    {datePreset !== 'all' && marginChange !== 0 && (
+                      <Badge variant="outline" className={cn("text-xs font-medium ml-2", marginChange > 0 && "bg-emerald-500/10 text-emerald-600 border-emerald-500/30", marginChange < 0 && "bg-red-500/10 text-red-600 border-red-500/30")}>
+                        {marginChange > 0 ? '+' : ''}{marginChange.toFixed(1)}pp
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-2xl font-bold text-purple-600">{profitMargin.toFixed(1)}%</p>
+                  {datePreset !== 'all' && prevProfitMargin !== 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">vs {prevProfitMargin.toFixed(1)}% {getComparisonLabel()}</p>
+                  )}
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Charts */}
-        <Tabs defaultValue="overview" className="space-y-4">
-          <div className="flex items-center justify-between overflow-x-auto">
-            <TabsList className="flex-wrap">
-              <TabsTrigger value="overview" className="gap-2">
-                <LineChartIcon className="w-4 h-4" />
-                Overview
-              </TabsTrigger>
-              <TabsTrigger value="region-trends" className="gap-2">
-                <MapPin className="w-4 h-4" />
-                Region Trends
-              </TabsTrigger>
-              <TabsTrigger value="clv" className="gap-2">
-                <Crown className="w-4 h-4" />
-                Customer LTV
-              </TabsTrigger>
-              <TabsTrigger value="seasonal" className="gap-2">
-                <Sun className="w-4 h-4" />
-                Seasonal
-              </TabsTrigger>
-              <TabsTrigger value="shipments" className="gap-2">
-                <BarChart3 className="w-4 h-4" />
-                Shipments
-              </TabsTrigger>
-              <TabsTrigger value="breakdown" className="gap-2">
-                <PieChartIcon className="w-4 h-4" />
-                Breakdown
-              </TabsTrigger>
-            </TabsList>
-          </div>
+        {/* Main Tabs */}
+        <Tabs defaultValue="financial" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
+            <TabsTrigger value="financial">Financial</TabsTrigger>
+            <TabsTrigger value="operations">Operations</TabsTrigger>
+            <TabsTrigger value="revenue">Revenue</TabsTrigger>
+            <TabsTrigger value="distribution">Distribution</TabsTrigger>
+          </TabsList>
 
-          {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-4">
+          {/* Financial Tab */}
+          <TabsContent value="financial" className="space-y-4">
+            {/* Monthly Trend Chart */}
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Performance Overview</CardTitle>
-                  <CardDescription>Revenue, expenses, and profit trends</CardDescription>
-                </div>
-                <Button variant="outline" size="sm" onClick={() => exportToCSV('revenue')}>
-                  <FileSpreadsheet className="w-4 h-4 mr-2" />
-                  Export
-                </Button>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <LineChartIcon className="h-5 w-5" />
+                  Monthly Financial Trend
+                </CardTitle>
+                <CardDescription>Revenue, expenses, and profit trend over time (in TZS)</CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={400}>
-                  <ComposedChart data={timeSeriesData}>
+                <ResponsiveContainer width="100%" height={350}>
+                  <ComposedChart data={monthlyData}>
                     <defs>
-                      <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+                      <linearGradient id="profitGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
-                    <XAxis 
-                      dataKey="period" 
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                    />
-                    <YAxis 
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                      tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-                    />
+                    <XAxis dataKey="shortMonth" axisLine={false} tickLine={false} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} tickFormatter={(v) => v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}K` : v.toString()} />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend />
-                    <Area 
-                      type="monotone" 
-                      dataKey="revenue" 
-                      stroke="#10B981" 
-                      strokeWidth={2}
-                      fill="url(#revenueGrad)"
-                      name="Revenue"
-                    />
-                    <Bar dataKey="expenses" fill="#F59E0B" name="Expenses" radius={[4, 4, 0, 0]} />
-                    <Line 
-                      type="monotone" 
-                      dataKey="profit" 
-                      stroke="#3B82F6" 
-                      strokeWidth={2.5}
-                      dot={{ fill: '#3B82F6', r: 4 }}
-                      name="Profit"
-                    />
+                    <Area type="monotone" dataKey="profit" name="Profit" fill="url(#profitGradient)" stroke="#3B82F6" strokeWidth={2} />
+                    <Line type="monotone" dataKey="revenue" name="Revenue" stroke="#10B981" strokeWidth={3} dot={{ fill: '#10B981', strokeWidth: 2, r: 4 }} />
+                    <Line type="monotone" dataKey="expenses" name="Expenses" stroke="#F59E0B" strokeWidth={3} dot={{ fill: '#F59E0B', strokeWidth: 2, r: 4 }} />
                   </ComposedChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
-          </TabsContent>
 
-          {/* Region Trends Tab */}
-          <TabsContent value="region-trends" className="space-y-4">
-            <div className="grid gap-4 lg:grid-cols-2">
-              <Card className="lg:col-span-2">
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle>Revenue by Region Over Time</CardTitle>
-                    <CardDescription>Monthly revenue trends across all origin regions</CardDescription>
-                  </div>
-                  <Button variant="outline" size="sm" onClick={() => exportToCSV('regions')}>
-                    <FileSpreadsheet className="w-4 h-4 mr-2" />
-                    Export
-                  </Button>
+            {/* Revenue & Expense Breakdown */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card className="bg-gradient-to-br from-emerald-500/5 to-transparent border-emerald-500/20">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <DollarSign className="h-5 w-5 text-emerald-600" />
+                    Revenue Breakdown
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={400}>
-                    <AreaChart data={regionTrendData}>
-                      <defs>
-                        {Object.entries(REGION_COLORS).map(([region, color]) => (
-                          <linearGradient key={region} id={`grad-${region}`} x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={color} stopOpacity={0.3}/>
-                            <stop offset="95%" stopColor={color} stopOpacity={0}/>
-                          </linearGradient>
-                        ))}
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
-                      <XAxis 
-                        dataKey="period" 
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                      />
-                      <YAxis 
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                        tickFormatter={(value) => `$${value.toLocaleString()}`}
-                      />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Legend />
-                      {(regions || []).map((region) => (
-                        <Area
-                          key={region.code}
-                          type="monotone"
-                          dataKey={region.code}
-                          stackId="1"
-                          stroke={REGION_COLORS[region.code] || '#888'}
-                          fill={`url(#grad-${region.code})`}
-                          name={`${region.flag_emoji || ''} ${region.name}`}
-                        />
-                      ))}
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Revenue Share by Region</CardTitle>
-                  <CardDescription>Current period distribution</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={regionData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={100}
-                        paddingAngle={2}
-                        dataKey="revenue"
-                        nameKey="name"
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                        labelLine={false}
-                      >
-                        {regionData.map((entry, index) => (
-                          <Cell 
-                            key={`cell-${index}`} 
-                            fill={REGION_COLORS[entry.region] || CHART_COLORS[index % CHART_COLORS.length]} 
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value: number) => `$${value.toLocaleString()}`} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Region Performance</CardTitle>
-                  <CardDescription>Shipments, weight, and revenue comparison</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {regionData.sort((a, b) => b.revenue - a.revenue).map((region, index) => (
-                      <div key={region.region} className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="text-lg">{regionsMap[region.region]?.flag_emoji}</span>
-                            <span className="font-medium">{region.name}</span>
-                            {index === 0 && <Badge className="bg-yellow-500">Top</Badge>}
-                          </div>
-                          <span className="font-bold">${region.revenue.toLocaleString()}</span>
-                        </div>
-                        <Progress 
-                          value={(region.revenue / Math.max(...regionData.map(r => r.revenue))) * 100} 
-                          className="h-2"
-                        />
-                        <div className="flex gap-4 text-xs text-muted-foreground">
-                          <span>{region.shipments} shipments</span>
-                          <span>{region.weight.toFixed(0)} kg</span>
-                        </div>
+                  {revenueBreakdown.length > 0 ? (
+                    <div className="flex flex-col md:flex-row gap-4">
+                      <div className="flex-shrink-0">
+                        <ResponsiveContainer width={160} height={160}>
+                          <PieChart>
+                            <Pie data={revenueBreakdown} cx="50%" cy="50%" innerRadius={40} outerRadius={70} paddingAngle={2} dataKey="amountInTzs" strokeWidth={0}>
+                              {revenueBreakdown.map((_, index) => <Cell key={`cell-${index}`} fill={REVENUE_COLORS[index % REVENUE_COLORS.length]} />)}
+                            </Pie>
+                            <Tooltip content={<CurrencyTooltip />} />
+                          </PieChart>
+                        </ResponsiveContainer>
                       </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* CLV Tab */}
-          <TabsContent value="clv" className="space-y-4">
-            <div className="grid gap-4 lg:grid-cols-3">
-              <Card className="lg:col-span-2">
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Crown className="h-5 w-5 text-yellow-500" />
-                      Top Customers by Lifetime Value
-                    </CardTitle>
-                    <CardDescription>Projected 12-month customer lifetime value</CardDescription>
-                  </div>
-                  <Button variant="outline" size="sm" onClick={() => exportToCSV('clv')}>
-                    <FileSpreadsheet className="w-4 h-4 mr-2" />
-                    Export CLV
-                  </Button>
-                </CardHeader>
-                <CardContent>
-                  {topCustomers.length > 0 ? (
-                    <div className="space-y-4">
-                      {topCustomers.map((customer, index) => (
-                        <div key={customer.id} className="flex items-center gap-4 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
-                          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                            {index < 3 ? (
-                              <Award className={cn(
-                                "h-4 w-4",
-                                index === 0 && "text-yellow-500",
-                                index === 1 && "text-gray-400",
-                                index === 2 && "text-amber-600"
-                              )} />
-                            ) : (
-                              <span className="text-xs font-bold text-muted-foreground">{index + 1}</span>
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium truncate">{customer.name}</p>
-                            <div className="flex gap-3 text-xs text-muted-foreground">
-                              <span>{customer.orderCount} orders</span>
-                              <span>Avg ${customer.avgOrderValue.toFixed(0)}</span>
-                              <span>{customer.tenure} days</span>
+                      <div className="flex-1 space-y-2">
+                        {revenueBreakdown.map((item, index) => (
+                          <div key={item.currency} className="flex items-center justify-between p-2 bg-background/60 rounded-lg">
+                            <div className="flex items-center gap-2">
+                              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: REVENUE_COLORS[index % REVENUE_COLORS.length] }} />
+                              <Badge variant="outline" className="text-xs font-mono">{item.currency}</Badge>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-semibold text-sm">{item.symbol}{item.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                              <p className="text-xs text-muted-foreground">TZS {item.amountInTzs.toLocaleString()}</p>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <p className="font-bold text-lg">${customer.clv.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
-                            <p className="text-xs text-muted-foreground">Projected CLV</p>
-                          </div>
+                        ))}
+                        <div className="pt-2 border-t flex justify-between items-center">
+                          <span className="text-sm font-medium">Total</span>
+                          <span className="text-lg font-bold text-emerald-600">TZS {formatTZS(totalRevenueTzs)}</span>
                         </div>
-                      ))}
+                      </div>
                     </div>
                   ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                      No customer data available
-                    </div>
+                    <div className="h-40 flex items-center justify-center text-muted-foreground">No revenue data available</div>
                   )}
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>CLV Distribution</CardTitle>
-                  <CardDescription>Customer value segments</CardDescription>
+              <Card className="bg-gradient-to-br from-amber-500/5 to-transparent border-amber-500/20">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Receipt className="h-5 w-5 text-amber-600" />
+                    Expense Breakdown
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <BarChart data={clvDistribution} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
-                      <XAxis type="number" />
-                      <YAxis 
-                        dataKey="range" 
-                        type="category" 
-                        width={80}
-                        tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-                      />
-                      <Tooltip />
-                      <Bar dataKey="count" fill="#8B5CF6" name="Customers" radius={[0, 4, 4, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                  <div className="mt-4 space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Total Customers</span>
-                      <span className="font-bold">{clvData.length}</span>
+                  {expenseBreakdown.length > 0 ? (
+                    <div className="flex flex-col md:flex-row gap-4">
+                      <div className="flex-shrink-0">
+                        <ResponsiveContainer width={160} height={160}>
+                          <PieChart>
+                            <Pie data={expenseBreakdown} cx="50%" cy="50%" innerRadius={40} outerRadius={70} paddingAngle={2} dataKey="amountInTzs" strokeWidth={0}>
+                              {expenseBreakdown.map((_, index) => <Cell key={`cell-${index}`} fill={EXPENSE_COLORS[index % EXPENSE_COLORS.length]} />)}
+                            </Pie>
+                            <Tooltip content={<CurrencyTooltip />} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        {expenseBreakdown.map((item, index) => (
+                          <div key={item.currency} className="flex items-center justify-between p-2 bg-background/60 rounded-lg">
+                            <div className="flex items-center gap-2">
+                              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: EXPENSE_COLORS[index % EXPENSE_COLORS.length] }} />
+                              <Badge variant="outline" className="text-xs font-mono">{item.currency}</Badge>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-semibold text-sm">{item.symbol}{item.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                              <p className="text-xs text-muted-foreground">TZS {item.amountInTzs.toLocaleString()}</p>
+                            </div>
+                          </div>
+                        ))}
+                        <div className="pt-2 border-t flex justify-between items-center">
+                          <span className="text-sm font-medium">Total</span>
+                          <span className="text-lg font-bold text-amber-600">TZS {formatTZS(totalExpensesTzs)}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Avg CLV</span>
-                      <span className="font-bold">${stats.avgCLV.toFixed(0)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Top CLV</span>
-                      <span className="font-bold text-green-600">${stats.topCLV.toFixed(0)}</span>
-                    </div>
-                  </div>
+                  ) : (
+                    <div className="h-40 flex items-center justify-center text-muted-foreground">No expense data available</div>
+                  )}
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
 
-          {/* Seasonal Tab */}
-          <TabsContent value="seasonal" className="space-y-4">
+            {/* Expense by Category */}
             <div className="grid gap-4 lg:grid-cols-2">
               <Card>
                 <CardHeader>
-                  <CardTitle>Revenue by Season</CardTitle>
-                  <CardDescription>Performance across different seasons</CardDescription>
+                  <CardTitle>Expense by Category</CardTitle>
+                  <CardDescription>Breakdown by expense type</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 gap-4 mb-6">
-                    {seasonalData.map(season => {
-                      const SeasonIcon = SEASONS.find(s => s.name === season.season)?.icon || Sun;
-                      return (
-                        <Card key={season.season} className="p-4">
-                          <div className="flex items-center gap-3">
-                            <div 
-                              className="p-2 rounded-lg" 
-                              style={{ backgroundColor: `${season.color}20` }}
-                            >
-                              <SeasonIcon className="h-5 w-5" style={{ color: season.color }} />
-                            </div>
-                            <div>
-                              <p className="text-sm text-muted-foreground">{season.season}</p>
-                              <p className="font-bold text-lg">${season.revenue.toLocaleString()}</p>
-                              <p className="text-xs text-muted-foreground">{season.orders} orders</p>
-                            </div>
-                          </div>
-                        </Card>
-                      );
-                    })}
+                  <div className="h-[300px]">
+                    {expensesByCategory.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie data={expensesByCategory} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value" label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`} labelLine={false}>
+                            {expensesByCategory.map((_, index) => <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />)}
+                          </Pie>
+                          <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} formatter={(v: number) => [`TZS ${formatTZS(v)}`, '']} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-muted-foreground">No expense data yet</div>
+                    )}
                   </div>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={seasonalData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
-                      <XAxis dataKey="season" />
-                      <YAxis tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Bar dataKey="revenue" name="Revenue">
-                        {seasonalData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Monthly Patterns</CardTitle>
-                  <CardDescription>Revenue and order patterns by month</CardDescription>
+                  <CardTitle>Expense Details</CardTitle>
+                  <CardDescription>Top expense categories</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={350}>
-                    <ComposedChart data={monthlyPatterns}>
-                      <defs>
-                        <linearGradient id="monthGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
-                      <XAxis dataKey="month" />
-                      <YAxis 
-                        yAxisId="left" 
-                        tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`}
-                        tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-                      />
-                      <YAxis 
-                        yAxisId="right" 
-                        orientation="right"
-                        tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-                      />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Legend />
-                      <Area 
-                        yAxisId="left"
-                        type="monotone" 
-                        dataKey="revenue" 
-                        stroke="#3B82F6"
-                        fill="url(#monthGrad)"
-                        name="Revenue"
-                      />
-                      <Line 
-                        yAxisId="right"
-                        type="monotone" 
-                        dataKey="orders" 
-                        stroke="#10B981"
-                        strokeWidth={2}
-                        dot={{ r: 4 }}
-                        name="Orders"
-                      />
-                    </ComposedChart>
-                  </ResponsiveContainer>
+                  <div className="space-y-4">
+                    {expensesByCategory.slice(0, 6).map((category, index) => (
+                      <div key={category.name} className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }} />
+                          <span className="text-sm font-medium">{category.name}</span>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold">TZS {formatTZS(category.value)}</p>
+                          <p className="text-xs text-muted-foreground">{totalExpensesTzs > 0 ? ((category.value / totalExpensesTzs) * 100).toFixed(1) : 0}%</p>
+                        </div>
+                      </div>
+                    ))}
+                    {expensesByCategory.length === 0 && (
+                      <div className="text-center text-muted-foreground py-8">No expense data yet</div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             </div>
           </TabsContent>
 
-          {/* Shipments Tab */}
-          <TabsContent value="shipments" className="space-y-4">
+          {/* Operations Tab */}
+          <TabsContent value="operations" className="space-y-4">
+            {/* Summary Stats */}
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Total Shipments</CardTitle>
+                  <Package className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats.totalShipments.toLocaleString()}</div>
+                  <div className="flex items-center text-xs">
+                    {stats.shipmentGrowth >= 0 ? <ArrowUpRight className="h-3 w-3 text-green-500 mr-1" /> : <ArrowDownRight className="h-3 w-3 text-red-500 mr-1" />}
+                    <span className={stats.shipmentGrowth >= 0 ? 'text-green-500' : 'text-red-500'}>{Math.abs(stats.shipmentGrowth).toFixed(1)}%</span>
+                    <span className="text-muted-foreground ml-1">vs last month</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Total Weight</CardTitle>
+                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats.totalWeight.toLocaleString()} kg</div>
+                  <p className="text-xs text-muted-foreground">Across all shipments</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Total Customers</CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats.totalCustomers.toLocaleString()}</div>
+                  <div className="flex items-center text-xs">
+                    {stats.customerGrowth >= 0 ? <ArrowUpRight className="h-3 w-3 text-green-500 mr-1" /> : <ArrowDownRight className="h-3 w-3 text-red-500 mr-1" />}
+                    <span className={stats.customerGrowth >= 0 ? 'text-green-500' : 'text-red-500'}>{Math.abs(stats.customerGrowth).toFixed(1)}%</span>
+                    <span className="text-muted-foreground ml-1">vs last month</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Revenue (TZS)</CardTitle>
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">TZS {formatTZS(totalRevenueTzs)}</div>
+                  <p className="text-xs text-muted-foreground">From paid invoices</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Shipment & Weight Charts */}
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Monthly Shipments</CardTitle>
+                  <CardDescription>Number of shipments created per month</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[300px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={monthlyData}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                        <XAxis dataKey="month" className="text-xs" />
+                        <YAxis className="text-xs" />
+                        <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                        <Bar dataKey="shipments" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Weight Trend</CardTitle>
+                  <CardDescription>Total weight shipped per month (kg)</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[300px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={monthlyData}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                        <XAxis dataKey="month" className="text-xs" />
+                        <YAxis className="text-xs" />
+                        <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                        <Area type="monotone" dataKey="weight" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.2} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Customer Growth */}
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Shipment Volume</CardTitle>
-                  <CardDescription>Number of shipments and weight over time</CardDescription>
-                </div>
-                <Button variant="outline" size="sm" onClick={() => exportToCSV('shipments')}>
-                  <FileSpreadsheet className="w-4 h-4 mr-2" />
-                  Export
-                </Button>
+              <CardHeader>
+                <CardTitle>Customer Growth</CardTitle>
+                <CardDescription>New customers acquired per month</CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={400}>
-                  <BarChart data={timeSeriesData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
-                    <XAxis 
-                      dataKey="period" 
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                    />
-                    <YAxis 
-                      yAxisId="left"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                    />
-                    <YAxis 
-                      yAxisId="right"
-                      orientation="right"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                      tickFormatter={(value) => `${value}kg`}
-                    />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend />
-                    <Bar yAxisId="left" dataKey="shipments" fill="#3B82F6" name="Shipments" radius={[4, 4, 0, 0]} />
-                    <Line yAxisId="right" type="monotone" dataKey="weight" stroke="#8B5CF6" strokeWidth={2} name="Weight (kg)" />
-                  </BarChart>
-                </ResponsiveContainer>
+                <div className="h-[350px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={monthlyData}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis dataKey="month" className="text-xs" />
+                      <YAxis className="text-xs" />
+                      <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                      <Line type="monotone" dataKey="customers" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ fill: 'hsl(var(--primary))', strokeWidth: 2 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
 
-          {/* Breakdown Tab */}
-          <TabsContent value="breakdown" className="space-y-4">
+          {/* Revenue Tab */}
+          <TabsContent value="revenue" className="space-y-4">
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle>Revenue Overview</CardTitle>
+                <CardDescription>Paid vs pending invoices per month (in TZS)</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[350px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={monthlyData}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis dataKey="month" className="text-xs" />
+                      <YAxis className="text-xs" tickFormatter={(v) => `${(v / 1000000).toFixed(1)}M`} />
+                      <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} formatter={(v: number) => [`TZS ${formatTZS(v)}`, '']} />
+                      <Legend />
+                      <Bar dataKey="revenue" name="Paid" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="pending" name="Pending" fill="#94a3b8" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Revenue vs Expenses Trend */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Revenue vs Expenses Trend</CardTitle>
+                <CardDescription>Monthly comparison with net profit line</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[350px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={monthlyData}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis dataKey="month" className="text-xs" />
+                      <YAxis className="text-xs" tickFormatter={(v) => `${(v / 1000000).toFixed(1)}M`} />
+                      <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} formatter={(v: number) => [`TZS ${formatTZS(v)}`, '']} />
+                      <Legend />
+                      <Bar dataKey="revenue" name="Revenue" fill="#10B981" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="expenses" name="Expenses" fill="#EF4444" radius={[4, 4, 0, 0]} />
+                      <Line type="monotone" dataKey="netProfit" name="Net Profit" stroke="#3B82F6" strokeWidth={3} dot={{ fill: '#3B82F6', strokeWidth: 2, r: 4 }} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Distribution Tab */}
+          <TabsContent value="distribution" className="space-y-4">
             <div className="grid gap-4 lg:grid-cols-2">
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle>Expense Breakdown</CardTitle>
-                    <CardDescription>Approved expenses by category</CardDescription>
-                  </div>
-                  <Button variant="outline" size="sm" onClick={() => exportToCSV('expenses')}>
-                    <FileSpreadsheet className="w-4 h-4 mr-2" />
-                    Export
-                  </Button>
+                <CardHeader>
+                  <CardTitle>Shipment Status</CardTitle>
+                  <CardDescription>Distribution by current status</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={expenseBreakdown}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={100}
-                        paddingAngle={2}
-                        dataKey="value"
-                        nameKey="name"
-                      >
-                        {expenseBreakdown.map((_, index) => (
-                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value: number) => `$${value.toLocaleString()}`} />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <div className="h-[300px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie data={statusDistribution} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value" label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`} labelLine={false}>
+                          {statusDistribution.map((_, index) => <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />)}
+                        </Pie>
+                        <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Shipment Status</CardTitle>
-                  <CardDescription>Current status distribution</CardDescription>
+                  <CardTitle>Regional Distribution</CardTitle>
+                  <CardDescription>Shipments by origin region</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={statusBreakdown}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={100}
-                        paddingAngle={2}
-                        dataKey="value"
-                        nameKey="name"
-                        label={({ name, value }) => `${name}: ${value}`}
-                        labelLine={false}
-                      >
-                        {statusBreakdown.map((_, index) => (
-                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <div className="h-[300px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={regionDistribution} layout="vertical">
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                        <XAxis type="number" className="text-xs" />
+                        <YAxis dataKey="name" type="category" className="text-xs" width={80} />
+                        <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+                        <Bar dataKey="value" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
                 </CardContent>
               </Card>
             </div>
