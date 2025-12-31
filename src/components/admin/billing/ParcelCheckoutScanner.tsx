@@ -228,6 +228,31 @@ export function ParcelCheckoutScanner() {
   const releaseSelectedParcels = useCallback(async () => {
     if (!parcelData || !user?.id || selectedParcelIds.size === 0) return;
 
+    // Check if user is admin - if not, require full payment
+    const { data: userRoles } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id);
+    
+    const isUserAdmin = userRoles?.some(r => r.role === 'super_admin') || false;
+    
+    // Calculate remaining balance
+    const invoice = parcelData.invoice;
+    const totalAmount = Number(invoice?.amount || 0);
+    const paidAmount = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    const invoicePaid = Math.max(Number(invoice?.amount_paid || 0), paidAmount);
+    const balance = Math.max(0, totalAmount - invoicePaid);
+    const isFullyPaid = invoice?.status === 'paid' || balance <= 0;
+    
+    // If not admin and invoice not fully paid, block release
+    if (!isUserAdmin && invoice && !isFullyPaid) {
+      toast.error('Payment Required', {
+        description: `Invoice must be fully paid before releasing parcels. Outstanding balance: ${invoice.currency || 'USD'} ${balance.toFixed(2)}`,
+      });
+      playErrorBeep();
+      return;
+    }
+
     setIsLoading(true);
     try {
       const idsToRelease = Array.from(selectedParcelIds);
@@ -278,7 +303,7 @@ export function ParcelCheckoutScanner() {
     } finally {
       setIsLoading(false);
     }
-  }, [parcelData, user?.id, selectedParcelIds, queryClient]);
+  }, [parcelData, user?.id, selectedParcelIds, queryClient, payments]);
 
   const toggleParcelSelection = (parcelId: string) => {
     setSelectedParcelIds(prev => {
