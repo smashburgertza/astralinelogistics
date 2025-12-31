@@ -33,17 +33,6 @@ import {
   BankTransaction
 } from '@/hooks/useBankReconciliation';
 import { ImportBankStatementDialog } from './ImportBankStatementDialog';
-import { useBankAccounts, BankAccount } from '@/hooks/useAccounting';
-import { 
-  useBankTransactions, 
-  useUnreconciledJournalEntries,
-  useCreateBankTransaction,
-  useReconcileTransaction,
-  useUnreconcileTransaction,
-  useMarkReconciled,
-  useReconciliationSummary,
-  BankTransaction
-} from '@/hooks/useBankReconciliation';
 
 export function BankReconciliationTab() {
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
