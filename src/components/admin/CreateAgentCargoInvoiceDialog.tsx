@@ -375,7 +375,6 @@ export function CreateAgentCargoInvoiceDialog({
                             <SelectValue placeholder="Select service..." />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="custom">Custom Item</SelectItem>
                             {productsServices?.filter(p => p.is_active).map((product) => (
                               <SelectItem key={product.id} value={product.id}>
                                 {product.name}

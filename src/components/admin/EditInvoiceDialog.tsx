@@ -496,12 +496,6 @@ export function EditInvoiceDialog({ invoice, open, onOpenChange }: EditInvoiceDi
                                     </SelectTrigger>
                                   </FormControl>
                                   <SelectContent>
-                                    <SelectItem value="none">
-                                      <span className="flex items-center gap-2">
-                                        <Package className="h-3 w-3" />
-                                        Custom item
-                                      </span>
-                                    </SelectItem>
                                     {Object.entries(groupedProducts).map(([type, items]) => (
                                       <SelectGroup key={type}>
                                         <SelectLabel className="text-xs font-semibold">
