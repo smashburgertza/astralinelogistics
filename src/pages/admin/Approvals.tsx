@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
+import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -70,6 +71,10 @@ function ParcelReleaseApprovals() {
   const [reviewNotes, setReviewNotes] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [reviewAction, setReviewAction] = useState<'approved' | 'rejected'>('approved');
+  const [fullInvoice, setFullInvoice] = useState<any>(null);
+  const [invoiceItems, setInvoiceItems] = useState<any[]>([]);
+  const [invoicePayments, setInvoicePayments] = useState<any[]>([]);
+  const [loadingInvoice, setLoadingInvoice] = useState(false);
 
   const { data: requests, isLoading } = useApprovalRequests({
     type: 'parcel_release',
@@ -78,11 +83,51 @@ function ParcelReleaseApprovals() {
 
   const reviewMutation = useReviewApprovalRequest();
 
-  const handleReview = (request: ApprovalRequest, action: 'approved' | 'rejected') => {
+  const handleReview = async (request: ApprovalRequest, action: 'approved' | 'rejected') => {
     setSelectedRequest(request);
     setReviewAction(action);
     setReviewNotes('');
     setDialogOpen(true);
+    
+    // Fetch full invoice details if invoice_id exists
+    if (request.invoice_id) {
+      setLoadingInvoice(true);
+      try {
+        const [invoiceRes, itemsRes, paymentsRes] = await Promise.all([
+          supabase
+            .from('invoices')
+            .select(`
+              *,
+              customers(id, name, email, phone, address, company_name, tin, vrn),
+              shipments(id, tracking_number, origin_region, total_weight_kg, customer_name, description)
+            `)
+            .eq('id', request.invoice_id)
+            .single(),
+          supabase
+            .from('invoice_items')
+            .select('*')
+            .eq('invoice_id', request.invoice_id)
+            .order('created_at', { ascending: true }),
+          supabase
+            .from('payments')
+            .select('*')
+            .eq('invoice_id', request.invoice_id)
+            .order('paid_at', { ascending: false }),
+        ]);
+
+        if (invoiceRes.data) setFullInvoice(invoiceRes.data);
+        if (itemsRes.data) setInvoiceItems(itemsRes.data);
+        if (paymentsRes.data) setInvoicePayments(paymentsRes.data);
+      } catch (err) {
+        console.error('Error fetching invoice details:', err);
+      } finally {
+        setLoadingInvoice(false);
+      }
+    } else {
+      setFullInvoice(null);
+      setInvoiceItems([]);
+      setInvoicePayments([]);
+    }
   };
 
   const confirmReview = () => {
@@ -96,9 +141,17 @@ function ParcelReleaseApprovals() {
       onSuccess: () => {
         setDialogOpen(false);
         setSelectedRequest(null);
+        setFullInvoice(null);
+        setInvoiceItems([]);
+        setInvoicePayments([]);
       },
     });
   };
+
+  // Calculate totals
+  const totalPaid = invoicePayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+  const invoiceAmount = Number(fullInvoice?.amount || 0);
+  const balance = Math.max(0, invoiceAmount - Math.max(totalPaid, Number(fullInvoice?.amount_paid || 0)));
 
   if (isLoading) {
     return <Skeleton className="h-[400px]" />;
@@ -237,7 +290,7 @@ function ParcelReleaseApprovals() {
 
       {/* Review Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {reviewAction === 'approved' ? (
@@ -245,7 +298,7 @@ function ParcelReleaseApprovals() {
               ) : (
                 <XCircle className="h-5 w-5 text-red-600" />
               )}
-              {reviewAction === 'approved' ? 'Approve' : 'Reject'} Request
+              {reviewAction === 'approved' ? 'Approve' : 'Reject'} Parcel Release Request
             </DialogTitle>
             <DialogDescription>
               {reviewAction === 'approved'
@@ -260,9 +313,9 @@ function ParcelReleaseApprovals() {
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <p className="text-muted-foreground">Customer</p>
-                  <p className="font-medium">{selectedRequest.customers?.name || '-'}</p>
-                  {selectedRequest.customers?.phone && (
-                    <p className="text-xs text-muted-foreground">{selectedRequest.customers.phone}</p>
+                  <p className="font-medium">{selectedRequest.customers?.name || fullInvoice?.customers?.name || '-'}</p>
+                  {(selectedRequest.customers?.phone || fullInvoice?.customers?.phone) && (
+                    <p className="text-xs text-muted-foreground">{selectedRequest.customers?.phone || fullInvoice?.customers?.phone}</p>
                   )}
                 </div>
                 <div>
@@ -274,8 +327,117 @@ function ParcelReleaseApprovals() {
                 </div>
               </div>
 
-              {/* Invoice Details */}
-              {selectedRequest.invoices && (
+              {/* Full Invoice Details */}
+              {loadingInvoice ? (
+                <Skeleton className="h-40" />
+              ) : fullInvoice ? (
+                <div className="rounded-lg border bg-muted/30 overflow-hidden">
+                  <div className="flex items-center gap-2 p-3 border-b bg-muted/50">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <p className="font-medium text-sm">Invoice #{fullInvoice.invoice_number}</p>
+                    <Badge variant="outline" className="ml-auto">
+                      {fullInvoice.status}
+                    </Badge>
+                  </div>
+                  
+                  {/* Shipment Info */}
+                  {fullInvoice.shipments && (
+                    <div className="p-3 border-b text-sm">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <span className="text-muted-foreground">Tracking:</span>{' '}
+                          <span className="font-mono">{fullInvoice.shipments.tracking_number}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Origin:</span>{' '}
+                          <span>{fullInvoice.shipments.origin_region?.toUpperCase()}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Weight:</span>{' '}
+                          <span>{fullInvoice.shipments.total_weight_kg} kg</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Invoice Items */}
+                  {invoiceItems.length > 0 && (
+                    <div className="p-3 border-b">
+                      <p className="text-xs font-medium text-muted-foreground mb-2">Invoice Items</p>
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="text-xs">
+                            <TableHead className="py-1">Description</TableHead>
+                            <TableHead className="py-1 text-right">Amount</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {invoiceItems.map((item) => (
+                            <TableRow key={item.id} className="text-sm">
+                              <TableCell className="py-1.5">
+                                {item.description || item.item_type}
+                                {item.weight_kg && (
+                                  <span className="text-xs text-muted-foreground ml-1">
+                                    ({item.weight_kg} kg @ {item.unit_price}/kg)
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell className="py-1.5 text-right font-mono">
+                                {CURRENCY_SYMBOLS[item.currency || 'USD']}{item.amount?.toFixed(2)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+
+                  {/* Payment History */}
+                  {invoicePayments.length > 0 && (
+                    <div className="p-3 border-b">
+                      <p className="text-xs font-medium text-muted-foreground mb-2">Payment History</p>
+                      <div className="space-y-1">
+                        {invoicePayments.map((payment) => (
+                          <div key={payment.id} className="flex justify-between items-center text-sm">
+                            <div className="flex items-center gap-2">
+                              <CreditCard className="h-3 w-3 text-muted-foreground" />
+                              <span className="capitalize">{payment.payment_method}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {format(new Date(payment.paid_at), 'MMM d, yyyy')}
+                              </span>
+                            </div>
+                            <span className="font-mono text-emerald-600">
+                              +{CURRENCY_SYMBOLS[payment.currency || 'USD']}{payment.amount?.toFixed(2)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Invoice Totals */}
+                  <div className="p-3 space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Invoice Total</span>
+                      <span className="font-mono">
+                        {CURRENCY_SYMBOLS[fullInvoice.currency || 'USD']}{invoiceAmount.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Amount Paid</span>
+                      <span className="font-mono text-emerald-600">
+                        -{CURRENCY_SYMBOLS[fullInvoice.currency || 'USD']}{Math.max(totalPaid, Number(fullInvoice.amount_paid || 0)).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between font-semibold pt-1 border-t">
+                      <span>Outstanding Balance</span>
+                      <span className={balance > 0 ? 'text-amber-600' : 'text-emerald-600'}>
+                        {CURRENCY_SYMBOLS[fullInvoice.currency || 'USD']}{balance.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ) : selectedRequest.invoices ? (
                 <div className="rounded-lg border p-3 bg-muted/30">
                   <div className="flex items-center gap-2 mb-2">
                     <FileText className="h-4 w-4 text-muted-foreground" />
@@ -294,19 +456,8 @@ function ParcelReleaseApprovals() {
                       </p>
                     </div>
                   </div>
-                  {selectedRequest.amount !== null && selectedRequest.amount !== undefined && (
-                    <div className="mt-2 pt-2 border-t">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">Outstanding Balance</span>
-                        <span className="font-semibold text-amber-600">
-                          {CURRENCY_SYMBOLS[selectedRequest.currency || 'USD']}
-                          {selectedRequest.amount.toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-                  )}
                 </div>
-              )}
+              ) : null}
 
               {/* Reason */}
               <div>
@@ -315,7 +466,7 @@ function ParcelReleaseApprovals() {
               </div>
 
               {/* Requested By */}
-              <div className="flex items-center gap-2 text-sm">
+              <div className="flex items-center gap-2 text-sm flex-wrap">
                 <User className="h-4 w-4 text-muted-foreground" />
                 <span className="text-muted-foreground">Requested by:</span>
                 <span>{selectedRequest.requester?.full_name || selectedRequest.requester?.email || 'Unknown'}</span>
@@ -343,10 +494,10 @@ function ParcelReleaseApprovals() {
             </Button>
             <Button
               onClick={confirmReview}
-              disabled={reviewMutation.isPending}
+              disabled={reviewMutation.isPending || loadingInvoice}
               className={reviewAction === 'approved' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'}
             >
-              {reviewMutation.isPending ? 'Processing...' : reviewAction === 'approved' ? 'Approve' : 'Reject'}
+              {reviewMutation.isPending ? 'Processing...' : reviewAction === 'approved' ? 'Approve Release' : 'Reject Request'}
             </Button>
           </DialogFooter>
         </DialogContent>
