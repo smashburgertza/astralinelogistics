@@ -31,6 +31,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useAgentInvoicesToMe, useAgentMarkInvoicePaid } from '@/hooks/useAgentInvoices';
+import { useAgentFullConfig } from '@/hooks/useAgentSettings';
 import { format } from 'date-fns';
 import { Loader2, Search, FileText, Download, Printer, Eye, ArrowDownLeft, ArrowUpRight, CheckCircle, Clock } from 'lucide-react';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
@@ -75,6 +76,11 @@ function AgentInvoicesPage() {
   // Invoices to agent (from Astraline)
   const { data: invoicesToMe, isLoading: isLoadingToMe } = useAgentInvoicesToMe();
   const markPayment = useAgentMarkInvoicePaid();
+  const { data: agentConfig } = useAgentFullConfig();
+  
+  // Get the agent's base currency for display
+  const agentCurrency = agentConfig?.settings?.base_currency || 'USD';
+  const agentCurrencySymbol = CURRENCY_SYMBOLS[agentCurrency] || '$';
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
@@ -192,7 +198,7 @@ function AgentInvoicesPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Total Invoices</p>
-                    <p className="text-2xl font-bold">${currentStats.total.toFixed(2)}</p>
+                    <p className="text-2xl font-bold">{agentCurrencySymbol}{currentStats.total.toFixed(2)}</p>
                   </div>
                   <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
                     <FileText className="w-6 h-6 text-primary" />
@@ -208,7 +214,7 @@ function AgentInvoicesPage() {
                     <p className="text-sm text-muted-foreground">
                       {activeTab === 'to_me' ? 'Awaiting Payment' : 'Pending'}
                     </p>
-                    <p className="text-2xl font-bold text-amber-600">${currentStats.pending.toFixed(2)}</p>
+                    <p className="text-2xl font-bold text-amber-600">{agentCurrencySymbol}{currentStats.pending.toFixed(2)}</p>
                   </div>
                   <Badge variant="outline" className="text-amber-600 border-amber-500/30">
                     {filteredInvoices?.filter(inv => inv.status === 'pending').length || 0}
@@ -222,7 +228,7 @@ function AgentInvoicesPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Paid</p>
-                    <p className="text-2xl font-bold text-emerald-600">${currentStats.paid.toFixed(2)}</p>
+                    <p className="text-2xl font-bold text-emerald-600">{agentCurrencySymbol}{currentStats.paid.toFixed(2)}</p>
                   </div>
                   <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
                     {filteredInvoices?.filter(inv => inv.status === 'paid').length || 0}
