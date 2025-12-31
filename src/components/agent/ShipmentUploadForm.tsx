@@ -680,8 +680,7 @@ export function ShipmentUploadForm() {
   if (completedShipments && completedShipments.length > 0) {
     return (
       <PrintableLabels
-        shipment={completedShipments[0]}
-        parcels={completedShipments[0].parcels}
+        shipments={completedShipments}
         onBack={resetForm}
       />
     );
