@@ -14,14 +14,15 @@ import { Plus, Trash2, FileText } from 'lucide-react';
 import { useCreateEstimate } from '@/hooks/useEstimates';
 import { useCustomers, useShipments } from '@/hooks/useShipments';
 import { useExchangeRates, convertToTZS } from '@/hooks/useExchangeRates';
-import { useChartOfAccounts } from '@/hooks/useAccounting';
+import { useProductsServices, SERVICE_TYPES } from '@/hooks/useProductsServices';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 
 const lineItemSchema = z.object({
-  account_id: z.string().optional(),
+  product_service_id: z.string().optional(),
   description: z.string().min(1, 'Description is required'),
-  quantity: z.coerce.number().min(1, 'Quantity must be at least 1'),
+  quantity: z.coerce.number().min(0, 'Quantity must be 0 or more'),
   unit_price: z.coerce.number().min(0, 'Price must be 0 or more'),
+  unit_type: z.string().optional(),
 });
 
 const estimateSchema = z.object({
@@ -54,16 +55,18 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
   const { data: customers } = useCustomers();
   const { data: shipments } = useShipments();
   const { data: exchangeRates } = useExchangeRates();
-  const { data: accounts } = useChartOfAccounts({ active: true });
+  const { data: productsServices } = useProductsServices({ active: true });
 
-  // Group accounts by type for the dropdown
-  const groupedAccounts = useMemo(() => {
-    if (!accounts) return { revenue: [], expense: [] };
-    return {
-      revenue: accounts.filter(a => a.account_type === 'revenue'),
-      expense: accounts.filter(a => a.account_type === 'expense'),
-    };
-  }, [accounts]);
+  // Group products/services by type
+  const groupedProducts = useMemo(() => {
+    if (!productsServices) return {};
+    return productsServices.reduce((acc, item) => {
+      const type = item.service_type || 'other';
+      if (!acc[type]) acc[type] = [];
+      acc[type].push(item);
+      return acc;
+    }, {} as Record<string, typeof productsServices>);
+  }, [productsServices]);
 
   const form = useForm<EstimateFormData>({
     resolver: zodResolver(estimateSchema),
@@ -77,7 +80,7 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
       tax_rate: 0,
       notes: '',
       line_items: [
-        { account_id: '', description: '', quantity: 1, unit_price: 0 },
+        { product_service_id: '', description: '', quantity: 1, unit_price: 0, unit_type: '' },
       ],
     },
   });
@@ -95,7 +98,7 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
         tax_rate: 0,
         notes: '',
         line_items: [
-          { account_id: '', description: '', quantity: 1, unit_price: 0 },
+          { product_service_id: '', description: '', quantity: 1, unit_price: 0, unit_type: '' },
         ],
       });
     }
@@ -185,7 +188,7 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
   };
 
   const handleAddLineItem = () => {
-    append({ account_id: '', description: '', quantity: 1, unit_price: 0 });
+    append({ product_service_id: '', description: '', quantity: 1, unit_price: 0, unit_type: '' });
   };
 
   return (
@@ -354,47 +357,58 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
                 {fields.map((field, index) => {
                   const quantity = watchLineItems[index]?.quantity || 0;
                   const unitPrice = watchLineItems[index]?.unit_price || 0;
-                  const lineTotal = quantity * unitPrice;
+                  const unitType = watchLineItems[index]?.unit_type || '';
+                  const isPercentage = unitType === 'percent';
+                  const lineTotal = isPercentage 
+                    ? (calculations.subtotal * unitPrice / 100) 
+                    : quantity * unitPrice;
 
                   return (
                     <div key={field.id} className="grid grid-cols-12 gap-2 items-center">
                       <div className="col-span-3">
                         <FormField
                           control={form.control}
-                          name={`line_items.${index}.account_id`}
-                          render={({ field }) => (
+                          name={`line_items.${index}.product_service_id`}
+                          render={({ field: psField }) => (
                             <FormItem>
                               <Select 
-                                onValueChange={(val) => field.onChange(val === "none" ? "" : val)} 
-                                value={field.value || "none"}
+                                onValueChange={(val) => {
+                                  psField.onChange(val === "none" ? "" : val);
+                                  // Auto-fill description, unit_price, and unit_type from selected product/service
+                                  if (val && val !== "none") {
+                                    const selectedProduct = productsServices?.find(p => p.id === val);
+                                    if (selectedProduct) {
+                                      form.setValue(`line_items.${index}.description`, selectedProduct.name);
+                                      form.setValue(`line_items.${index}.unit_price`, selectedProduct.unit_price);
+                                      form.setValue(`line_items.${index}.unit_type`, selectedProduct.unit || '');
+                                      if (selectedProduct.unit === 'percent') {
+                                        form.setValue(`line_items.${index}.quantity`, 1);
+                                      }
+                                    }
+                                  } else {
+                                    form.setValue(`line_items.${index}.unit_type`, '');
+                                  }
+                                }} 
+                                value={psField.value || "none"}
                               >
                                 <FormControl>
                                   <SelectTrigger className="text-xs">
-                                    <SelectValue placeholder="Select service" />
+                                    <SelectValue placeholder="Select item" />
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                  <SelectItem value="none">No account</SelectItem>
-                                  {groupedAccounts.revenue.length > 0 && (
-                                    <SelectGroup>
-                                      <SelectLabel className="text-xs font-semibold text-primary">Revenue</SelectLabel>
-                                      {groupedAccounts.revenue.map((account) => (
-                                        <SelectItem key={account.id} value={account.id} className="text-xs">
-                                          {account.account_code} - {account.account_name}
+                                  {Object.entries(groupedProducts).map(([type, items]) => (
+                                    <SelectGroup key={type}>
+                                      <SelectLabel className="text-xs font-semibold">
+                                        {SERVICE_TYPES[type as keyof typeof SERVICE_TYPES]?.label || type}
+                                      </SelectLabel>
+                                      {items.map((item) => (
+                                        <SelectItem key={item.id} value={item.id} className="text-xs">
+                                          {item.name} - {item.unit === 'percent' ? `${item.unit_price}%` : `${CURRENCY_SYMBOLS[item.currency] || '$'}${item.unit_price}/${item.unit}`}
                                         </SelectItem>
                                       ))}
                                     </SelectGroup>
-                                  )}
-                                  {groupedAccounts.expense.length > 0 && (
-                                    <SelectGroup>
-                                      <SelectLabel className="text-xs font-semibold text-destructive">Costs/Expenses</SelectLabel>
-                                      {groupedAccounts.expense.map((account) => (
-                                        <SelectItem key={account.id} value={account.id} className="text-xs">
-                                          {account.account_code} - {account.account_name}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectGroup>
-                                  )}
+                                  ))}
                                 </SelectContent>
                               </Select>
                               <FormMessage />
@@ -420,52 +434,63 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
                           )}
                         />
                       </div>
+                      {/* Quantity - hidden for percentage items */}
                       <div className="col-span-1">
-                        <FormField
-                          control={form.control}
-                          name={`line_items.${index}.quantity`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Input 
-                                  type="number" 
-                                  min="1"
-                                  className="text-center text-xs"
-                                  value={field.value}
-                                  onChange={(e) => field.onChange(Number(e.target.value) || 0)}
-                                  onBlur={field.onBlur}
-                                  name={field.name}
-                                  ref={field.ref}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                        {isPercentage ? (
+                          <div className="text-center text-xs text-muted-foreground">-</div>
+                        ) : (
+                          <FormField
+                            control={form.control}
+                            name={`line_items.${index}.quantity`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormControl>
+                                  <Input 
+                                    type="number" 
+                                    step="0.01"
+                                    min="0"
+                                    className="text-center text-xs"
+                                    value={field.value}
+                                    onChange={(e) => field.onChange(Number(e.target.value) || 0)}
+                                    onBlur={field.onBlur}
+                                    name={field.name}
+                                    ref={field.ref}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        )}
                       </div>
+                      {/* Unit Price - show as percentage for percent items */}
                       <div className="col-span-2">
-                        <FormField
-                          control={form.control}
-                          name={`line_items.${index}.unit_price`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Input 
-                                  type="number" 
-                                  step="0.01"
-                                  min="0"
-                                  className="text-right text-xs"
-                                  value={field.value}
-                                  onChange={(e) => field.onChange(Number(e.target.value) || 0)}
-                                  onBlur={field.onBlur}
-                                  name={field.name}
-                                  ref={field.ref}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                        {isPercentage ? (
+                          <div className="text-right text-xs font-medium">{unitPrice}%</div>
+                        ) : (
+                          <FormField
+                            control={form.control}
+                            name={`line_items.${index}.unit_price`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormControl>
+                                  <Input 
+                                    type="number" 
+                                    step="0.01"
+                                    min="0"
+                                    className="text-right text-xs"
+                                    value={field.value}
+                                    onChange={(e) => field.onChange(Number(e.target.value) || 0)}
+                                    onBlur={field.onBlur}
+                                    name={field.name}
+                                    ref={field.ref}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        )}
                       </div>
                       <div className="col-span-2 text-right font-medium text-sm">
                         {currencySymbol}{lineTotal.toFixed(2)}
