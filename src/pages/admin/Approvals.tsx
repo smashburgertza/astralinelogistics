@@ -49,7 +49,8 @@ import {
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 import { usePaymentsPendingVerification, useVerifyPayment } from '@/hooks/useAgentInvoices';
 import { useBankAccounts, useChartOfAccounts } from '@/hooks/useAccounting';
-import { useExchangeRatesMap } from '@/hooks/useExchangeRates';
+import { useExchangeRatesMap, useExchangeRates, convertToTZS } from '@/hooks/useExchangeRates';
+import { CurrencyInline } from '@/components/shared/CurrencyDisplay';
 import { toast } from 'sonner';
 import { Label } from '@/components/ui/label';
 
@@ -81,6 +82,7 @@ function ParcelReleaseApprovals() {
     status: statusFilter === 'all' ? undefined : statusFilter,
   });
 
+  const { data: exchangeRates } = useExchangeRates();
   const reviewMutation = useReviewApprovalRequest();
 
   const handleReview = async (request: ApprovalRequest, action: 'approved' | 'rejected') => {
@@ -382,8 +384,8 @@ function ParcelReleaseApprovals() {
                                   </span>
                                 )}
                               </TableCell>
-                              <TableCell className="py-1.5 text-right font-mono">
-                                {CURRENCY_SYMBOLS[item.currency || 'USD']}{item.amount?.toFixed(2)}
+                              <TableCell className="py-1.5 text-right">
+                                <CurrencyInline amount={item.amount || 0} currency={item.currency || 'USD'} />
                               </TableCell>
                             </TableRow>
                           ))}
@@ -407,7 +409,7 @@ function ParcelReleaseApprovals() {
                               </span>
                             </div>
                             <span className="font-mono text-emerald-600">
-                              +{CURRENCY_SYMBOLS[payment.currency || 'USD']}{payment.amount?.toFixed(2)}
+                              +<CurrencyInline amount={payment.amount || 0} currency={payment.currency || 'USD'} />
                             </span>
                           </div>
                         ))}
@@ -416,24 +418,45 @@ function ParcelReleaseApprovals() {
                   )}
 
                   {/* Invoice Totals */}
-                  <div className="p-3 space-y-1 text-sm">
-                    <div className="flex justify-between">
+                  <div className="p-3 space-y-2 text-sm">
+                    <div className="flex justify-between items-start">
                       <span className="text-muted-foreground">Invoice Total</span>
-                      <span className="font-mono">
-                        {CURRENCY_SYMBOLS[fullInvoice.currency || 'USD']}{invoiceAmount.toFixed(2)}
-                      </span>
+                      <div className="text-right">
+                        <div className="font-mono">
+                          {CURRENCY_SYMBOLS[fullInvoice.currency || 'USD']}{invoiceAmount.toFixed(2)}
+                        </div>
+                        {fullInvoice.currency !== 'TZS' && exchangeRates && (
+                          <div className="text-xs text-muted-foreground">
+                            ≈ TZS {convertToTZS(invoiceAmount, fullInvoice.currency || 'USD', exchangeRates).toLocaleString()}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-start">
                       <span className="text-muted-foreground">Amount Paid</span>
-                      <span className="font-mono text-emerald-600">
-                        -{CURRENCY_SYMBOLS[fullInvoice.currency || 'USD']}{Math.max(totalPaid, Number(fullInvoice.amount_paid || 0)).toFixed(2)}
-                      </span>
+                      <div className="text-right text-emerald-600">
+                        <div className="font-mono">
+                          -{CURRENCY_SYMBOLS[fullInvoice.currency || 'USD']}{Math.max(totalPaid, Number(fullInvoice.amount_paid || 0)).toFixed(2)}
+                        </div>
+                        {fullInvoice.currency !== 'TZS' && exchangeRates && (
+                          <div className="text-xs text-muted-foreground">
+                            ≈ TZS {convertToTZS(Math.max(totalPaid, Number(fullInvoice.amount_paid || 0)), fullInvoice.currency || 'USD', exchangeRates).toLocaleString()}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex justify-between font-semibold pt-1 border-t">
+                    <div className="flex justify-between items-start font-semibold pt-2 border-t">
                       <span>Outstanding Balance</span>
-                      <span className={balance > 0 ? 'text-amber-600' : 'text-emerald-600'}>
-                        {CURRENCY_SYMBOLS[fullInvoice.currency || 'USD']}{balance.toFixed(2)}
-                      </span>
+                      <div className={`text-right ${balance > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                        <div className="font-mono">
+                          {CURRENCY_SYMBOLS[fullInvoice.currency || 'USD']}{balance.toFixed(2)}
+                        </div>
+                        {fullInvoice.currency !== 'TZS' && exchangeRates && (
+                          <div className="text-xs font-normal text-muted-foreground">
+                            ≈ TZS {convertToTZS(balance, fullInvoice.currency || 'USD', exchangeRates).toLocaleString()}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
