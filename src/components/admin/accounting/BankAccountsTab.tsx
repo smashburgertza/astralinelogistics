@@ -188,6 +188,12 @@ function CreateBankAccountDialog({
          a.account_name.toLowerCase().includes('cash')
   );
 
+  // Find the "Bank Accounts" parent account (1100)
+  const bankAccountsParent = chartAccounts.find(
+    a => a.account_code === '1100' || 
+         (a.account_name === 'Bank Accounts' && a.account_type === 'asset')
+  );
+
   const handleCreateChartAccount = async () => {
     if (!newAccountCode || !newAccountName) return;
     
@@ -201,7 +207,7 @@ function CreateBankAccountDialog({
         currency: currency,
         description: `Bank account: ${bankName || newAccountName}`,
         is_active: true,
-        parent_id: null,
+        parent_id: bankAccountsParent?.id || null, // Link under Bank Accounts parent
       });
       
       if (result?.id) {
