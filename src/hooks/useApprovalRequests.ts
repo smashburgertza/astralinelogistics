@@ -55,15 +55,14 @@ export function useApprovalRequests(filters?: ApprovalFilters) {
   return useQuery({
     queryKey: ['approval-requests', filters],
     queryFn: async () => {
+      // First, fetch approval requests with existing foreign key relationships
       let query = supabase
         .from('approval_requests')
         .select(`
           *,
           customers:customer_id(id, name, phone),
           parcels:parcel_id(id, barcode, description, weight_kg),
-          invoices:invoice_id(id, invoice_number, amount, currency),
-          requester:requested_by(id, full_name, email),
-          reviewer:reviewed_by(id, full_name, email)
+          invoices:invoice_id(id, invoice_number, amount, currency)
         `)
         .order('created_at', { ascending: false });
 
@@ -76,7 +75,34 @@ export function useApprovalRequests(filters?: ApprovalFilters) {
 
       const { data, error } = await query;
       if (error) throw error;
-      return data as unknown as ApprovalRequest[];
+
+      // Fetch profile data for requesters and reviewers
+      const userIds = new Set<string>();
+      data?.forEach(req => {
+        if (req.requested_by) userIds.add(req.requested_by);
+        if (req.reviewed_by) userIds.add(req.reviewed_by);
+      });
+
+      let profiles: Record<string, { id: string; full_name: string | null; email: string }> = {};
+      if (userIds.size > 0) {
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .in('id', Array.from(userIds));
+        
+        if (profilesData) {
+          profiles = Object.fromEntries(profilesData.map(p => [p.id, p]));
+        }
+      }
+
+      // Merge profile data into results
+      const results = data?.map(req => ({
+        ...req,
+        requester: req.requested_by ? profiles[req.requested_by] || null : null,
+        reviewer: req.reviewed_by ? profiles[req.reviewed_by] || null : null,
+      }));
+
+      return results as unknown as ApprovalRequest[];
     },
   });
 }
