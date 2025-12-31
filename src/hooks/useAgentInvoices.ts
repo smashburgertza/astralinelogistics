@@ -300,6 +300,27 @@ export function useVerifyPayment() {
               amountInTzs,
               exchangeRate,
             });
+
+            // Also create an expense record for agent payments
+            const { data: invoiceData } = await supabase
+              .from('invoices')
+              .select('agent_id, notes')
+              .eq('id', invoiceId)
+              .single();
+
+            await supabase
+              .from('expenses')
+              .insert({
+                amount: amount,
+                currency: currency || 'USD',
+                category: 'agent_payment',
+                description: `Agent payment for invoice ${invoiceNumber || 'Unknown'}`,
+                status: 'approved', // Auto-approved since payment is verified
+                approved_by: user.id,
+                approved_at: new Date().toISOString(),
+                created_by: user.id,
+                submitted_by: user.id,
+              });
           } else {
             // Customer payment: money coming IN (debit bank, credit accounts receivable)
             await createInvoicePaymentJournalEntry({
@@ -331,6 +352,10 @@ export function useVerifyPayment() {
       queryClient.invalidateQueries({ queryKey: ['customer-payments'] });
       queryClient.invalidateQueries({ queryKey: ['customer-invoices'] });
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      // Expenses query - agent payments create expenses
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      queryClient.invalidateQueries({ queryKey: ['expense-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['pending-expenses'] });
       toast.success(data.status === 'verified' ? 'Payment verified and recorded' : 'Payment rejected');
     },
     onError: (error) => {
