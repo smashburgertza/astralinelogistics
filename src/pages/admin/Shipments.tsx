@@ -4,7 +4,7 @@ import { ShipmentFilters } from '@/components/admin/ShipmentFilters';
 import { BatchGroupedShipmentTable } from '@/components/admin/BatchGroupedShipmentTable';
 import { BulkActionsBar } from '@/components/admin/BulkActionsBar';
 import { CreateShipmentDialog } from '@/components/admin/CreateShipmentDialog';
-import { ParcelCheckout } from '@/components/admin/ParcelCheckout';
+import { ParcelCheckoutScanner } from '@/components/admin/billing/ParcelCheckoutScanner';
 import { BulkParcelScanner } from '@/components/admin/BulkParcelScanner';
 import { ParcelLookupScanner } from '@/components/admin/ParcelLookupScanner';
 import { useShipments } from '@/hooks/useShipments';
@@ -117,7 +117,7 @@ export default function AdminShipmentsPage() {
         </TabsContent>
 
         <TabsContent value="checkout" className="mt-0">
-          <ParcelCheckout />
+          <ParcelCheckoutScanner />
         </TabsContent>
       </Tabs>
 
