@@ -1,13 +1,15 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { ScanLine, Package, User, Phone, Mail, CheckCircle2, AlertCircle, Volume2, X, CreditCard, FileText, Download } from 'lucide-react';
+import { ScanLine, Package, User, Phone, Mail, CheckCircle2, AlertCircle, Volume2, X, CreditCard, FileText, Download, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useRecordPayment, Invoice } from '@/hooks/useInvoices';
@@ -15,6 +17,7 @@ import { useInvoicePayments } from '@/hooks/useInvoicePayments';
 import { useInvoiceItems } from '@/hooks/useInvoiceItems';
 import { useExchangeRates, convertToTZS } from '@/hooks/useExchangeRates';
 import { InvoiceStatusBadge, InvoicePDFPreview, RecordPaymentDialog, type PaymentDetails } from '@/components/admin/invoices';
+import { useCreateApprovalRequest } from '@/hooks/useApprovalRequests';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -22,7 +25,6 @@ import { playSuccessBeep, playErrorBeep } from '@/lib/audioFeedback';
 import { useReactToPrint } from 'react-to-print';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
-
 interface ParcelInfo {
   id: string;
   barcode: string;
@@ -61,14 +63,18 @@ export function ParcelCheckoutScanner() {
   const [parcelData, setParcelData] = useState<ParcelWithInvoice | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
+  const [approvalReason, setApprovalReason] = useState('');
   const [recentCheckouts, setRecentCheckouts] = useState<ParcelInfo[]>([]);
   const [selectedParcelIds, setSelectedParcelIds] = useState<Set<string>>(new Set());
+  const [pendingBalance, setPendingBalance] = useState<{ amount: number; currency: string }>({ amount: 0, currency: 'USD' });
   
   const inputRef = useRef<HTMLInputElement>(null);
   const printRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const recordPayment = useRecordPayment();
+  const createApprovalRequest = useCreateApprovalRequest();
   
   const { data: payments = [], refetch: refetchPayments } = useInvoicePayments(parcelData?.invoice?.id || '');
   const { data: invoiceItems = [] } = useInvoiceItems(parcelData?.invoice?.id || '');
@@ -244,14 +250,18 @@ export function ParcelCheckoutScanner() {
     const balance = Math.max(0, totalAmount - invoicePaid);
     const isFullyPaid = invoice?.status === 'paid' || balance <= 0;
     
-    // If not admin and invoice not fully paid, block release
+    // If not admin and invoice not fully paid, show approval dialog option
     if (!isUserAdmin && invoice && !isFullyPaid) {
-      toast.error('Payment Required', {
-        description: `Invoice must be fully paid before releasing parcels. Outstanding balance: ${invoice.currency || 'USD'} ${balance.toFixed(2)}`,
-      });
-      playErrorBeep();
+      setPendingBalance({ amount: balance, currency: invoice.currency || 'USD' });
+      setApprovalDialogOpen(true);
       return;
     }
+
+    await executeRelease();
+  }, [parcelData, user?.id, selectedParcelIds, queryClient, payments]);
+
+  const executeRelease = useCallback(async () => {
+    if (!parcelData || !user?.id || selectedParcelIds.size === 0) return;
 
     setIsLoading(true);
     try {
@@ -303,7 +313,42 @@ export function ParcelCheckoutScanner() {
     } finally {
       setIsLoading(false);
     }
-  }, [parcelData, user?.id, selectedParcelIds, queryClient, payments]);
+  }, [parcelData, user?.id, selectedParcelIds, queryClient]);
+
+  const submitApprovalRequest = useCallback(async () => {
+    if (!parcelData || selectedParcelIds.size === 0) return;
+
+    const parcelsToRequest = parcelData.allParcels.filter(p => selectedParcelIds.has(p.id));
+    const parcelBarcodes = parcelsToRequest.map(p => p.barcode).join(', ');
+    
+    // Create approval request for each selected parcel
+    for (const parcelId of selectedParcelIds) {
+      const parcel = parcelData.allParcels.find(p => p.id === parcelId);
+      await createApprovalRequest.mutateAsync({
+        approval_type: 'parcel_release',
+        reference_type: 'parcel',
+        reference_id: parcelId,
+        reason: approvalReason || `Request to release parcel without full payment. Outstanding balance: ${pendingBalance.currency} ${pendingBalance.amount.toFixed(2)}`,
+        amount: pendingBalance.amount,
+        currency: pendingBalance.currency,
+        customer_id: parcelData.shipment?.customer?.id,
+        parcel_id: parcelId,
+        invoice_id: parcelData.invoice?.id,
+        metadata: {
+          barcode: parcel?.barcode,
+          customer_name: parcelData.shipment?.customer?.name,
+          tracking_number: parcelData.shipment?.tracking_number,
+        },
+      });
+    }
+
+    setApprovalDialogOpen(false);
+    setApprovalReason('');
+    toast.success('Approval Request Submitted', {
+      description: `Request sent for ${parcelsToRequest.length} parcel(s): ${parcelBarcodes}`,
+    });
+    playSuccessBeep();
+  }, [parcelData, selectedParcelIds, approvalReason, pendingBalance, createApprovalRequest]);
 
   const toggleParcelSelection = (parcelId: string) => {
     setSelectedParcelIds(prev => {
@@ -816,6 +861,65 @@ export function ParcelCheckoutScanner() {
         remainingBalance={remainingBalance}
         onRecordPayment={handleRecordPayment}
       />
+
+      {/* Approval Request Dialog */}
+      <Dialog open={approvalDialogOpen} onOpenChange={setApprovalDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Send className="h-5 w-5 text-amber-500" />
+              Request Approval
+            </DialogTitle>
+            <DialogDescription>
+              Invoice has an outstanding balance of {pendingBalance.currency} {pendingBalance.amount.toFixed(2)}. 
+              Submit a request to release the parcel without full payment.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="approval-reason">Reason for Release (Optional)</Label>
+              <Textarea
+                id="approval-reason"
+                placeholder="e.g., Customer will pay remaining balance next week..."
+                value={approvalReason}
+                onChange={(e) => setApprovalReason(e.target.value)}
+                rows={3}
+              />
+            </div>
+            
+            <div className="p-3 rounded-lg bg-muted/50 border text-sm">
+              <div className="font-medium mb-1">Parcels to be released:</div>
+              <div className="text-muted-foreground">
+                {Array.from(selectedParcelIds).map(id => {
+                  const p = parcelData?.allParcels.find(parcel => parcel.id === id);
+                  return p?.barcode;
+                }).filter(Boolean).join(', ')}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="flex gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setApprovalDialogOpen(false);
+                setApprovalReason('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={submitApprovalRequest}
+              disabled={createApprovalRequest.isPending}
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              <Send className="h-4 w-4 mr-2" />
+              {createApprovalRequest.isPending ? 'Submitting...' : 'Submit Request'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
