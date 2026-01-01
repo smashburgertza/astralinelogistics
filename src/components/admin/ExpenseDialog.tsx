@@ -293,14 +293,17 @@ export function ExpenseDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Region (optional)</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || ''}>
+                  <Select 
+                    onValueChange={(value) => field.onChange(value === 'none' ? '' : value)} 
+                    value={field.value || 'none'}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a region" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">No region</SelectItem>
+                      <SelectItem value="none">No region</SelectItem>
                       {regions.map((region) => (
                         <SelectItem key={region.id} value={region.code}>
                           {region.flag_emoji} {region.name}
