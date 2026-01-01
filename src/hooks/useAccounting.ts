@@ -249,12 +249,16 @@ export function useCreateJournalEntry() {
       return journalEntry;
     },
     onSuccess: () => {
+      // Refetch all accounting-related queries to ensure UI updates
       queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
+      queryClient.invalidateQueries({ queryKey: ['journal-lines'] });
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['trial-balance'] });
       queryClient.invalidateQueries({ queryKey: ['income-statement'] });
       queryClient.invalidateQueries({ queryKey: ['balance-sheet'] });
       queryClient.invalidateQueries({ queryKey: ['accounting-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['chart-of-accounts'] });
       toast.success('Journal entry created successfully');
     },
     onError: (error) => {
