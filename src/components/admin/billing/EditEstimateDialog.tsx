@@ -14,6 +14,7 @@ import { Estimate, useUpdateEstimate } from '@/hooks/useEstimates';
 import { useCustomers } from '@/hooks/useShipments';
 import { useExchangeRates, convertToTZS } from '@/hooks/useExchangeRates';
 import { useActiveRegions } from '@/hooks/useRegions';
+import { useProductsServices } from '@/hooks/useProductsServices';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 import { toast } from 'sonner';
 
@@ -21,6 +22,8 @@ const lineItemSchema = z.object({
   description: z.string().min(1, 'Description is required'),
   quantity: z.coerce.number().min(0, 'Quantity must be 0 or more'),
   unit_price: z.coerce.number().min(0, 'Price must be 0 or more'),
+  unit_type: z.enum(['fixed', 'kg', 'percent']).default('fixed'),
+  product_service_id: z.string().optional(),
 });
 
 const estimateSchema = z.object({
@@ -46,6 +49,7 @@ export function EditEstimateDialog({ estimate, open, onOpenChange }: EditEstimat
   const { data: customers } = useCustomers();
   const { data: exchangeRates } = useExchangeRates();
   const { data: regions } = useActiveRegions();
+  const { data: productsServices } = useProductsServices();
 
   const form = useForm<EstimateFormData>({
     resolver: zodResolver(estimateSchema),
@@ -64,88 +68,250 @@ export function EditEstimateDialog({ estimate, open, onOpenChange }: EditEstimat
     name: 'line_items',
   });
 
+  // Parse notes to extract line items info if available
+  const parseNotesForLineItems = (notes: string | null) => {
+    if (!notes) return null;
+    
+    // Try to parse line items from notes format: "Line Items: Description (qty x $price), ..."
+    const match = notes.match(/Line Items:\s*(.+)/);
+    if (!match) return null;
+    
+    const items: Array<{
+      description: string;
+      quantity: number;
+      unit_price: number;
+      unit_type: 'fixed' | 'kg' | 'percent';
+    }> = [];
+    
+    // Split by comma and parse each item
+    const itemParts = match[1].split('),');
+    for (const part of itemParts) {
+      const trimmed = part.trim().replace(/\)$/, '');
+      
+      // Check for percentage format: "Description (X%)"
+      const percentMatch = trimmed.match(/^(.+?)\s*\((\d+(?:\.\d+)?)%$/);
+      if (percentMatch) {
+        items.push({
+          description: percentMatch[1].trim(),
+          quantity: 1,
+          unit_price: parseFloat(percentMatch[2]),
+          unit_type: 'percent',
+        });
+        continue;
+      }
+      
+      // Check for fixed/kg format: "Description (qty x $price)"
+      const fixedMatch = trimmed.match(/^(.+?)\s*\((\d+(?:\.\d+)?)\s*x\s*[$£€¥]?(\d+(?:\.\d+)?)$/);
+      if (fixedMatch) {
+        const description = fixedMatch[1].trim();
+        const qty = parseFloat(fixedMatch[2]);
+        const price = parseFloat(fixedMatch[3]);
+        
+        // Determine if it's kg or fixed based on description
+        const isKg = description.toLowerCase().includes('shipping') || 
+                     description.toLowerCase().includes('air cargo') ||
+                     description.toLowerCase().includes('kg');
+        
+        items.push({
+          description,
+          quantity: qty,
+          unit_price: price,
+          unit_type: isKg ? 'kg' : 'fixed',
+        });
+      }
+    }
+    
+    return items.length > 0 ? items : null;
+  };
+
   // Load estimate data when dialog opens
   useEffect(() => {
     if (open) {
-      // Build line items from estimate data
-      const items = [];
+      // Try to parse line items from notes first
+      const parsedItems = parseNotesForLineItems(estimate.notes);
       
-      // Shipping line item
-      if (estimate.weight_kg > 0) {
-        items.push({
-          description: `Shipping ${estimate.weight_kg}kg @ ${CURRENCY_SYMBOLS[estimate.currency] || '$'}${estimate.rate_per_kg}/kg`,
-          quantity: estimate.weight_kg,
-          unit_price: estimate.rate_per_kg,
+      if (parsedItems && parsedItems.length > 0) {
+        // Use parsed line items from notes
+        form.reset({
+          customer_id: estimate.customer_id || '',
+          origin_region: estimate.origin_region || '',
+          currency: estimate.currency || 'USD',
+          valid_until: estimate.valid_until || '',
+          notes: '', // Clear notes since we're using line items
+          line_items: parsedItems,
         });
-      }
-      
-      // Handling fee
-      if (estimate.handling_fee > 0) {
-        items.push({
-          description: 'Handling Fee',
-          quantity: 1,
-          unit_price: estimate.handling_fee,
-        });
-      }
-      
-      // Product cost (for purchase_shipping type)
-      if (estimate.product_cost > 0) {
-        items.push({
-          description: 'Product Cost',
-          quantity: 1,
-          unit_price: estimate.product_cost,
-        });
-      }
-      
-      // Purchase fee
-      if (estimate.purchase_fee > 0) {
-        items.push({
-          description: 'Purchase Fee',
-          quantity: 1,
-          unit_price: estimate.purchase_fee,
-        });
-      }
+      } else {
+        // Build line items from estimate data (legacy format)
+        const items: Array<{
+          description: string;
+          quantity: number;
+          unit_price: number;
+          unit_type: 'fixed' | 'kg' | 'percent';
+          product_service_id?: string;
+        }> = [];
+        
+        // Product cost (for purchase_shipping type)
+        if (estimate.product_cost && estimate.product_cost > 0) {
+          const productService = productsServices?.find(ps => ps.service_type === 'product');
+          items.push({
+            description: 'Product Cost',
+            quantity: 1,
+            unit_price: estimate.product_cost,
+            unit_type: 'fixed',
+            product_service_id: productService?.id,
+          });
+        }
+        
+        // Shipping line item
+        if (estimate.weight_kg > 0) {
+          const shippingService = productsServices?.find(ps => ps.service_type === 'air_cargo');
+          items.push({
+            description: `Air Cargo Shipping`,
+            quantity: estimate.weight_kg,
+            unit_price: estimate.rate_per_kg,
+            unit_type: 'kg',
+            product_service_id: shippingService?.id,
+          });
+        }
+        
+        // Handling fee
+        if (estimate.handling_fee && estimate.handling_fee > 0) {
+          const handlingService = productsServices?.find(ps => ps.service_type === 'handling');
+          // Calculate percentage if we can determine the base
+          const baseAmount = (estimate.product_cost || 0) + (estimate.weight_kg * estimate.rate_per_kg);
+          const handlingPercent = baseAmount > 0 ? (estimate.handling_fee / baseAmount) * 100 : 0;
+          
+          items.push({
+            description: 'Handling Fee',
+            quantity: 1,
+            unit_price: handlingPercent > 0 ? handlingPercent : estimate.handling_fee,
+            unit_type: handlingPercent > 0 ? 'percent' : 'fixed',
+            product_service_id: handlingService?.id,
+          });
+        }
+        
+        // Purchase fee
+        if (estimate.purchase_fee && estimate.purchase_fee > 0) {
+          const customsService = productsServices?.find(ps => ps.service_type === 'customs');
+          // Calculate percentage if we can determine the base
+          const baseAmount = estimate.product_cost || 0;
+          const customsPercent = baseAmount > 0 ? (estimate.purchase_fee / baseAmount) * 100 : 0;
+          
+          items.push({
+            description: 'Customs & Duty Clearance',
+            quantity: 1,
+            unit_price: customsPercent > 0 ? customsPercent : estimate.purchase_fee,
+            unit_type: customsPercent > 0 ? 'percent' : 'fixed',
+            product_service_id: customsService?.id,
+          });
+        }
 
-      // If no items, add a default one
-      if (items.length === 0) {
-        items.push({ description: '', quantity: 1, unit_price: 0 });
-      }
+        // If no items, add a default one
+        if (items.length === 0) {
+          items.push({ description: '', quantity: 1, unit_price: 0, unit_type: 'fixed' });
+        }
 
-      form.reset({
-        customer_id: estimate.customer_id || '',
-        origin_region: estimate.origin_region || '',
-        currency: estimate.currency || 'USD',
-        valid_until: estimate.valid_until || '',
-        notes: estimate.notes || '',
-        line_items: items,
-      });
+        form.reset({
+          customer_id: estimate.customer_id || '',
+          origin_region: estimate.origin_region || '',
+          currency: estimate.currency || 'USD',
+          valid_until: estimate.valid_until || '',
+          notes: estimate.notes || '',
+          line_items: items,
+        });
+      }
     }
-  }, [open, estimate, form]);
+  }, [open, estimate, form, productsServices]);
 
   const watchedItems = form.watch('line_items');
   const watchedCurrency = form.watch('currency');
 
   const calculations = useMemo(() => {
-    const subtotal = watchedItems.reduce((sum, item) => {
-      return sum + (Number(item.quantity) * Number(item.unit_price));
-    }, 0);
-    return { subtotal, total: subtotal };
+    let subtotal = 0;
+    let productCost = 0;
+    let purchaseFee = 0;
+    
+    // First pass: calculate base amounts (non-percentage items)
+    for (const item of watchedItems) {
+      if (item.unit_type !== 'percent') {
+        const amount = Number(item.quantity) * Number(item.unit_price);
+        subtotal += amount;
+        
+        // Track product cost for percentage calculations
+        if (item.description?.toLowerCase().includes('product')) {
+          productCost += amount;
+        }
+      }
+    }
+    
+    // Second pass: calculate percentage-based items
+    for (const item of watchedItems) {
+      if (item.unit_type === 'percent') {
+        // Determine base amount for percentage
+        const isCustoms = item.description?.toLowerCase().includes('customs') || 
+                          item.description?.toLowerCase().includes('duty');
+        const baseAmount = isCustoms ? productCost : subtotal;
+        const amount = (Number(item.unit_price) / 100) * baseAmount;
+        purchaseFee += amount;
+      }
+    }
+    
+    const total = subtotal + purchaseFee;
+    
+    return { subtotal, productCost, purchaseFee, total };
   }, [watchedItems]);
 
   const currencySymbol = CURRENCY_SYMBOLS[watchedCurrency] || watchedCurrency;
 
+  const getLineItemAmount = (item: typeof watchedItems[0], index: number) => {
+    if (item.unit_type === 'percent') {
+      // Calculate the base amount for percentage
+      const isCustoms = item.description?.toLowerCase().includes('customs') || 
+                        item.description?.toLowerCase().includes('duty');
+      
+      let baseAmount = 0;
+      if (isCustoms) {
+        // Customs is based on product cost only
+        for (const i of watchedItems) {
+          if (i.unit_type !== 'percent' && i.description?.toLowerCase().includes('product')) {
+            baseAmount += Number(i.quantity) * Number(i.unit_price);
+          }
+        }
+      } else {
+        // Handling is based on subtotal
+        for (const i of watchedItems) {
+          if (i.unit_type !== 'percent') {
+            baseAmount += Number(i.quantity) * Number(i.unit_price);
+          }
+        }
+      }
+      
+      return (Number(item.unit_price) / 100) * baseAmount;
+    }
+    return Number(item.quantity) * Number(item.unit_price);
+  };
+
   const onSubmit = async (data: EstimateFormData) => {
     setIsSubmitting(true);
     try {
-      // Calculate weight and rate from first line item (assuming it's shipping)
-      const shippingItem = data.line_items[0];
-      const weight_kg = Number(shippingItem?.quantity || 0);
-      const rate_per_kg = Number(shippingItem?.unit_price || 0);
+      // Calculate weight from kg-based items
+      const totalWeight = data.line_items.reduce((sum, item) => {
+        if (item.unit_type === 'kg') {
+          return sum + Number(item.quantity);
+        }
+        return sum;
+      }, 0);
       
-      // Get handling fee from second item if exists
-      const handling_fee = data.line_items.length > 1 
-        ? Number(data.line_items[1]?.unit_price || 0)
+      // Get average rate per kg
+      const shippingItems = data.line_items.filter(item => item.unit_type === 'kg');
+      const avgRate = shippingItems.length > 0 
+        ? shippingItems.reduce((sum, item) => sum + Number(item.unit_price), 0) / shippingItems.length
         : 0;
+
+      // Build notes from line items
+      const notesFromItems = `Line Items: ${data.line_items.map(i => 
+        `${i.description} (${i.unit_type === 'percent' ? `${i.unit_price}%` : `${i.quantity} x ${currencySymbol}${i.unit_price}`})`
+      ).join(', ')}`;
 
       await updateEstimate.mutateAsync({
         id: estimate.id,
@@ -153,12 +319,14 @@ export function EditEstimateDialog({ estimate, open, onOpenChange }: EditEstimat
         origin_region: data.origin_region as any,
         currency: data.currency,
         valid_until: data.valid_until || null,
-        notes: data.notes || null,
-        weight_kg,
-        rate_per_kg,
-        handling_fee,
+        notes: data.notes || notesFromItems,
+        weight_kg: totalWeight,
+        rate_per_kg: avgRate,
+        handling_fee: 0, // Handled in total calculation
         subtotal: calculations.subtotal,
         total: calculations.total,
+        product_cost: calculations.productCost,
+        purchase_fee: calculations.purchaseFee,
       });
 
       toast.success('Estimate updated successfully');
@@ -172,7 +340,7 @@ export function EditEstimateDialog({ estimate, open, onOpenChange }: EditEstimat
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Estimate {estimate.estimate_number}</DialogTitle>
         </DialogHeader>
@@ -282,84 +450,124 @@ export function EditEstimateDialog({ estimate, open, onOpenChange }: EditEstimat
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => append({ description: '', quantity: 1, unit_price: 0 })}
+                  onClick={() => append({ description: '', quantity: 1, unit_price: 0, unit_type: 'fixed' })}
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Item
                 </Button>
               </div>
 
-              {fields.map((field, index) => (
-                <div key={field.id} className="grid grid-cols-12 gap-2 items-start p-3 bg-muted/50 rounded-lg">
-                  <div className="col-span-5">
-                    <FormField
-                      control={form.control}
-                      name={`line_items.${index}.description`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs">Description</FormLabel>
-                          <FormControl>
-                            <Input {...field} placeholder="Item description" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
+              {fields.map((field, index) => {
+                const item = watchedItems[index];
+                const amount = getLineItemAmount(item, index);
+                
+                return (
+                  <div key={field.id} className="grid grid-cols-12 gap-2 items-start p-3 bg-muted/50 rounded-lg">
+                    <div className="col-span-4">
+                      <FormField
+                        control={form.control}
+                        name={`line_items.${index}.description`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">Description</FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="Item description" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="col-span-2">
+                      <FormField
+                        control={form.control}
+                        name={`line_items.${index}.unit_type`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">Type</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="fixed">Fixed</SelectItem>
+                                <SelectItem value="kg">Per kg</SelectItem>
+                                <SelectItem value="percent">Percent</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="col-span-2">
+                      <FormField
+                        control={form.control}
+                        name={`line_items.${index}.quantity`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">
+                              {item?.unit_type === 'kg' ? 'Weight (kg)' : item?.unit_type === 'percent' ? 'Base' : 'Qty'}
+                            </FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                type="number" 
+                                step="0.01" 
+                                min="0"
+                                disabled={item?.unit_type === 'percent'}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="col-span-2">
+                      <FormField
+                        control={form.control}
+                        name={`line_items.${index}.unit_price`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">
+                              {item?.unit_type === 'percent' ? 'Rate (%)' : `Price (${currencySymbol})`}
+                            </FormLabel>
+                            <FormControl>
+                              <Input {...field} type="number" step="0.01" min="0" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="col-span-1 pt-6">
+                      <p className="text-sm font-medium">
+                        {currencySymbol}{amount.toFixed(2)}
+                      </p>
+                    </div>
+
+                    <div className="col-span-1 pt-6">
+                      {fields.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => remove(index)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       )}
-                    />
+                    </div>
                   </div>
-
-                  <div className="col-span-2">
-                    <FormField
-                      control={form.control}
-                      name={`line_items.${index}.quantity`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs">Qty</FormLabel>
-                          <FormControl>
-                            <Input {...field} type="number" step="0.01" min="0" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="col-span-2">
-                    <FormField
-                      control={form.control}
-                      name={`line_items.${index}.unit_price`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs">Price</FormLabel>
-                          <FormControl>
-                            <Input {...field} type="number" step="0.01" min="0" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="col-span-2 pt-6">
-                    <p className="text-sm font-medium">
-                      {currencySymbol}{(Number(watchedItems[index]?.quantity || 0) * Number(watchedItems[index]?.unit_price || 0)).toFixed(2)}
-                    </p>
-                  </div>
-
-                  <div className="col-span-1 pt-6">
-                    {fields.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => remove(index)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <Separator />
