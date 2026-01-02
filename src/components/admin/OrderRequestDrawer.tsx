@@ -205,16 +205,16 @@ export function OrderRequestDrawer({ order, open, onOpenChange }: OrderRequestDr
               </h4>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Product Total</span>
+                  <span className="text-muted-foreground">Product Cost</span>
                   <span>${Number(order.total_product_cost).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Est. Duty</span>
-                  <span>${Number(order.estimated_duty || 0).toFixed(2)}</span>
+                  <span className="text-muted-foreground">Shipping Charges</span>
+                  <span>${Number(order.estimated_shipping_cost).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Est. Shipping</span>
-                  <span>${Number(order.estimated_shipping_cost).toFixed(2)}</span>
+                  <span className="text-muted-foreground">Duty & Clearing</span>
+                  <span>${Number(order.estimated_duty || 0).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Handling Fee</span>
