@@ -187,29 +187,30 @@ export function calculateShopForMeCharges(
     dutyAndOtherCharges += chargeAmount;
   }
 
-  // Add shipping to breakdown (after duty, before handling if handling is cumulative)
-  // We need to insert shipping in the right position for display
-  // Find where to insert shipping (after duty_clearing, before handling_fee)
-  const handlingIndex = breakdown.findIndex(b => b.key === 'handling_fee');
-  const shippingEntry = {
+  // Add shipping to breakdown
+  breakdown.push({
     name: 'Shipping Charges',
     key: 'shipping',
     amount: shippingCost,
-  };
-
-  if (handlingIndex !== -1) {
-    // Insert shipping before handling fee
-    breakdown.splice(handlingIndex, 0, shippingEntry);
-  } else {
-    // Add at the end
-    breakdown.push(shippingEntry);
-  }
+  });
 
   // Calculate total
   const total = breakdown.reduce((sum, item) => sum + item.amount, 0);
 
+  // Define the desired display order
+  const displayOrder = ['product_cost', 'shipping', 'duty_clearing', 'handling_fee'];
+  
+  // Sort breakdown by the defined order, unknown keys go to the end
+  const sortedBreakdown = [...breakdown].sort((a, b) => {
+    const indexA = displayOrder.indexOf(a.key);
+    const indexB = displayOrder.indexOf(b.key);
+    const orderA = indexA === -1 ? displayOrder.length : indexA;
+    const orderB = indexB === -1 ? displayOrder.length : indexB;
+    return orderA - orderB;
+  });
+
   return {
-    breakdown,
+    breakdown: sortedBreakdown,
     total,
     shippingCost,
   };
