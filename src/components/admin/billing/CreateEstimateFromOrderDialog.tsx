@@ -525,8 +525,20 @@ export function CreateEstimateFromOrderDialog({
                   const unitPrice = watchLineItems[index]?.unit_price || 0;
                   const unitType = watchLineItems[index]?.unit_type || '';
                   const isPercentage = unitType === 'percent';
+                  
+                  // Calculate running total up to this line item (for percentage calculations)
+                  let runningTotalForItem = 0;
+                  for (let i = 0; i < index; i++) {
+                    const prevItem = watchLineItems[i];
+                    if (prevItem?.unit_type === 'percent') {
+                      runningTotalForItem += runningTotalForItem * (prevItem.unit_price / 100);
+                    } else {
+                      runningTotalForItem += (prevItem?.quantity || 0) * (prevItem?.unit_price || 0);
+                    }
+                  }
+                  
                   const lineTotal = isPercentage 
-                    ? (calculations.subtotal * unitPrice / 100) 
+                    ? (runningTotalForItem * unitPrice / 100) 
                     : quantity * unitPrice;
 
                   return (
