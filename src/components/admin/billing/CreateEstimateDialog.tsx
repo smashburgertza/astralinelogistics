@@ -65,68 +65,26 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
   const parseNotesForLineItems = (notes: string | null) => {
     if (!notes) return null;
     
-    // Try to parse line items from notes format: "Line Items: Description (qty x $price), ..."
-    const match = notes.match(/Line Items:\s*(.+)/);
-    if (!match) return null;
-    
-    const items: Array<{
-      product_service_id: string;
-      description: string;
-      quantity: number;
-      unit_price: number;
-      unit_type: string;
-    }> = [];
-    
-    // Split by comma followed by space and capital letter or end
-    const itemParts = match[1].split(/\),\s*(?=[A-Z])/);
-    for (const part of itemParts) {
-      const trimmed = part.trim().replace(/\)$/, '');
-      
-      // Check for percentage format: "Description (X%)"
-      const percentMatch = trimmed.match(/^(.+?)\s*\((\d+(?:\.\d+)?)%$/);
-      if (percentMatch) {
-        const description = percentMatch[1].trim();
-        const productService = productsServices?.find(ps => 
-          ps.name.toLowerCase() === description.toLowerCase() ||
-          description.toLowerCase().includes(ps.name.toLowerCase())
-        );
-        items.push({
-          product_service_id: productService?.id || '',
-          description: description,
-          quantity: 1,
-          unit_price: parseFloat(percentMatch[2]),
-          unit_type: 'percent',
-        });
-        continue;
-      }
-      
-      // Check for fixed/kg format: "Description (qty x $price)"
-      const fixedMatch = trimmed.match(/^(.+?)\s*\((\d+(?:\.\d+)?)\s*x\s*[$£€¥]?(\d+(?:\.\d+)?)$/);
-      if (fixedMatch) {
-        const description = fixedMatch[1].trim();
-        const qty = parseFloat(fixedMatch[2]);
-        const price = parseFloat(fixedMatch[3]);
-        
-        // Find matching product/service
-        const productService = productsServices?.find(ps => 
-          ps.name.toLowerCase() === description.toLowerCase() ||
-          description.toLowerCase().includes(ps.name.toLowerCase())
-        );
-        
-        // Determine if it's kg or fixed based on product/service unit type
-        const unitType = productService?.unit === 'kg' ? 'kg' : 'fixed';
-        
-        items.push({
-          product_service_id: productService?.id || '',
-          description,
-          quantity: qty,
-          unit_price: price,
-          unit_type: unitType,
-        });
+    // Try to parse JSON format first (new format)
+    const jsonMatch = notes.match(/\[LINE_ITEMS_JSON\](.*?)\[\/LINE_ITEMS_JSON\]/s);
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[1]);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map(item => ({
+            product_service_id: item.product_service_id || '',
+            description: item.description || '',
+            quantity: item.quantity || 1,
+            unit_price: item.unit_price || 0,
+            unit_type: item.unit_type || '',
+          }));
+        }
+      } catch (e) {
+        console.error('Failed to parse line items JSON:', e);
       }
     }
     
-    return items.length > 0 ? items : null;
+    return null;
   };
 
   // Group products/services by type
@@ -373,7 +331,16 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
     const hasPurchaseItems = calculations.productCost > 0 || calculations.purchaseFee > 0;
     const estimateType = hasPurchaseItems ? 'purchase_shipping' : 'shipping';
 
-    const notesFromItems = data.notes || `Line Items: ${data.line_items.map(i => `${i.description} (${i.unit_type === 'percent' ? `${i.unit_price}%` : `${i.quantity} x ${currencySymbol}${i.unit_price}`})`).join(', ')}`;
+    // Store line items as JSON for reliable parsing, plus human-readable summary
+    const lineItemsJson = JSON.stringify(data.line_items.map(i => ({
+      product_service_id: i.product_service_id,
+      description: i.description,
+      quantity: i.quantity,
+      unit_price: i.unit_price,
+      unit_type: i.unit_type,
+    })));
+    const humanReadable = data.line_items.map(i => `${i.description} (${i.unit_type === 'percent' ? `${i.unit_price}%` : `${i.quantity} x ${currencySymbol}${i.unit_price}`})`).join(', ');
+    const notesFromItems = `[LINE_ITEMS_JSON]${lineItemsJson}[/LINE_ITEMS_JSON]\n${data.notes || humanReadable}`;
 
     try {
       if (isEditMode && editEstimate) {
