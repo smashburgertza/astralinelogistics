@@ -39,6 +39,13 @@ export interface JournalEntry {
   rejected_by: string | null;
   rejected_at: string | null;
   rejection_reason: string | null;
+  // Expense-specific fields
+  expense_category: string | null;
+  expense_amount: number | null;
+  expense_currency: string | null;
+  receipt_url: string | null;
+  vendor_name: string | null;
+  is_expense: boolean;
   lines?: JournalLine[];
 }
 
@@ -218,6 +225,25 @@ export function useJournalEntry(id: string) {
   });
 }
 
+// Type for creating journal entries - expense fields are optional
+type CreateJournalEntryInput = {
+  entry_date: string;
+  description: string;
+  reference_type: string | null;
+  reference_id: string | null;
+  status: 'draft' | 'pending_approval' | 'posted' | 'voided' | 'rejected';
+  posted_at: string | null;
+  posted_by: string | null;
+  created_by: string | null;
+  notes: string | null;
+  expense_category?: string | null;
+  expense_amount?: number | null;
+  expense_currency?: string | null;
+  receipt_url?: string | null;
+  vendor_name?: string | null;
+  is_expense?: boolean;
+};
+
 export function useCreateJournalEntry() {
   const queryClient = useQueryClient();
 
@@ -226,7 +252,7 @@ export function useCreateJournalEntry() {
       entry,
       lines,
     }: {
-      entry: Omit<JournalEntry, 'id' | 'entry_number' | 'created_at' | 'updated_at' | 'lines' | 'submitted_by' | 'submitted_at' | 'approved_by' | 'approved_at' | 'rejected_by' | 'rejected_at' | 'rejection_reason'>;
+      entry: CreateJournalEntryInput;
       lines: Omit<JournalLine, 'id' | 'journal_entry_id' | 'created_at' | 'account'>[];
     }) => {
       // Generate entry number

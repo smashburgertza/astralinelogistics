@@ -72,6 +72,11 @@ export function SimpleTransactionDialog({ open, onOpenChange, preselectedAccount
   const [toAccountId, setToAccountId] = useState('');
   const [notes, setNotes] = useState('');
   
+  // Expense-specific fields
+  const [vendorName, setVendorName] = useState('');
+  const [receiptUrl, setReceiptUrl] = useState('');
+  const [requiresApproval, setRequiresApproval] = useState(false);
+  
   // Transfer-specific state
   const [destinationAmount, setDestinationAmount] = useState('');
   const [destinationCurrency, setDestinationCurrency] = useState('TZS');
@@ -246,6 +251,7 @@ export function SimpleTransactionDialog({ open, onOpenChange, preselectedAccount
           posted_by: null,
           created_by: null,
           notes: notes || null,
+          is_expense: false,
         },
         lines: journalLines,
       }, {
@@ -260,6 +266,8 @@ export function SimpleTransactionDialog({ open, onOpenChange, preselectedAccount
     if (!debitAccountId || !creditAccountId) return;
 
     const amountInTzs = numAmount * exchangeRate;
+    const isExpense = transactionType === 'expense';
+    const shouldAutoPost = !isExpense || !requiresApproval;
 
     createEntry.mutate({
       entry: {
@@ -267,11 +275,18 @@ export function SimpleTransactionDialog({ open, onOpenChange, preselectedAccount
         description: entryDescription,
         reference_type: transactionType,
         reference_id: null,
-        status: 'posted', // Auto-post for simple transactions
-        posted_at: new Date().toISOString(),
+        status: shouldAutoPost ? 'posted' : 'pending_approval',
+        posted_at: shouldAutoPost ? new Date().toISOString() : null,
         posted_by: null,
         created_by: null,
         notes: notes || null,
+        // Expense-specific fields
+        is_expense: isExpense,
+        expense_category: isExpense ? category : null,
+        expense_amount: isExpense ? numAmount : null,
+        expense_currency: isExpense ? currency : null,
+        vendor_name: isExpense && vendorName ? vendorName : null,
+        receipt_url: isExpense && receiptUrl ? receiptUrl : null,
       },
       lines: [
         {
@@ -315,6 +330,9 @@ export function SimpleTransactionDialog({ open, onOpenChange, preselectedAccount
     setDestinationCurrency('TZS');
     setBankCharges('');
     setChargesFromSource(true);
+    setVendorName('');
+    setReceiptUrl('');
+    setRequiresApproval(false);
   };
 
   const categories = transactionType === 'income' ? INCOME_CATEGORIES : 
@@ -433,6 +451,44 @@ export function SimpleTransactionDialog({ open, onOpenChange, preselectedAccount
                 </SelectContent>
               </Select>
             </div>
+          )}
+
+          {/* Expense-specific fields */}
+          {transactionType === 'expense' && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="vendor">Vendor / Payee</Label>
+                <Input
+                  id="vendor"
+                  value={vendorName}
+                  onChange={(e) => setVendorName(e.target.value)}
+                  placeholder="Who was paid?"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="receipt">Receipt URL (optional)</Label>
+                <Input
+                  id="receipt"
+                  value={receiptUrl}
+                  onChange={(e) => setReceiptUrl(e.target.value)}
+                  placeholder="Link to receipt or document"
+                />
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="requiresApproval"
+                  checked={requiresApproval}
+                  onChange={(e) => setRequiresApproval(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <Label htmlFor="requiresApproval" className="text-sm font-normal cursor-pointer">
+                  Submit for approval (expense will not be posted until approved)
+                </Label>
+              </div>
+            </>
           )}
 
           {transactionType === 'transfer' && (
