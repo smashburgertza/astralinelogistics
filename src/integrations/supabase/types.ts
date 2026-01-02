@@ -904,6 +904,36 @@ export type Database = {
         }
         Relationships: []
       }
+      employee_permissions: {
+        Row: {
+          action: Database["public"]["Enums"]["permission_action"]
+          created_at: string | null
+          employee_id: string
+          granted_by: string | null
+          id: string
+          module: string
+          updated_at: string | null
+        }
+        Insert: {
+          action: Database["public"]["Enums"]["permission_action"]
+          created_at?: string | null
+          employee_id: string
+          granted_by?: string | null
+          id?: string
+          module: string
+          updated_at?: string | null
+        }
+        Update: {
+          action?: Database["public"]["Enums"]["permission_action"]
+          created_at?: string | null
+          employee_id?: string
+          granted_by?: string | null
+          id?: string
+          module?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       employee_salaries: {
         Row: {
           base_salary: number
@@ -2920,6 +2950,13 @@ export type Database = {
       generate_payroll_number: { Args: never; Returns: string }
       generate_settlement_number: { Args: never; Returns: string }
       generate_tracking_number: { Args: never; Returns: string }
+      get_employee_permissions: {
+        Args: { _employee_id: string }
+        Returns: {
+          action: Database["public"]["Enums"]["permission_action"]
+          module: string
+        }[]
+      }
       get_next_sequence: { Args: { p_counter_key: string }; Returns: string }
       get_or_create_batch: {
         Args: {
@@ -2932,6 +2969,14 @@ export type Database = {
       get_user_region: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["agent_region"]
+      }
+      has_permission: {
+        Args: {
+          _action: Database["public"]["Enums"]["permission_action"]
+          _module: string
+          _user_id: string
+        }
+        Returns: boolean
       }
       has_role: {
         Args: {
@@ -2960,6 +3005,14 @@ export type Database = {
         | "astraline_internal"
       customer_type: "individual" | "corporate"
       invoice_direction_type: "to_agent" | "from_agent"
+      permission_action:
+        | "view"
+        | "create"
+        | "edit"
+        | "delete"
+        | "approve"
+        | "export"
+        | "manage"
       shipment_owner_type: "astraline" | "agent"
       shipment_status: "collected" | "in_transit" | "arrived" | "delivered"
       transit_point_type: "direct" | "nairobi" | "zanzibar"
@@ -3101,6 +3154,15 @@ export const Constants = {
       ],
       customer_type: ["individual", "corporate"],
       invoice_direction_type: ["to_agent", "from_agent"],
+      permission_action: [
+        "view",
+        "create",
+        "edit",
+        "delete",
+        "approve",
+        "export",
+        "manage",
+      ],
       shipment_owner_type: ["astraline", "agent"],
       shipment_status: ["collected", "in_transit", "arrived", "delivered"],
       transit_point_type: ["direct", "nairobi", "zanzibar"],
