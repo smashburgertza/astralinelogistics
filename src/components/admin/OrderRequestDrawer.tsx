@@ -73,8 +73,8 @@ export function OrderRequestDrawer({ order, open, onOpenChange }: OrderRequestDr
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-xl">
-        <SheetHeader>
+      <SheetContent className="w-full sm:max-w-xl flex flex-col h-full p-0">
+        <SheetHeader className="px-6 pt-6 pb-4 border-b">
           <SheetTitle className="flex items-center gap-2">
             <Package className="h-5 w-5" />
             Order Request
@@ -84,8 +84,8 @@ export function OrderRequestDrawer({ order, open, onOpenChange }: OrderRequestDr
           </SheetDescription>
         </SheetHeader>
 
-        <ScrollArea className="h-[calc(100vh-180px)] mt-6 pr-4">
-          <div className="space-y-6">
+        <ScrollArea className="flex-1 px-6">
+          <div className="space-y-6 py-6">
             {/* Status */}
             <div className="space-y-2">
               <Label>Status</Label>
@@ -231,17 +231,19 @@ export function OrderRequestDrawer({ order, open, onOpenChange }: OrderRequestDr
                 rows={3}
               />
             </div>
-
-            {/* Save Button */}
-            <Button
-              onClick={handleSave}
-              disabled={updateStatus.isPending}
-              className="w-full"
-            >
-              {updateStatus.isPending ? 'Saving...' : 'Save Changes'}
-            </Button>
           </div>
         </ScrollArea>
+
+        {/* Fixed Save Button at Bottom */}
+        <div className="px-6 py-4 border-t bg-background">
+          <Button
+            onClick={handleSave}
+            disabled={updateStatus.isPending}
+            className="w-full"
+          >
+            {updateStatus.isPending ? 'Saving...' : 'Save Changes'}
+          </Button>
+        </div>
       </SheetContent>
     </Sheet>
   );
