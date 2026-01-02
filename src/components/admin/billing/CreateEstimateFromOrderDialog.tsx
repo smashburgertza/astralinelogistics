@@ -527,13 +527,19 @@ export function CreateEstimateFromOrderDialog({
                   const isPercentage = unitType === 'percent';
                   
                   // Calculate running total up to this line item (for percentage calculations)
+                  // This should match the order summary calculation: percentages apply to cumulative running total
                   let runningTotalForItem = 0;
                   for (let i = 0; i < index; i++) {
                     const prevItem = watchLineItems[i];
+                    const prevQty = prevItem?.quantity || 0;
+                    const prevPrice = prevItem?.unit_price || 0;
+                    
                     if (prevItem?.unit_type === 'percent') {
-                      runningTotalForItem += runningTotalForItem * (prevItem.unit_price / 100);
+                      // For percentage items, add the calculated percentage amount
+                      runningTotalForItem += runningTotalForItem * (prevPrice / 100);
                     } else {
-                      runningTotalForItem += (prevItem?.quantity || 0) * (prevItem?.unit_price || 0);
+                      // For fixed items, add quantity * price
+                      runningTotalForItem += prevQty * prevPrice;
                     }
                   }
                   
