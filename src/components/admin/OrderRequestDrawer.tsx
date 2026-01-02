@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import { ExternalLink, Package, Mail, Phone, MapPin, Clock, DollarSign } from 'lucide-react';
+import { ExternalLink, Package, Mail, Phone, MapPin, Calculator } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -25,6 +25,7 @@ import { OrderRequest, useOrderItems, useUpdateOrderStatus } from '@/hooks/useOr
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
+import { CreateEstimateFromOrderDialog } from './CreateEstimateFromOrderDialog';
 
 interface OrderRequestDrawerProps {
   order: OrderRequest | null;
@@ -47,6 +48,7 @@ export function OrderRequestDrawer({ order, open, onOpenChange }: OrderRequestDr
   const updateStatus = useUpdateOrderStatus();
   const [status, setStatus] = useState(order?.status || 'pending');
   const [notes, setNotes] = useState(order?.notes || '');
+  const [showEstimateDialog, setShowEstimateDialog] = useState(false);
 
   const usdRate = exchangeRates?.find(r => r.currency_code === 'USD')?.rate_to_tzs || 2500;
 
@@ -248,8 +250,16 @@ export function OrderRequestDrawer({ order, open, onOpenChange }: OrderRequestDr
           </div>
         </ScrollArea>
 
-        {/* Fixed Save Button at Bottom */}
-        <div className="px-6 py-4 border-t bg-background">
+        {/* Fixed Buttons at Bottom */}
+        <div className="px-6 py-4 border-t bg-background space-y-2">
+          <Button
+            onClick={() => setShowEstimateDialog(true)}
+            variant="outline"
+            className="w-full"
+          >
+            <Calculator className="h-4 w-4 mr-2" />
+            Create Estimate
+          </Button>
           <Button
             onClick={handleSave}
             disabled={updateStatus.isPending}
@@ -259,6 +269,19 @@ export function OrderRequestDrawer({ order, open, onOpenChange }: OrderRequestDr
           </Button>
         </div>
       </SheetContent>
+
+      {/* Create Estimate Dialog */}
+      {order && items && (
+        <CreateEstimateFromOrderDialog
+          order={order}
+          items={items}
+          open={showEstimateDialog}
+          onOpenChange={setShowEstimateDialog}
+          onSuccess={() => {
+            onOpenChange(false);
+          }}
+        />
+      )}
     </Sheet>
   );
 }
