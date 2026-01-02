@@ -11,11 +11,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGr
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Separator } from '@/components/ui/separator';
 import { Plus, Trash2, FileText } from 'lucide-react';
-import { useCreateEstimate } from '@/hooks/useEstimates';
+import { Estimate, useCreateEstimate, useUpdateEstimate } from '@/hooks/useEstimates';
 import { useCustomers, useShipments } from '@/hooks/useShipments';
 import { useExchangeRates, convertToTZS } from '@/hooks/useExchangeRates';
 import { useProductsServices, SERVICE_TYPES } from '@/hooks/useProductsServices';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
+import { toast } from 'sonner';
 
 const lineItemSchema = z.object({
   product_service_id: z.string().optional(),
@@ -44,18 +45,89 @@ interface CreateEstimateDialogProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   regions?: Array<{ code: string; name: string; flag_emoji?: string | null }>;
+  editEstimate?: Estimate | null; // For edit mode
 }
 
-export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChange, regions = [] }: CreateEstimateDialogProps) {
+export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChange, regions = [], editEstimate }: CreateEstimateDialogProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen ?? internalOpen;
   const setOpen = onOpenChange ?? setInternalOpen;
 
+  const isEditMode = !!editEstimate;
   const createEstimate = useCreateEstimate();
+  const updateEstimate = useUpdateEstimate();
   const { data: customers } = useCustomers();
   const { data: shipments } = useShipments();
   const { data: exchangeRates } = useExchangeRates();
   const { data: productsServices } = useProductsServices({ active: true });
+
+  // Parse notes to extract line items info if available
+  const parseNotesForLineItems = (notes: string | null) => {
+    if (!notes) return null;
+    
+    // Try to parse line items from notes format: "Line Items: Description (qty x $price), ..."
+    const match = notes.match(/Line Items:\s*(.+)/);
+    if (!match) return null;
+    
+    const items: Array<{
+      product_service_id: string;
+      description: string;
+      quantity: number;
+      unit_price: number;
+      unit_type: string;
+    }> = [];
+    
+    // Split by comma followed by space and capital letter or end
+    const itemParts = match[1].split(/\),\s*(?=[A-Z])/);
+    for (const part of itemParts) {
+      const trimmed = part.trim().replace(/\)$/, '');
+      
+      // Check for percentage format: "Description (X%)"
+      const percentMatch = trimmed.match(/^(.+?)\s*\((\d+(?:\.\d+)?)%$/);
+      if (percentMatch) {
+        const description = percentMatch[1].trim();
+        const productService = productsServices?.find(ps => 
+          ps.name.toLowerCase() === description.toLowerCase() ||
+          description.toLowerCase().includes(ps.name.toLowerCase())
+        );
+        items.push({
+          product_service_id: productService?.id || '',
+          description: description,
+          quantity: 1,
+          unit_price: parseFloat(percentMatch[2]),
+          unit_type: 'percent',
+        });
+        continue;
+      }
+      
+      // Check for fixed/kg format: "Description (qty x $price)"
+      const fixedMatch = trimmed.match(/^(.+?)\s*\((\d+(?:\.\d+)?)\s*x\s*[$£€¥]?(\d+(?:\.\d+)?)$/);
+      if (fixedMatch) {
+        const description = fixedMatch[1].trim();
+        const qty = parseFloat(fixedMatch[2]);
+        const price = parseFloat(fixedMatch[3]);
+        
+        // Find matching product/service
+        const productService = productsServices?.find(ps => 
+          ps.name.toLowerCase() === description.toLowerCase() ||
+          description.toLowerCase().includes(ps.name.toLowerCase())
+        );
+        
+        // Determine if it's kg or fixed based on product/service unit type
+        const unitType = productService?.unit === 'kg' ? 'kg' : 'fixed';
+        
+        items.push({
+          product_service_id: productService?.id || '',
+          description,
+          quantity: qty,
+          unit_price: price,
+          unit_type: unitType,
+        });
+      }
+    }
+    
+    return items.length > 0 ? items : null;
+  };
 
   // Group products/services by type
   const groupedProducts = useMemo(() => {
@@ -85,24 +157,117 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
     },
   });
 
-  // Reset form when dialog opens
+  // Reset form when dialog opens or load edit data
   useEffect(() => {
     if (open) {
-      form.reset({
-        customer_id: '',
-        shipment_id: '',
-        origin_region: '',
-        currency: 'TZS',
-        valid_days: 30,
-        discount: '',
-        tax_rate: 0,
-        notes: '',
-        line_items: [
-          { product_service_id: '', description: '', quantity: 1, unit_price: 0, unit_type: '' },
-        ],
-      });
+      if (isEditMode && editEstimate) {
+        // Parse line items from notes or build from estimate data
+        const parsedItems = parseNotesForLineItems(editEstimate.notes);
+        
+        if (parsedItems && parsedItems.length > 0) {
+          form.reset({
+            customer_id: editEstimate.customer_id || '',
+            shipment_id: editEstimate.shipment_id || '',
+            origin_region: editEstimate.origin_region || '',
+            currency: editEstimate.currency || 'USD',
+            valid_days: 30,
+            discount: '',
+            tax_rate: 0,
+            notes: '',
+            line_items: parsedItems,
+          });
+        } else {
+          // Build line items from estimate data (legacy format)
+          const items: Array<{
+            product_service_id: string;
+            description: string;
+            quantity: number;
+            unit_price: number;
+            unit_type: string;
+          }> = [];
+          
+          // Product cost
+          if (editEstimate.product_cost && editEstimate.product_cost > 0) {
+            const productService = productsServices?.find(ps => ps.service_type === 'product');
+            items.push({
+              product_service_id: productService?.id || '',
+              description: 'Product Cost',
+              quantity: 1,
+              unit_price: editEstimate.product_cost,
+              unit_type: 'fixed',
+            });
+          }
+          
+          // Shipping
+          if (editEstimate.weight_kg > 0) {
+            const shippingService = productsServices?.find(ps => ps.service_type === 'air_cargo');
+            items.push({
+              product_service_id: shippingService?.id || '',
+              description: 'Air Cargo Shipping',
+              quantity: editEstimate.weight_kg,
+              unit_price: editEstimate.rate_per_kg,
+              unit_type: 'kg',
+            });
+          }
+          
+          // Handling fee
+          if (editEstimate.handling_fee && editEstimate.handling_fee > 0) {
+            const handlingService = productsServices?.find(ps => ps.service_type === 'handling');
+            items.push({
+              product_service_id: handlingService?.id || '',
+              description: 'Handling Fee',
+              quantity: 1,
+              unit_price: editEstimate.handling_fee,
+              unit_type: 'fixed',
+            });
+          }
+          
+          // Purchase fee
+          if (editEstimate.purchase_fee && editEstimate.purchase_fee > 0) {
+            const customsService = productsServices?.find(ps => ps.service_type === 'customs');
+            items.push({
+              product_service_id: customsService?.id || '',
+              description: 'Customs & Duty Clearance',
+              quantity: 1,
+              unit_price: editEstimate.purchase_fee,
+              unit_type: 'fixed',
+            });
+          }
+
+          if (items.length === 0) {
+            items.push({ product_service_id: '', description: '', quantity: 1, unit_price: 0, unit_type: '' });
+          }
+
+          form.reset({
+            customer_id: editEstimate.customer_id || '',
+            shipment_id: editEstimate.shipment_id || '',
+            origin_region: editEstimate.origin_region || '',
+            currency: editEstimate.currency || 'USD',
+            valid_days: 30,
+            discount: '',
+            tax_rate: 0,
+            notes: '',
+            line_items: items,
+          });
+        }
+      } else {
+        // Create mode - reset to defaults
+        form.reset({
+          customer_id: '',
+          shipment_id: '',
+          origin_region: '',
+          currency: 'TZS',
+          valid_days: 30,
+          discount: '',
+          tax_rate: 0,
+          notes: '',
+          line_items: [
+            { product_service_id: '', description: '', quantity: 1, unit_price: 0, unit_type: '' },
+          ],
+        });
+      }
     }
-  }, [open, form]);
+  }, [open, form, isEditMode, editEstimate, productsServices]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -208,25 +373,53 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
     const hasPurchaseItems = calculations.productCost > 0 || calculations.purchaseFee > 0;
     const estimateType = hasPurchaseItems ? 'purchase_shipping' : 'shipping';
 
-    await createEstimate.mutateAsync({
-      customer_id: data.customer_id,
-      shipment_id: data.shipment_id || undefined,
-      origin_region: data.origin_region,
-      weight_kg: totalWeight,
-      rate_per_kg: avgRate,
-      handling_fee: 0,
-      currency: data.currency,
-      notes: data.notes || `Line Items: ${data.line_items.map(i => `${i.description} (${i.unit_type === 'percent' ? `${i.unit_price}%` : `${i.quantity} x ${currencySymbol}${i.unit_price}`})`).join(', ')}`,
-      valid_days: data.valid_days,
-      estimate_type: estimateType,
-      product_cost: calculations.productCost,
-      purchase_fee: calculations.purchaseFee,
-      subtotal: calculations.subtotal,  // Pass pre-calculated subtotal
-      total: calculations.total,         // Pass pre-calculated total
-    });
+    const notesFromItems = data.notes || `Line Items: ${data.line_items.map(i => `${i.description} (${i.unit_type === 'percent' ? `${i.unit_price}%` : `${i.quantity} x ${currencySymbol}${i.unit_price}`})`).join(', ')}`;
 
-    form.reset();
-    setOpen(false);
+    try {
+      if (isEditMode && editEstimate) {
+        // Update existing estimate
+        await updateEstimate.mutateAsync({
+          id: editEstimate.id,
+          customer_id: data.customer_id,
+          shipment_id: data.shipment_id || null,
+          origin_region: data.origin_region as any,
+          weight_kg: totalWeight,
+          rate_per_kg: avgRate,
+          handling_fee: 0,
+          currency: data.currency,
+          notes: notesFromItems,
+          estimate_type: estimateType,
+          product_cost: calculations.productCost,
+          purchase_fee: calculations.purchaseFee,
+          subtotal: calculations.subtotal,
+          total: calculations.total,
+        });
+        toast.success('Estimate updated successfully');
+      } else {
+        // Create new estimate
+        await createEstimate.mutateAsync({
+          customer_id: data.customer_id,
+          shipment_id: data.shipment_id || undefined,
+          origin_region: data.origin_region,
+          weight_kg: totalWeight,
+          rate_per_kg: avgRate,
+          handling_fee: 0,
+          currency: data.currency,
+          notes: notesFromItems,
+          valid_days: data.valid_days,
+          estimate_type: estimateType,
+          product_cost: calculations.productCost,
+          purchase_fee: calculations.purchaseFee,
+          subtotal: calculations.subtotal,
+          total: calculations.total,
+        });
+      }
+
+      form.reset();
+      setOpen(false);
+    } catch (error: any) {
+      toast.error(`Failed to ${isEditMode ? 'update' : 'create'} estimate: ${error.message}`);
+    }
   };
 
   const handleAddLineItem = () => {
@@ -243,7 +436,7 @@ export function CreateEstimateDialog({ trigger, open: controlledOpen, onOpenChan
       <DialogContent className="sm:max-w-[calc(100vw-var(--sidebar-width,256px)-2rem)] sm:max-h-[calc(100vh-2rem)] h-[calc(100vh-2rem)] overflow-y-auto fixed right-4 left-auto top-4 translate-x-0 translate-y-0 data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-primary">
-            Generate Estimate
+            {isEditMode ? `Edit Estimate ${editEstimate?.estimate_number}` : 'Generate Estimate'}
           </DialogTitle>
         </DialogHeader>
 
