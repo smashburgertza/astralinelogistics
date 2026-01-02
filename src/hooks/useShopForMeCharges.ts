@@ -8,7 +8,7 @@ export interface ShopForMeCharge {
   charge_key: string;
   charge_type: 'percentage' | 'fixed';
   charge_value: number;
-  applies_to: 'product_cost' | 'subtotal' | 'cumulative';
+  applies_to: 'product_cost' | 'subtotal' | 'cumulative' | 'product_and_shipping';
   display_order: number;
   is_active: boolean;
   description: string | null;
@@ -159,6 +159,10 @@ export function calculateShopForMeCharges(
         case 'product_cost':
           // Percentage of product cost only
           base = productCost;
+          break;
+        case 'product_and_shipping':
+          // Percentage of product cost + shipping cost
+          base = productCost + shippingCost;
           break;
         case 'subtotal':
           // Percentage of product cost + previous charges (not shipping)

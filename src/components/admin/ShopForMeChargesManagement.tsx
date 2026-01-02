@@ -56,7 +56,7 @@ export function ShopForMeChargesManagement() {
     charge_key: '',
     charge_type: 'percentage' as 'percentage' | 'fixed',
     charge_value: 0,
-    applies_to: 'product_cost' as 'product_cost' | 'subtotal' | 'cumulative',
+    applies_to: 'product_and_shipping' as 'product_cost' | 'subtotal' | 'cumulative' | 'product_and_shipping',
     display_order: 0,
     is_active: true,
     description: '',
@@ -68,7 +68,7 @@ export function ShopForMeChargesManagement() {
       charge_key: '',
       charge_type: 'percentage',
       charge_value: 0,
-      applies_to: 'product_cost',
+      applies_to: 'product_and_shipping',
       display_order: charges?.length ? Math.max(...charges.map(c => c.display_order)) + 1 : 0,
       is_active: true,
       description: '',
@@ -231,6 +231,7 @@ export function ShopForMeChargesManagement() {
             </p>
             <ul className="text-sm text-muted-foreground mt-2 space-y-1 list-disc list-inside">
               <li><strong>Product Cost</strong>: Percentage of the product price only</li>
+              <li><strong>Product + Shipping</strong>: Percentage of product cost + shipping cost</li>
               <li><strong>Subtotal</strong>: Percentage of product cost + previous charges</li>
               <li><strong>Cumulative</strong>: Percentage of product cost + shipping + previous charges</li>
             </ul>
@@ -315,7 +316,7 @@ export function ShopForMeChargesManagement() {
                 <Label htmlFor="applies_to">Applies To</Label>
                 <Select
                   value={formData.applies_to}
-                  onValueChange={(value: 'product_cost' | 'subtotal' | 'cumulative') => 
+                  onValueChange={(value: 'product_cost' | 'subtotal' | 'cumulative' | 'product_and_shipping') => 
                     setFormData(prev => ({ ...prev, applies_to: value }))
                   }
                 >
@@ -324,6 +325,7 @@ export function ShopForMeChargesManagement() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="product_cost">Product Cost Only</SelectItem>
+                    <SelectItem value="product_and_shipping">Product + Shipping</SelectItem>
                     <SelectItem value="subtotal">Subtotal (Product + Previous Charges)</SelectItem>
                     <SelectItem value="cumulative">Cumulative (Product + Shipping + Charges)</SelectItem>
                   </SelectContent>
