@@ -13,6 +13,7 @@ import { useRegions } from '@/hooks/useRegions';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { NotificationsList } from '@/components/customer/NotificationsList';
+import { useFeatureVisibility } from '@/hooks/useFeatureVisibility';
 
 export default function CustomerDashboard() {
   const navigate = useNavigate();
@@ -21,6 +22,7 @@ export default function CustomerDashboard() {
   const { data: shipments, isLoading: shipmentsLoading } = useCustomerShipments();
   const { data: invoices, isLoading: invoicesLoading } = useCustomerInvoices();
   const { data: regions } = useRegions();
+  const { showOnCustomer: showShopForMe } = useFeatureVisibility('shop_for_me');
 
   const recentShipments = shipments?.slice(0, 5) || [];
   const pendingInvoices = invoices?.filter(i => i.status === 'pending').slice(0, 3) || [];
@@ -248,24 +250,26 @@ export default function CustomerDashboard() {
           </Card>
 
           {/* Shop For Me Card */}
-          <Card className="shadow-xl border-0 overflow-hidden relative">
-            <div className="absolute inset-0 bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500" />
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
-            <CardContent className="relative z-10 p-6">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-lg">
-                  <ShoppingCart className="w-7 h-7 text-white" />
+          {showShopForMe && (
+            <Card className="shadow-xl border-0 overflow-hidden relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500" />
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+              <CardContent className="relative z-10 p-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-lg">
+                    <ShoppingCart className="w-7 h-7 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-white text-lg">Shop For Me</p>
+                    <Link to="/shop-for-me" className="text-white/80 hover:text-white text-sm flex items-center gap-1 group">
+                      Paste links, we'll buy & ship 
+                      <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                    </Link>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-semibold text-white text-lg">Shop For Me</p>
-                  <Link to="/shop-for-me" className="text-white/80 hover:text-white text-sm flex items-center gap-1 group">
-                    Paste links, we'll buy & ship 
-                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  </Link>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Help Card */}
           <Card className="shadow-xl border-0 overflow-hidden relative">
