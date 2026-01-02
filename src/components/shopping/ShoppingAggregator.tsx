@@ -957,50 +957,23 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
         </Card>
       )}
 
-      {/* Customer Details */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <User className="h-5 w-5" />
-            Your Details
-            {customerProfile && (
-              <Badge variant="secondary" className="ml-auto">
-                <CheckCircle2 className="h-3 w-3 mr-1" />
-                Signed In
-              </Badge>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {customerProfile ? (
-            // Signed in - show read-only details
-            <div className="space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <Label className="text-muted-foreground text-xs">Full Name</Label>
-                  <p className="font-medium">{customerDetails.name || '-'}</p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-muted-foreground text-xs">Email Address</Label>
-                  <p className="font-medium">{customerDetails.email || '-'}</p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-muted-foreground text-xs">Phone Number</Label>
-                  <p className="font-medium">{customerDetails.phone || '-'}</p>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-muted-foreground text-xs">Delivery Address</Label>
-                <p className="font-medium">{customerDetails.address || '-'}</p>
-              </div>
-              {(!customerDetails.name || !customerDetails.phone || !customerDetails.address) && (
-                <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
-                  Some details are missing from your profile. Please update your profile in settings or fill in below.
+      {/* Customer Details - only show if NOT signed in or profile is incomplete */}
+      {(!customerProfile || !customerDetails.name || !customerDetails.phone || !customerDetails.address) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              Your Details
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {customerProfile ? (
+              // Signed in but profile incomplete - show only missing fields
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Please complete the missing details below:
                 </p>
-              )}
-              {/* Allow editing if profile is incomplete */}
-              {(!customerDetails.name || !customerDetails.phone || !customerDetails.address) && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {!customerDetails.name && (
                     <div className="space-y-2">
                       <Label htmlFor="name">Full Name</Label>
@@ -1042,63 +1015,63 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
                     </div>
                   )}
                 </div>
-              )}
-            </div>
-          ) : (
-            // Not signed in - show editable form
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Full Name</Label>
-                  <Input
-                    id="name"
-                    placeholder="John Doe"
-                    value={customerDetails.name}
-                    onChange={(e) =>
-                      setCustomerDetails(prev => ({ ...prev, name: e.target.value }))
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="john@example.com"
-                    value={customerDetails.email}
-                    onChange={(e) =>
-                      setCustomerDetails(prev => ({ ...prev, email: e.target.value }))
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number</Label>
-                  <Input
-                    id="phone"
-                    placeholder="+255 XXX XXX XXX"
-                    value={customerDetails.phone}
-                    onChange={(e) =>
-                      setCustomerDetails(prev => ({ ...prev, phone: e.target.value }))
-                    }
-                  />
-                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="address">Delivery Address in Tanzania</Label>
-                <Textarea
-                  id="address"
-                  placeholder="Street address, City, Region..."
-                  value={customerDetails.address}
-                  onChange={(e) =>
-                    setCustomerDetails(prev => ({ ...prev, address: e.target.value }))
-                  }
-                  rows={3}
-                />
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+            ) : (
+              // Not signed in - show full editable form
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Full Name</Label>
+                    <Input
+                      id="name"
+                      placeholder="John Doe"
+                      value={customerDetails.name}
+                      onChange={(e) =>
+                        setCustomerDetails(prev => ({ ...prev, name: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email Address</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="john@example.com"
+                      value={customerDetails.email}
+                      onChange={(e) =>
+                        setCustomerDetails(prev => ({ ...prev, email: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Phone Number</Label>
+                    <Input
+                      id="phone"
+                      placeholder="+255 XXX XXX XXX"
+                      value={customerDetails.phone}
+                      onChange={(e) =>
+                        setCustomerDetails(prev => ({ ...prev, phone: e.target.value }))
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="address">Delivery Address in Tanzania</Label>
+                  <Textarea
+                    id="address"
+                    placeholder="Street address, City, Region..."
+                    value={customerDetails.address}
+                    onChange={(e) =>
+                      setCustomerDetails(prev => ({ ...prev, address: e.target.value }))
+                    }
+                    rows={3}
+                  />
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Submit Button */}
       <Button
