@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Wallet, ArrowUpCircle, ArrowDownCircle, TrendingUp, Receipt, CreditCard } from 'lucide-react';
+import { Wallet, ArrowUpCircle, ArrowDownCircle, TrendingUp, Receipt, CreditCard, CalendarIcon } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useBankAccounts } from '@/hooks/useAccounting';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,9 +10,18 @@ import { AccountBalancesWidget } from './AccountBalancesWidget';
 import { LatestTransactionsWidget } from './LatestTransactionsWidget';
 import { AgingSummaryWidget } from './AgingSummaryWidget';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { startOfWeek, startOfMonth, startOfYear } from 'date-fns';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { startOfWeek, startOfMonth, startOfYear, format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
-type TimePeriod = 'week' | 'month' | 'year';
+type TimePeriod = 'week' | 'month' | 'year' | 'custom';
+
+interface DateRange {
+  from: Date;
+  to: Date;
+}
 
 interface AccountingSummary {
   cashBalance: number;
@@ -22,25 +31,38 @@ interface AccountingSummary {
   periodExpenses: number;
 }
 
-function getStartDate(period: TimePeriod): Date {
+function getStartDate(period: TimePeriod, customRange?: DateRange): Date {
+  if (period === 'custom' && customRange) {
+    return customRange.from;
+  }
   const now = new Date();
   switch (period) {
     case 'week':
-      return startOfWeek(now, { weekStartsOn: 1 }); // Monday
+      return startOfWeek(now, { weekStartsOn: 1 });
     case 'month':
       return startOfMonth(now);
     case 'year':
       return startOfYear(now);
+    default:
+      return startOfMonth(now);
   }
 }
 
-function useAccountingSummary(period: TimePeriod) {
+function getEndDate(period: TimePeriod, customRange?: DateRange): Date | null {
+  if (period === 'custom' && customRange) {
+    return customRange.to;
+  }
+  return null; // No end date for preset periods (up to now)
+}
+
+function useAccountingSummary(period: TimePeriod, customRange?: DateRange) {
   const { data: calculatedBankAccounts = [] } = useBankAccounts();
   
   return useQuery({
-    queryKey: ['accounting-summary', period],
+    queryKey: ['accounting-summary', period, customRange?.from?.toISOString(), customRange?.to?.toISOString()],
     queryFn: async (): Promise<AccountingSummary> => {
-      const periodStart = getStartDate(period).toISOString();
+      const periodStart = getStartDate(period, customRange).toISOString();
+      const periodEnd = getEndDate(period, customRange);
       
       // Get exchange rates for conversion to TZS
       const { data: exchangeRates } = await supabase
@@ -104,11 +126,15 @@ function useAccountingSummary(period: TimePeriod) {
       });
 
       // Get period income (paid invoices)
-      const { data: paidInvoices } = await supabase
+      let incomeQuery = supabase
         .from('invoices')
         .select('amount, currency')
         .eq('status', 'paid')
         .gte('paid_at', periodStart);
+      if (periodEnd) {
+        incomeQuery = incomeQuery.lte('paid_at', periodEnd.toISOString());
+      }
+      const { data: paidInvoices } = await incomeQuery;
 
       let periodIncome = 0;
       paidInvoices?.forEach(inv => {
@@ -116,19 +142,27 @@ function useAccountingSummary(period: TimePeriod) {
       });
 
       // Get period expenses (approved expenses from expenses table)
-      const { data: approvedExpenses } = await supabase
+      let expensesQuery = supabase
         .from('expenses')
         .select('amount, currency')
         .eq('status', 'approved')
         .gte('approved_at', periodStart);
+      if (periodEnd) {
+        expensesQuery = expensesQuery.lte('approved_at', periodEnd.toISOString());
+      }
+      const { data: approvedExpenses } = await expensesQuery;
 
       // Also get posted expense transactions from journal entries
-      const { data: expenseJournals } = await supabase
+      let journalQuery = supabase
         .from('journal_entries')
         .select('expense_amount, expense_currency')
         .eq('is_expense', true)
         .eq('status', 'posted')
         .gte('posted_at', periodStart);
+      if (periodEnd) {
+        journalQuery = journalQuery.lte('posted_at', periodEnd.toISOString());
+      }
+      const { data: expenseJournals } = await journalQuery;
 
       let periodExpenses = 0;
       approvedExpenses?.forEach(exp => {
@@ -162,11 +196,16 @@ const periodLabels: Record<TimePeriod, string> = {
   week: 'This Week',
   month: 'This Month',
   year: 'This Year',
+  custom: 'Custom',
 };
 
 export function AccountingDashboard() {
   const [period, setPeriod] = useState<TimePeriod>('month');
-  const { data, isLoading } = useAccountingSummary(period);
+  const [customRange, setCustomRange] = useState<DateRange>({
+    from: startOfMonth(new Date()),
+    to: new Date(),
+  });
+  const { data, isLoading } = useAccountingSummary(period, period === 'custom' ? customRange : undefined);
 
   if (isLoading) {
     return (
@@ -244,10 +283,17 @@ export function AccountingDashboard() {
     },
   ];
 
+  const getPeriodLabel = () => {
+    if (period === 'custom') {
+      return `${format(customRange.from, 'MMM d')} - ${format(customRange.to, 'MMM d, yyyy')}`;
+    }
+    return periodLabels[period];
+  };
+
   return (
     <div className="space-y-6">
       {/* Period Filter */}
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2 flex-wrap">
         <Select value={period} onValueChange={(v) => setPeriod(v as TimePeriod)}>
           <SelectTrigger className="w-[140px]">
             <SelectValue />
@@ -256,8 +302,47 @@ export function AccountingDashboard() {
             <SelectItem value="week">This Week</SelectItem>
             <SelectItem value="month">This Month</SelectItem>
             <SelectItem value="year">This Year</SelectItem>
+            <SelectItem value="custom">Custom Range</SelectItem>
           </SelectContent>
         </Select>
+
+        {period === 'custom' && (
+          <div className="flex gap-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className={cn("w-[130px] justify-start text-left font-normal")}>
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {format(customRange.from, 'MMM d, yyyy')}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={customRange.from}
+                  onSelect={(date) => date && setCustomRange(prev => ({ ...prev, from: date }))}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+            <span className="self-center text-muted-foreground">to</span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className={cn("w-[130px] justify-start text-left font-normal")}>
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {format(customRange.to, 'MMM d, yyyy')}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={customRange.to}
+                  onSelect={(date) => date && setCustomRange(prev => ({ ...prev, to: date }))}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+        )}
       </div>
 
       {/* Stats Grid */}
