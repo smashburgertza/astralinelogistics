@@ -1353,10 +1353,15 @@ export type Database = {
           description: string
           entry_date: string
           entry_number: string
+          expense_amount: number | null
+          expense_category: string | null
+          expense_currency: string | null
           id: string
+          is_expense: boolean | null
           notes: string | null
           posted_at: string | null
           posted_by: string | null
+          receipt_url: string | null
           reference_id: string | null
           reference_type: string | null
           rejected_at: string | null
@@ -1366,6 +1371,7 @@ export type Database = {
           submitted_at: string | null
           submitted_by: string | null
           updated_at: string | null
+          vendor_name: string | null
         }
         Insert: {
           approved_at?: string | null
@@ -1375,10 +1381,15 @@ export type Database = {
           description: string
           entry_date?: string
           entry_number: string
+          expense_amount?: number | null
+          expense_category?: string | null
+          expense_currency?: string | null
           id?: string
+          is_expense?: boolean | null
           notes?: string | null
           posted_at?: string | null
           posted_by?: string | null
+          receipt_url?: string | null
           reference_id?: string | null
           reference_type?: string | null
           rejected_at?: string | null
@@ -1388,6 +1399,7 @@ export type Database = {
           submitted_at?: string | null
           submitted_by?: string | null
           updated_at?: string | null
+          vendor_name?: string | null
         }
         Update: {
           approved_at?: string | null
@@ -1397,10 +1409,15 @@ export type Database = {
           description?: string
           entry_date?: string
           entry_number?: string
+          expense_amount?: number | null
+          expense_category?: string | null
+          expense_currency?: string | null
           id?: string
+          is_expense?: boolean | null
           notes?: string | null
           posted_at?: string | null
           posted_by?: string | null
+          receipt_url?: string | null
           reference_id?: string | null
           reference_type?: string | null
           rejected_at?: string | null
@@ -1410,6 +1427,7 @@ export type Database = {
           submitted_at?: string | null
           submitted_by?: string | null
           updated_at?: string | null
+          vendor_name?: string | null
         }
         Relationships: []
       }

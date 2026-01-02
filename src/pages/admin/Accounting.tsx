@@ -8,14 +8,13 @@ import { ChartOfAccountsTab } from '@/components/admin/accounting/ChartOfAccount
 import { FinancialReportsTab } from '@/components/admin/accounting/FinancialReportsTab';
 import { BankAccountsTab } from '@/components/admin/accounting/BankAccountsTab';
 import { ProductsServicesTab } from '@/components/admin/accounting/ProductsServicesTab';
-import { ExpensesTab } from '@/components/admin/accounting/ExpensesTab';
-import { usePendingExpenses } from '@/hooks/useExpenses';
-import { LayoutDashboard, Receipt, List, FileText, Landmark, Package, Wallet } from 'lucide-react';
+import { useTransactionStats } from '@/hooks/useAccounting';
+import { LayoutDashboard, Receipt, List, FileText, Landmark, Package } from 'lucide-react';
 
 export default function AccountingPage() {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const { data: pendingExpenses } = usePendingExpenses();
-  const pendingCount = pendingExpenses?.length || 0;
+  const { data: stats } = useTransactionStats();
+  const pendingCount = stats?.pendingCount || 0;
 
   return (
     <AdminLayout title="Accounting">
@@ -28,14 +27,14 @@ export default function AccountingPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-7 lg:w-auto lg:inline-flex">
+          <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-flex">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
               <LayoutDashboard className="h-4 w-4" />
               <span className="hidden sm:inline">Dashboard</span>
             </TabsTrigger>
-            <TabsTrigger value="expenses" className="flex items-center gap-2 relative">
-              <Wallet className="h-4 w-4" />
-              <span className="hidden sm:inline">Expenses</span>
+            <TabsTrigger value="transactions" className="flex items-center gap-2 relative">
+              <Receipt className="h-4 w-4" />
+              <span className="hidden sm:inline">Transactions</span>
               {pendingCount > 0 && (
                 <Badge variant="destructive" className="ml-1 h-5 min-w-[20px] px-1.5 text-xs">
                   {pendingCount}
@@ -45,10 +44,6 @@ export default function AccountingPage() {
             <TabsTrigger value="products" className="flex items-center gap-2">
               <Package className="h-4 w-4" />
               <span className="hidden sm:inline">Products & Services</span>
-            </TabsTrigger>
-            <TabsTrigger value="transactions" className="flex items-center gap-2">
-              <Receipt className="h-4 w-4" />
-              <span className="hidden sm:inline">Transactions</span>
             </TabsTrigger>
             <TabsTrigger value="accounts" className="flex items-center gap-2">
               <Landmark className="h-4 w-4" />
@@ -68,16 +63,12 @@ export default function AccountingPage() {
             <AccountingDashboard />
           </TabsContent>
 
-          <TabsContent value="expenses">
-            <ExpensesTab />
+          <TabsContent value="transactions">
+            <TransactionsTab />
           </TabsContent>
 
           <TabsContent value="products">
             <ProductsServicesTab />
-          </TabsContent>
-
-          <TabsContent value="transactions">
-            <TransactionsTab />
           </TabsContent>
 
           <TabsContent value="accounts">

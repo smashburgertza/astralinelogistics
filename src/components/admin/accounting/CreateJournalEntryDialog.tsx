@@ -86,6 +86,7 @@ export function CreateJournalEntryDialog({ open, onOpenChange }: CreateJournalEn
         posted_by: null,
         created_by: null,
         notes: notes || null,
+        is_expense: false,
       },
       lines: validLines.map(l => ({
         account_id: l.account_id,
