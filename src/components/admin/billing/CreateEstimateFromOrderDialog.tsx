@@ -87,11 +87,11 @@ export function CreateEstimateFromOrderDialog({
     return productsServices?.find(p => p.service_type === serviceType);
   };
 
-  // Build default line items from order - include individual product details and match to service catalog
+  // Build default line items from order in order: Product → Shipping → Customs & Clearing → Handling Fee
   const defaultLineItems = useMemo(() => {
     const lineItems: Array<{ product_service_id: string; description: string; quantity: number; unit_price: number; unit_type: string }> = [];
     
-    // Add individual product items from the order (use purchasing service type if available)
+    // 1. Add individual product items from the order (use purchasing service type if available)
     const purchasingService = findProductByType('purchasing');
     items.forEach((item) => {
       const productName = item.product_name || 'Product';
@@ -107,23 +107,7 @@ export function CreateEstimateFromOrderDialog({
       });
     });
     
-    // Add customs/duty line item if present (match to customs service type) - percentage based
-    if (order.estimated_duty && order.estimated_duty > 0) {
-      const customsService = findProductByType('customs');
-      // Calculate percentage rate based on product cost
-      const productTotal = items.reduce((sum, item) => sum + (item.product_price || 0) * (item.quantity || 1), 0);
-      const dutyPercent = productTotal > 0 ? (order.estimated_duty / productTotal) * 100 : 0;
-      
-      lineItems.push({
-        product_service_id: customsService?.id || '',
-        description: customsService?.name || 'Customs Clearance',
-        quantity: 1,
-        unit_price: dutyPercent > 0 ? Number(dutyPercent.toFixed(2)) : (customsService?.unit_price || 0),
-        unit_type: 'percent',
-      });
-    }
-    
-    // Add shipping line item (match to air_cargo service type)
+    // 2. Add shipping line item (match to air_cargo service type)
     if (order.estimated_shipping_cost > 0 || totalWeight > 0) {
       const airCargoService = findProductByType('air_cargo');
       lineItems.push({
@@ -137,7 +121,23 @@ export function CreateEstimateFromOrderDialog({
       });
     }
     
-    // Add handling fee (match to handling service type) - percentage based
+    // 3. Add customs & clearing line item if present (match to customs service type) - percentage based
+    if (order.estimated_duty && order.estimated_duty > 0) {
+      const customsService = findProductByType('customs');
+      // Calculate percentage rate based on product cost
+      const productTotal = items.reduce((sum, item) => sum + (item.product_price || 0) * (item.quantity || 1), 0);
+      const dutyPercent = productTotal > 0 ? (order.estimated_duty / productTotal) * 100 : 0;
+      
+      lineItems.push({
+        product_service_id: customsService?.id || '',
+        description: customsService?.name || 'Customs & Clearing',
+        quantity: 1,
+        unit_price: dutyPercent > 0 ? Number(dutyPercent.toFixed(2)) : (customsService?.unit_price || 0),
+        unit_type: 'percent',
+      });
+    }
+    
+    // 4. Add handling fee (match to handling service type) - percentage based
     if (order.handling_fee > 0) {
       const handlingService = findProductByType('handling');
       // Calculate percentage rate based on product cost

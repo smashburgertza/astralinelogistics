@@ -207,7 +207,7 @@ export function CreateEstimateFromOrderDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="purchaseFee">Purchase Fee (USD)</Label>
+              <Label htmlFor="purchaseFee">Customs & Clearing (USD)</Label>
               <Input
                 id="purchaseFee"
                 type="number"
@@ -268,19 +268,19 @@ export function CreateEstimateFromOrderDialog({
 
           <Separator />
 
-          {/* Summary */}
+          {/* Summary - Order: Product → Shipping → Customs & Clearing → Handling Fee */}
           <div className="space-y-2 bg-muted/50 p-4 rounded-lg">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Product Cost</span>
               <span>${product.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Purchase Fee</span>
-              <span>${purchase.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Shipping ({weight.toFixed(2)} kg × ${rate.toFixed(2)})</span>
               <span>${shippingSubtotal.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Customs & Clearing</span>
+              <span>${purchase.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Handling Fee</span>
