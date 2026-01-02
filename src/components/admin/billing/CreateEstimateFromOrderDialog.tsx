@@ -124,15 +124,12 @@ export function CreateEstimateFromOrderDialog({
     // 3. Add customs & clearing line item if present (match to customs service type) - percentage based
     if (order.estimated_duty && order.estimated_duty > 0) {
       const customsService = findProductByType('customs');
-      // Calculate percentage rate based on product cost
-      const productTotal = items.reduce((sum, item) => sum + (item.product_price || 0) * (item.quantity || 1), 0);
-      const dutyPercent = productTotal > 0 ? (order.estimated_duty / productTotal) * 100 : 0;
-      
+      // Use the service's configured rate, which is the actual percentage (e.g., 35 for 35%)
       lineItems.push({
         product_service_id: customsService?.id || '',
         description: customsService?.name || 'Customs & Clearing',
         quantity: 1,
-        unit_price: dutyPercent > 0 ? Number(dutyPercent.toFixed(2)) : (customsService?.unit_price || 0),
+        unit_price: customsService?.unit_price || 35, // Default to 35% if no service configured
         unit_type: 'percent',
       });
     }
@@ -140,15 +137,12 @@ export function CreateEstimateFromOrderDialog({
     // 4. Add handling fee (match to handling service type) - percentage based
     if (order.handling_fee > 0) {
       const handlingService = findProductByType('handling');
-      // Calculate percentage rate based on product cost
-      const productTotal = items.reduce((sum, item) => sum + (item.product_price || 0) * (item.quantity || 1), 0);
-      const handlingPercent = productTotal > 0 ? (order.handling_fee / productTotal) * 100 : 0;
-      
+      // Use the service's configured rate, which is the actual percentage (e.g., 3 for 3%)
       lineItems.push({
         product_service_id: handlingService?.id || '',
         description: handlingService?.name || 'Handling Fee',
         quantity: 1,
-        unit_price: handlingPercent > 0 ? Number(handlingPercent.toFixed(2)) : (handlingService?.unit_price || 0),
+        unit_price: handlingService?.unit_price || 3, // Default to 3% if no service configured
         unit_type: 'percent',
       });
     }
@@ -527,7 +521,7 @@ export function CreateEstimateFromOrderDialog({
                   const isPercentage = unitType === 'percent';
                   
                   // Calculate running total up to this line item (for percentage calculations)
-                  // This should match the order summary calculation: percentages apply to cumulative running total
+                  // Matches order summary: percentages apply to cumulative running total of all previous items
                   let runningTotalForItem = 0;
                   for (let i = 0; i < index; i++) {
                     const prevItem = watchLineItems[i];
@@ -535,8 +529,9 @@ export function CreateEstimateFromOrderDialog({
                     const prevPrice = prevItem?.unit_price || 0;
                     
                     if (prevItem?.unit_type === 'percent') {
-                      // For percentage items, add the calculated percentage amount
-                      runningTotalForItem += runningTotalForItem * (prevPrice / 100);
+                      // For percentage items, calculate the amount (percentage of running total at that point)
+                      const percentAmount = runningTotalForItem * (prevPrice / 100);
+                      runningTotalForItem += percentAmount;
                     } else {
                       // For fixed items, add quantity * price
                       runningTotalForItem += prevQty * prevPrice;
