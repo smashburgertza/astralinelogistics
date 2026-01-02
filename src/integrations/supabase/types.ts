@@ -1346,6 +1346,8 @@ export type Database = {
       }
       journal_entries: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
           created_at: string | null
           created_by: string | null
           description: string
@@ -1357,10 +1359,17 @@ export type Database = {
           posted_by: string | null
           reference_id: string | null
           reference_type: string | null
+          rejected_at: string | null
+          rejected_by: string | null
+          rejection_reason: string | null
           status: string | null
+          submitted_at: string | null
+          submitted_by: string | null
           updated_at: string | null
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string | null
           created_by?: string | null
           description: string
@@ -1372,10 +1381,17 @@ export type Database = {
           posted_by?: string | null
           reference_id?: string | null
           reference_type?: string | null
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejection_reason?: string | null
           status?: string | null
+          submitted_at?: string | null
+          submitted_by?: string | null
           updated_at?: string | null
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string | null
           created_by?: string | null
           description?: string
@@ -1387,7 +1403,12 @@ export type Database = {
           posted_by?: string | null
           reference_id?: string | null
           reference_type?: string | null
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejection_reason?: string | null
           status?: string | null
+          submitted_at?: string | null
+          submitted_by?: string | null
           updated_at?: string | null
         }
         Relationships: []

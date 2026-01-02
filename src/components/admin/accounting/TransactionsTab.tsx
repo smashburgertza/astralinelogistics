@@ -6,8 +6,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Plus, 
   Search, 
@@ -20,14 +23,28 @@ import {
   Trash2,
   Download,
   Calendar,
-  Filter
+  Filter,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Send,
+  FileText
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, subMonths, isWithinInterval, parseISO } from 'date-fns';
-import { useJournalEntries, useDeleteJournalEntry } from '@/hooks/useAccounting';
+import { 
+  useJournalEntries, 
+  useDeleteJournalEntry, 
+  usePendingTransactions,
+  useTransactionStats,
+  useApproveTransaction,
+  useRejectTransaction,
+  useSubmitForApproval
+} from '@/hooks/useAccounting';
 import { SimpleTransactionDialog } from './SimpleTransactionDialog';
 import { JournalEntryDetailDialog } from './JournalEntryDetailDialog';
 import { EditTransactionDialog } from './EditTransactionDialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { StatCard } from '@/components/admin/StatCard';
 
 const formatCurrency = (amount: number, currency: string = 'TZS') => {
   return new Intl.NumberFormat('en-TZ', {
@@ -58,9 +75,17 @@ export function TransactionsTab() {
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [editEntryId, setEditEntryId] = useState<string | null>(null);
   const [deleteEntryId, setDeleteEntryId] = useState<string | null>(null);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [rejectEntryId, setRejectEntryId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
 
   const { data: entries = [], isLoading } = useJournalEntries();
+  const { data: pendingEntries = [], isLoading: pendingLoading } = usePendingTransactions();
+  const { data: stats } = useTransactionStats();
   const deleteEntry = useDeleteJournalEntry();
+  const approveTransaction = useApproveTransaction();
+  const rejectTransaction = useRejectTransaction();
+  const submitForApproval = useSubmitForApproval();
 
   // Handle date preset changes
   const handleDatePreset = (preset: string) => {
@@ -120,12 +145,10 @@ export function TransactionsTab() {
     
     filteredEntries.forEach(entry => {
       if (entry.reference_type === 'income' || entry.reference_type === 'payment') {
-        // Sum credit amounts for income
         entry.lines?.forEach((line) => {
           if (line.credit_amount) income += Number(line.credit_amount);
         });
       } else if (entry.reference_type === 'expense') {
-        // Sum debit amounts for expenses
         entry.lines?.forEach((line) => {
           if (line.debit_amount) expenses += Number(line.debit_amount);
         });
@@ -141,6 +164,29 @@ export function TransactionsTab() {
         onSuccess: () => setDeleteEntryId(null),
       });
     }
+  };
+
+  const handleApprove = (id: string) => {
+    approveTransaction.mutate(id);
+  };
+
+  const handleReject = () => {
+    if (rejectEntryId && rejectReason) {
+      rejectTransaction.mutate(
+        { id: rejectEntryId, reason: rejectReason },
+        {
+          onSuccess: () => {
+            setRejectDialogOpen(false);
+            setRejectEntryId(null);
+            setRejectReason('');
+          },
+        }
+      );
+    }
+  };
+
+  const handleSubmitForApproval = (id: string) => {
+    submitForApproval.mutate(id);
   };
 
   const exportToCSV = () => {
@@ -195,6 +241,23 @@ export function TransactionsTab() {
     }
   };
 
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'posted':
+        return <Badge className="bg-green-100 text-green-700">Posted</Badge>;
+      case 'pending_approval':
+        return <Badge className="bg-amber-100 text-amber-700">Pending Approval</Badge>;
+      case 'draft':
+        return <Badge variant="secondary">Draft</Badge>;
+      case 'rejected':
+        return <Badge className="bg-red-100 text-red-700">Rejected</Badge>;
+      case 'voided':
+        return <Badge variant="destructive">Voided</Badge>;
+      default:
+        return <Badge variant="secondary">{status}</Badge>;
+    }
+  };
+
   const getEntryAmount = (entry: any) => {
     const lines = entry.lines || [];
     const debit = lines.reduce((sum: number, line: any) => sum + (Number(line.debit_amount) || 0), 0);
@@ -202,8 +265,194 @@ export function TransactionsTab() {
     return Math.max(debit, credit);
   };
 
+  const pendingCount = stats?.pendingCount || 0;
+
+  const renderTransactionTable = (transactionList: any[], showApprovalActions: boolean = false, loading: boolean = false) => (
+    <div className="rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-12"></TableHead>
+            <TableHead className="w-28">Date</TableHead>
+            <TableHead>Description</TableHead>
+            <TableHead className="w-28">Type</TableHead>
+            <TableHead className="text-right w-32">Amount</TableHead>
+            <TableHead className="w-32">Status</TableHead>
+            <TableHead className="w-20"></TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {loading ? (
+            <TableRow>
+              <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                Loading transactions...
+              </TableCell>
+            </TableRow>
+          ) : transactionList.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                {showApprovalActions 
+                  ? 'No transactions pending approval.'
+                  : 'No transactions found. Click "New Transaction" to add one.'}
+              </TableCell>
+            </TableRow>
+          ) : (
+            transactionList.map((entry) => (
+              <TableRow key={entry.id} className="cursor-pointer hover:bg-muted/50">
+                <TableCell>
+                  <div className={`p-2 rounded-full w-fit ${
+                    entry.reference_type === 'income' || entry.reference_type === 'payment' ? 'bg-green-100' :
+                    entry.reference_type === 'expense' ? 'bg-red-100' : 'bg-blue-100'
+                  }`}>
+                    {getTypeIcon(entry.reference_type)}
+                  </div>
+                </TableCell>
+                <TableCell className="text-sm">
+                  {format(new Date(entry.entry_date), 'MMM d, yyyy')}
+                </TableCell>
+                <TableCell>
+                  <div>
+                    <p className="font-medium">{entry.description}</p>
+                    <p className="text-xs text-muted-foreground">{entry.entry_number}</p>
+                  </div>
+                </TableCell>
+                <TableCell>{getTypeBadge(entry.reference_type)}</TableCell>
+                <TableCell className="text-right font-medium">
+                  <span className={
+                    entry.reference_type === 'income' || entry.reference_type === 'payment' 
+                      ? 'text-green-600' 
+                      : entry.reference_type === 'expense' 
+                        ? 'text-red-600' 
+                        : ''
+                  }>
+                    {formatCurrency(getEntryAmount(entry))}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  {getStatusBadge(entry.status)}
+                </TableCell>
+                <TableCell>
+                  {showApprovalActions ? (
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
+                        onClick={() => handleApprove(entry.id)}
+                        disabled={approveTransaction.isPending}
+                      >
+                        <CheckCircle className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => {
+                          setRejectEntryId(entry.id);
+                          setRejectDialogOpen(true);
+                        }}
+                      >
+                        <XCircle className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => setSelectedEntryId(entry.id)}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => setSelectedEntryId(entry.id)}>
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Details
+                        </DropdownMenuItem>
+                        {entry.status === 'draft' && (
+                          <>
+                            <DropdownMenuItem onClick={() => handleSubmitForApproval(entry.id)}>
+                              <Send className="h-4 w-4 mr-2" />
+                              Submit for Approval
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setEditEntryId(entry.id)}>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              onClick={() => setDeleteEntryId(entry.id)}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                        {entry.status === 'rejected' && (
+                          <>
+                            <DropdownMenuItem onClick={() => setEditEntryId(entry.id)}>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit & Resubmit
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              onClick={() => setDeleteEntryId(entry.id)}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard
+          title="Pending Approval"
+          value={stats?.pendingCount ?? 0}
+          icon={Clock}
+          variant="navy"
+        />
+        <StatCard
+          title="Draft"
+          value={stats?.draftCount ?? 0}
+          icon={FileText}
+          variant="default"
+        />
+        <StatCard
+          title="Posted"
+          value={stats?.postedCount ?? 0}
+          icon={CheckCircle}
+          variant="success"
+        />
+        <StatCard
+          title="Rejected"
+          value={stats?.rejectedCount ?? 0}
+          icon={XCircle}
+          variant="default"
+        />
+      </div>
+
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
@@ -249,30 +498,48 @@ export function TransactionsTab() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Transactions</CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
-                {filteredEntries.length} transactions found
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={exportToCSV}>
-                <Download className="h-4 w-4 mr-2" />
-                Export
-              </Button>
-              <Button onClick={() => setShowCreateDialog(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                New Transaction
-              </Button>
-            </div>
+      {/* Tabs */}
+      <Tabs defaultValue="queue" className="space-y-4">
+        <div className="flex items-center justify-between">
+          <TabsList>
+            <TabsTrigger value="queue" className="relative">
+              Approval Queue
+              {pendingCount > 0 && (
+                <Badge 
+                  variant="destructive" 
+                  className="ml-2 h-5 min-w-[20px] px-1.5 text-xs"
+                >
+                  {pendingCount}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="all">All Transactions</TabsTrigger>
+          </TabsList>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={exportToCSV}>
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
+            <Button onClick={() => setShowCreateDialog(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              New Transaction
+            </Button>
           </div>
-        </CardHeader>
-        <CardContent>
+        </div>
+
+        <TabsContent value="queue" className="space-y-4">
+          <div className="bg-muted/50 rounded-lg p-4 border">
+            <h3 className="font-medium mb-1">Pending Approval</h3>
+            <p className="text-sm text-muted-foreground">
+              Review and approve or reject transactions submitted by employees. Approved transactions will be posted to the ledger.
+            </p>
+          </div>
+          {renderTransactionTable(pendingEntries, true, pendingLoading)}
+        </TabsContent>
+
+        <TabsContent value="all" className="space-y-4">
           {/* Filters */}
-          <div className="flex flex-wrap gap-4 mb-4">
+          <div className="flex flex-wrap gap-4">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -342,160 +609,100 @@ export function TransactionsTab() {
             </Select>
 
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-32">
+              <SelectTrigger className="w-40">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="pending_approval">Pending Approval</SelectItem>
                 <SelectItem value="posted">Posted</SelectItem>
+                <SelectItem value="rejected">Rejected</SelectItem>
                 <SelectItem value="voided">Voided</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12"></TableHead>
-                  <TableHead className="w-28">Date</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead className="w-28">Type</TableHead>
-                  <TableHead className="text-right w-32">Amount</TableHead>
-                  <TableHead className="w-24">Status</TableHead>
-                  <TableHead className="w-16"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                      Loading transactions...
-                    </TableCell>
-                  </TableRow>
-                ) : filteredEntries.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                      No transactions found. Click "New Transaction" to add one.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredEntries.map((entry) => (
-                    <TableRow key={entry.id} className="cursor-pointer hover:bg-muted/50">
-                      <TableCell>
-                        <div className={`p-2 rounded-full w-fit ${
-                          entry.reference_type === 'income' || entry.reference_type === 'payment' ? 'bg-green-100' :
-                          entry.reference_type === 'expense' ? 'bg-red-100' : 'bg-blue-100'
-                        }`}>
-                          {getTypeIcon(entry.reference_type)}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {format(new Date(entry.entry_date), 'MMM d, yyyy')}
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <p className="font-medium">{entry.description}</p>
-                          <p className="text-xs text-muted-foreground">{entry.entry_number}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell>{getTypeBadge(entry.reference_type)}</TableCell>
-                      <TableCell className="text-right font-medium">
-                        <span className={
-                          entry.reference_type === 'income' || entry.reference_type === 'payment' 
-                            ? 'text-green-600' 
-                            : entry.reference_type === 'expense' 
-                              ? 'text-red-600' 
-                              : ''
-                        }>
-                          {formatCurrency(getEntryAmount(entry))}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge 
-                          variant={entry.status === 'posted' ? 'default' : entry.status === 'voided' ? 'destructive' : 'secondary'}
-                          className="text-xs"
-                        >
-                          {entry.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => setSelectedEntryId(entry.id)}>
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setEditEntryId(entry.id)}>
-                              <Edit className="h-4 w-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            {entry.status === 'draft' && (
-                              <DropdownMenuItem 
-                                onClick={() => setDeleteEntryId(entry.id)}
-                                className="text-destructive"
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+          {renderTransactionTable(filteredEntries, false, isLoading)}
+        </TabsContent>
+      </Tabs>
+
+      <SimpleTransactionDialog 
+        open={showCreateDialog} 
+        onOpenChange={setShowCreateDialog}
+      />
+
+      {selectedEntryId && (
+        <JournalEntryDetailDialog
+          entryId={selectedEntryId}
+          open={!!selectedEntryId}
+          onOpenChange={(open) => !open && setSelectedEntryId(null)}
+        />
+      )}
+
+      <EditTransactionDialog
+        open={!!editEntryId}
+        onOpenChange={(open) => !open && setEditEntryId(null)}
+        entryId={editEntryId}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteEntryId} onOpenChange={(open) => !open && setDeleteEntryId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Transaction?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this journal entry. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDelete} 
+              className="bg-destructive text-destructive-foreground"
+              disabled={deleteEntry.isPending}
+            >
+              {deleteEntry.isPending ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reject Dialog */}
+      <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject Transaction</DialogTitle>
+            <DialogDescription>
+              Please provide a reason for rejecting this transaction.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="reject-reason">Reason for Rejection</Label>
+              <Textarea
+                id="reject-reason"
+                placeholder="Enter the reason for rejection..."
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                rows={3}
+              />
+            </div>
           </div>
-        </CardContent>
-
-        <SimpleTransactionDialog 
-          open={showCreateDialog} 
-          onOpenChange={setShowCreateDialog}
-        />
-
-        {selectedEntryId && (
-          <JournalEntryDetailDialog
-            entryId={selectedEntryId}
-            open={!!selectedEntryId}
-            onOpenChange={(open) => !open && setSelectedEntryId(null)}
-          />
-        )}
-
-        <EditTransactionDialog
-          open={!!editEntryId}
-          onOpenChange={(open) => !open && setEditEntryId(null)}
-          entryId={editEntryId}
-        />
-
-        <AlertDialog open={!!deleteEntryId} onOpenChange={(open) => !open && setDeleteEntryId(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Transaction?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This will permanently delete this journal entry. This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction 
-                onClick={handleDelete} 
-                className="bg-destructive text-destructive-foreground"
-                disabled={deleteEntry.isPending}
-              >
-                {deleteEntry.isPending ? 'Deleting...' : 'Delete'}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </Card>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejectDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleReject}
+              disabled={!rejectReason || rejectTransaction.isPending}
+            >
+              {rejectTransaction.isPending ? 'Rejecting...' : 'Reject Transaction'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

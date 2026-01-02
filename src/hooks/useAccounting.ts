@@ -25,13 +25,20 @@ export interface JournalEntry {
   description: string;
   reference_type: string | null;
   reference_id: string | null;
-  status: 'draft' | 'posted' | 'voided';
+  status: 'draft' | 'pending_approval' | 'posted' | 'voided' | 'rejected';
   posted_at: string | null;
   posted_by: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
   notes: string | null;
+  submitted_by: string | null;
+  submitted_at: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  rejected_by: string | null;
+  rejected_at: string | null;
+  rejection_reason: string | null;
   lines?: JournalLine[];
 }
 
@@ -219,7 +226,7 @@ export function useCreateJournalEntry() {
       entry,
       lines,
     }: {
-      entry: Omit<JournalEntry, 'id' | 'entry_number' | 'created_at' | 'updated_at' | 'lines'>;
+      entry: Omit<JournalEntry, 'id' | 'entry_number' | 'created_at' | 'updated_at' | 'lines' | 'submitted_by' | 'submitted_at' | 'approved_by' | 'approved_at' | 'rejected_by' | 'rejected_at' | 'rejection_reason'>;
       lines: Omit<JournalLine, 'id' | 'journal_entry_id' | 'created_at' | 'account'>[];
     }) => {
       // Generate entry number
@@ -326,6 +333,160 @@ export function useVoidJournalEntry() {
     },
     onError: (error) => {
       toast.error(`Failed to void journal entry: ${error.message}`);
+    },
+  });
+}
+
+// Submit for approval
+export function useSubmitForApproval() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const { data, error } = await supabase
+        .from('journal_entries')
+        .update({
+          status: 'pending_approval',
+          submitted_by: user?.id,
+          submitted_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
+      queryClient.invalidateQueries({ queryKey: ['pending-transactions'] });
+      toast.success('Transaction submitted for approval');
+    },
+    onError: (error) => {
+      toast.error(`Failed to submit for approval: ${error.message}`);
+    },
+  });
+}
+
+// Approve transaction
+export function useApproveTransaction() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const { data, error } = await supabase
+        .from('journal_entries')
+        .update({
+          status: 'posted',
+          approved_by: user?.id,
+          approved_at: new Date().toISOString(),
+          posted_at: new Date().toISOString(),
+          posted_by: user?.id,
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
+      queryClient.invalidateQueries({ queryKey: ['pending-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['trial-balance'] });
+      queryClient.invalidateQueries({ queryKey: ['income-statement'] });
+      queryClient.invalidateQueries({ queryKey: ['balance-sheet'] });
+      queryClient.invalidateQueries({ queryKey: ['accounting-summary'] });
+      toast.success('Transaction approved and posted');
+    },
+    onError: (error) => {
+      toast.error(`Failed to approve transaction: ${error.message}`);
+    },
+  });
+}
+
+// Reject transaction
+export function useRejectTransaction() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const { data, error } = await supabase
+        .from('journal_entries')
+        .update({
+          status: 'rejected',
+          rejected_by: user?.id,
+          rejected_at: new Date().toISOString(),
+          rejection_reason: reason,
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
+      queryClient.invalidateQueries({ queryKey: ['pending-transactions'] });
+      toast.success('Transaction rejected');
+    },
+    onError: (error) => {
+      toast.error(`Failed to reject transaction: ${error.message}`);
+    },
+  });
+}
+
+// Get pending approval transactions
+export function usePendingTransactions() {
+  return useQuery({
+    queryKey: ['pending-transactions'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('journal_entries')
+        .select('*')
+        .eq('status', 'pending_approval')
+        .order('submitted_at', { ascending: false });
+
+      if (error) throw error;
+      return data as JournalEntry[];
+    },
+  });
+}
+
+// Get transaction stats for approval workflow
+export function useTransactionStats() {
+  return useQuery({
+    queryKey: ['transaction-stats'],
+    queryFn: async () => {
+      const { data: entries, error } = await supabase
+        .from('journal_entries')
+        .select('status');
+
+      if (error) throw error;
+
+      const stats = {
+        pendingCount: 0,
+        draftCount: 0,
+        postedCount: 0,
+        rejectedCount: 0,
+      };
+
+      entries?.forEach((entry) => {
+        if (entry.status === 'pending_approval') stats.pendingCount++;
+        else if (entry.status === 'draft') stats.draftCount++;
+        else if (entry.status === 'posted') stats.postedCount++;
+        else if (entry.status === 'rejected') stats.rejectedCount++;
+      });
+
+      return stats;
     },
   });
 }
