@@ -470,7 +470,7 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
       return;
     }
 
-    if (!customerDetails.name || !customerDetails.email || !customerDetails.phone || !customerDetails.address) {
+    if (!customerDetails.name || !customerDetails.email || !customerDetails.phone) {
       toast.error('Please fill in all your details');
       return;
     }
@@ -962,7 +962,7 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
       )}
 
       {/* Customer Details - only show if NOT signed in or profile is incomplete */}
-      {(!customerProfile || !customerDetails.name || !customerDetails.phone || !customerDetails.address) && (
+      {(!customerProfile || !customerDetails.name || !customerDetails.phone) && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -1001,20 +1001,6 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
                         onChange={(e) =>
                           setCustomerDetails(prev => ({ ...prev, phone: e.target.value }))
                         }
-                      />
-                    </div>
-                  )}
-                  {!customerDetails.address && (
-                    <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="address">Delivery Address in Tanzania</Label>
-                      <Textarea
-                        id="address"
-                        placeholder="Street address, City, Region..."
-                        value={customerDetails.address}
-                        onChange={(e) =>
-                          setCustomerDetails(prev => ({ ...prev, address: e.target.value }))
-                        }
-                        rows={2}
                       />
                     </div>
                   )}
@@ -1058,18 +1044,6 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
                       }
                     />
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="address">Delivery Address in Tanzania</Label>
-                  <Textarea
-                    id="address"
-                    placeholder="Street address, City, Region..."
-                    value={customerDetails.address}
-                    onChange={(e) =>
-                      setCustomerDetails(prev => ({ ...prev, address: e.target.value }))
-                    }
-                    rows={3}
-                  />
                 </div>
               </>
             )}
