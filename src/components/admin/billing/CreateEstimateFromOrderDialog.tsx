@@ -323,6 +323,17 @@ export function CreateEstimateFromOrderDialog({
     const hasPurchaseItems = calculations.productCost > 0 || calculations.purchaseFee > 0;
     const estimateType = hasPurchaseItems ? 'purchase_shipping' : 'shipping';
 
+    // Store line items as JSON for reliable parsing, plus human-readable summary
+    const lineItemsJson = JSON.stringify(data.line_items.map(i => ({
+      product_service_id: i.product_service_id,
+      description: i.description,
+      quantity: i.quantity,
+      unit_price: i.unit_price,
+      unit_type: i.unit_type,
+    })));
+    const humanReadable = data.line_items.map(i => `${i.description} (${i.unit_type === 'percent' ? `${i.unit_price}%` : `${i.quantity} x ${currencySymbol}${i.unit_price}`})`).join(', ');
+    const notesFromItems = `[LINE_ITEMS_JSON]${lineItemsJson}[/LINE_ITEMS_JSON]\n${data.notes || humanReadable}`;
+
     try {
       const estimate = await createEstimate.mutateAsync({
         customer_id: data.customer_id,
@@ -331,7 +342,7 @@ export function CreateEstimateFromOrderDialog({
         rate_per_kg: avgRate,
         handling_fee: 0,
         currency: data.currency,
-        notes: data.notes || `Line Items: ${data.line_items.map(i => `${i.description} (${i.unit_type === 'percent' ? `${i.unit_price}%` : `${i.quantity} x ${currencySymbol}${i.unit_price}`})`).join(', ')}`,
+        notes: notesFromItems,
         valid_days: data.valid_days,
         estimate_type: estimateType,
         product_cost: calculations.productCost,
