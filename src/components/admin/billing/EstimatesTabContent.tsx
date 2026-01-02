@@ -38,7 +38,6 @@ import { useExchangeRates, convertToTZS } from '@/hooks/useExchangeRates';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 import { useActiveRegions, regionsToMap } from '@/hooks/useRegions';
 import { CreateEstimateDialog } from './CreateEstimateDialog';
-import { EditEstimateDialog } from './EditEstimateDialog';
 
 const CUSTOMER_RESPONSE_CONFIG = {
   pending: { label: 'Awaiting', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
@@ -48,8 +47,7 @@ const CUSTOMER_RESPONSE_CONFIG = {
 
 export function EstimatesTabContent() {
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
-  const [estimateToEdit, setEstimateToEdit] = useState<Estimate | null>(null);
+  const [editEstimate, setEditEstimate] = useState<Estimate | null>(null);
   const { data: estimates, isLoading } = useEstimates();
   const { data: exchangeRates } = useExchangeRates();
   const { data: regions } = useActiveRegions();
@@ -59,8 +57,15 @@ export function EstimatesTabContent() {
   const deleteEstimate = useDeleteEstimate();
 
   const handleEditEstimate = (estimate: Estimate) => {
-    setEstimateToEdit(estimate);
-    setEditOpen(true);
+    setEditEstimate(estimate);
+    setDialogOpen(true);
+  };
+
+  const handleDialogClose = (open: boolean) => {
+    setDialogOpen(open);
+    if (!open) {
+      setEditEstimate(null);
+    }
   };
 
   if (isLoading) {
@@ -75,18 +80,19 @@ export function EstimatesTabContent() {
   return (
     <>
       <div className="flex justify-between items-center">
-        <CreateEstimateDialog
-          open={dialogOpen}
-          onOpenChange={setDialogOpen}
-          regions={regions || []}
-          trigger={
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Estimate
-            </Button>
-          }
-        />
+        <Button onClick={() => { setEditEstimate(null); setDialogOpen(true); }}>
+          <Plus className="h-4 w-4 mr-2" />
+          Create Estimate
+        </Button>
       </div>
+
+      {/* Create/Edit Estimate Dialog */}
+      <CreateEstimateDialog
+        open={dialogOpen}
+        onOpenChange={handleDialogClose}
+        regions={regions || []}
+        editEstimate={editEstimate}
+      />
 
       <Card>
         <CardHeader>
@@ -231,18 +237,6 @@ export function EstimatesTabContent() {
           </Table>
         </CardContent>
       </Card>
-
-      {/* Edit Estimate Dialog */}
-      {estimateToEdit && (
-        <EditEstimateDialog
-          estimate={estimateToEdit}
-          open={editOpen}
-          onOpenChange={(open) => {
-            setEditOpen(open);
-            if (!open) setEstimateToEdit(null);
-          }}
-        />
-      )}
     </>
   );
 }
