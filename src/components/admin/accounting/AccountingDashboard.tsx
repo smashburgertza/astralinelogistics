@@ -19,10 +19,11 @@ interface AccountingSummary {
 
 function useAccountingSummary() {
   // Use the same hook that AccountBalancesWidget uses for consistent calculations
-  const { data: calculatedBankAccounts = [], dataUpdatedAt } = useBankAccounts();
+  const { data: calculatedBankAccounts = [] } = useBankAccounts();
   
+  // Use a stable key - the query will be invalidated when bank-accounts is invalidated
   return useQuery({
-    queryKey: ['accounting-summary', dataUpdatedAt],
+    queryKey: ['accounting-summary'],
     queryFn: async (): Promise<AccountingSummary> => {
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
