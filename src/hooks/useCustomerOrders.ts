@@ -14,6 +14,7 @@ export interface OrderRequest {
   total_product_cost: number;
   handling_fee: number;
   estimated_shipping_cost: number;
+  estimated_duty: number;
   grand_total: number;
   notes: string | null;
   created_at: string;

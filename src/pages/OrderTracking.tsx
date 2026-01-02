@@ -37,6 +37,7 @@ interface OrderRequest {
   total_product_cost: number;
   estimated_shipping_cost: number;
   handling_fee: number;
+  estimated_duty: number;
   grand_total: number;
   created_at: string;
   updated_at: string;
@@ -310,8 +311,12 @@ export default function OrderTracking() {
                       <span>{formatCurrency(order.total_product_cost)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Estimated Shipping</span>
+                      <span className="text-muted-foreground">Shipping Charges</span>
                       <span>{formatCurrency(order.estimated_shipping_cost)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Duty & Clearing</span>
+                      <span>{formatCurrency(order.estimated_duty || 0)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Handling Fee</span>

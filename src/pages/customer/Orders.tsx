@@ -135,8 +135,9 @@ export default function CustomerOrders() {
                       <div className="text-right space-y-1">
                         <div className="text-xs text-muted-foreground space-y-0.5">
                           <p>Products: ${order.total_product_cost.toFixed(2)}</p>
-                          <p>Handling: ${order.handling_fee.toFixed(2)}</p>
                           <p>Shipping: ${order.estimated_shipping_cost.toFixed(2)}</p>
+                          <p>Duty & Clearing: ${(order.estimated_duty || 0).toFixed(2)}</p>
+                          <p>Handling: ${order.handling_fee.toFixed(2)}</p>
                         </div>
                         <p className="text-lg font-bold text-foreground">
                           Total: ${order.grand_total.toFixed(2)}
