@@ -311,8 +311,14 @@ export function CreateEstimateFromOrderDialog({
   const currencySymbol = CURRENCY_SYMBOLS[watchCurrency] || '$';
 
   const onSubmit = async (data: EstimateFormData) => {
-    const totalWeight = data.line_items.reduce((sum, item) => sum + item.quantity, 0);
-    const avgRate = calculations.subtotal / totalWeight || 0;
+    const totalWeight = data.line_items.reduce((sum, item) => {
+      // Only count weight for non-percentage items
+      if (item.unit_type !== 'percent') {
+        return sum + item.quantity;
+      }
+      return sum;
+    }, 0);
+    const avgRate = totalWeight > 0 ? calculations.subtotal / totalWeight : 0;
     
     const hasPurchaseItems = calculations.productCost > 0 || calculations.purchaseFee > 0;
     const estimateType = hasPurchaseItems ? 'purchase_shipping' : 'shipping';
@@ -325,11 +331,13 @@ export function CreateEstimateFromOrderDialog({
         rate_per_kg: avgRate,
         handling_fee: 0,
         currency: data.currency,
-        notes: data.notes || `Line Items: ${data.line_items.map(i => `${i.description} (${i.quantity} x ${currencySymbol}${i.unit_price})`).join(', ')}`,
+        notes: data.notes || `Line Items: ${data.line_items.map(i => `${i.description} (${i.unit_type === 'percent' ? `${i.unit_price}%` : `${i.quantity} x ${currencySymbol}${i.unit_price}`})`).join(', ')}`,
         valid_days: data.valid_days,
         estimate_type: estimateType,
         product_cost: calculations.productCost,
         purchase_fee: calculations.purchaseFee,
+        subtotal: calculations.subtotal,  // Pass pre-calculated subtotal
+        total: calculations.total,         // Pass pre-calculated total
       });
 
       // Link estimate to order request
