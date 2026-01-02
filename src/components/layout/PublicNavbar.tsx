@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { MenuIcon, XIcon, PhoneCall, MailOpen, User, LayoutDashboard, LogOut, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
+import { useFeatureVisibility } from '@/hooks/useFeatureVisibility';
 import { cn } from '@/lib/utils';
 import astralineLogo from '@/assets/astraline-logo-full.svg';
 import astralineLogoWhite from '@/assets/astraline-logo-white.svg';
@@ -22,6 +23,8 @@ export function PublicNavbar() {
   const { user, profile, isAdmin, isAgent, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  
+  const { showOnPublic: showShopForMe } = useFeatureVisibility('shop_for_me');
 
   const getFirstName = () => {
     if (profile?.full_name) {
@@ -35,13 +38,21 @@ export function PublicNavbar() {
 
   const firstName = getFirstName();
 
-  const navItems = [
-    { label: 'Home', href: '/#', sectionId: '' },
-    { label: 'About Us', href: '/#about', sectionId: 'about' },
-    { label: 'Services', href: '/#services', sectionId: 'services' },
-    { label: 'Shop For Me', href: '/#shop-for-me', sectionId: 'shop-for-me' },
-    { label: 'Contact Us', href: '/#contact', sectionId: 'contact' },
-  ];
+  const navItems = useMemo(() => {
+    const items = [
+      { label: 'Home', href: '/#', sectionId: '' },
+      { label: 'About Us', href: '/#about', sectionId: 'about' },
+      { label: 'Services', href: '/#services', sectionId: 'services' },
+      { label: 'Contact Us', href: '/#contact', sectionId: 'contact' },
+    ];
+    
+    // Insert Shop For Me before Contact Us if enabled
+    if (showShopForMe) {
+      items.splice(3, 0, { label: 'Shop For Me', href: '/#shop-for-me', sectionId: 'shop-for-me' });
+    }
+    
+    return items;
+  }, [showShopForMe]);
 
   // Track active section on scroll
   useEffect(() => {
