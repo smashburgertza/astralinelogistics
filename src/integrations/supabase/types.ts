@@ -1582,6 +1582,7 @@ export type Database = {
           customer_name: string
           customer_phone: string
           estimate_id: string | null
+          estimated_duty: number
           estimated_shipping_cost: number
           grand_total: number
           handling_fee: number
@@ -1599,6 +1600,7 @@ export type Database = {
           customer_name: string
           customer_phone: string
           estimate_id?: string | null
+          estimated_duty?: number
           estimated_shipping_cost?: number
           grand_total?: number
           handling_fee?: number
@@ -1616,6 +1618,7 @@ export type Database = {
           customer_name?: string
           customer_phone?: string
           estimate_id?: string | null
+          estimated_duty?: number
           estimated_shipping_cost?: number
           grand_total?: number
           handling_fee?: number

@@ -10,6 +10,7 @@ export interface OrderRequest {
   total_product_cost: number;
   estimated_shipping_cost: number;
   handling_fee: number;
+  estimated_duty: number;
   grand_total: number;
   status: string;
   category: string | null;

@@ -209,6 +209,10 @@ export function OrderRequestDrawer({ order, open, onOpenChange }: OrderRequestDr
                   <span>${Number(order.total_product_cost).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
+                  <span className="text-muted-foreground">Est. Duty</span>
+                  <span>${Number(order.estimated_duty || 0).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
                   <span className="text-muted-foreground">Est. Shipping</span>
                   <span>${Number(order.estimated_shipping_cost).toFixed(2)}</span>
                 </div>
@@ -221,13 +225,13 @@ export function OrderRequestDrawer({ order, open, onOpenChange }: OrderRequestDr
                   <div className="flex justify-between font-semibold text-base">
                     <span>Grand Total</span>
                     <span className="text-primary">
-                      ${(Number(order.total_product_cost) + Number(order.estimated_shipping_cost) + Number(order.handling_fee)).toFixed(2)}
+                      ${(Number(order.total_product_cost) + Number(order.estimated_duty || 0) + Number(order.estimated_shipping_cost) + Number(order.handling_fee)).toFixed(2)}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm text-muted-foreground">
                     <span>TZS Equivalent</span>
                     <span>
-                      TZS {((Number(order.total_product_cost) + Number(order.estimated_shipping_cost) + Number(order.handling_fee)) * usdRate).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                      TZS {((Number(order.total_product_cost) + Number(order.estimated_duty || 0) + Number(order.estimated_shipping_cost) + Number(order.handling_fee)) * usdRate).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                     </span>
                   </div>
                 </div>
