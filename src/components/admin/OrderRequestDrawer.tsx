@@ -213,7 +213,9 @@ export function OrderRequestDrawer({ order, open, onOpenChange }: OrderRequestDr
                 <Separator />
                 <div className="flex justify-between font-semibold text-base">
                   <span>Grand Total</span>
-                  <span className="text-primary">${Number(order.grand_total).toFixed(2)}</span>
+                  <span className="text-primary">
+                    ${(Number(order.total_product_cost) + Number(order.estimated_shipping_cost) + Number(order.handling_fee)).toFixed(2)}
+                  </span>
                 </div>
               </div>
             </div>
