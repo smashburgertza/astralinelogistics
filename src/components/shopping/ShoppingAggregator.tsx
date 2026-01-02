@@ -491,7 +491,7 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
           total_product_cost: totalProductCost,
           estimated_shipping_cost: totalShipping,
           handling_fee: totalHandling,
-          grand_total: totals.grandTotalInTZS,
+          grand_total: totalProductCost + totalShipping + totalHandling,
           category: category || 'products',
         })
         .select()

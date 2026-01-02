@@ -22,6 +22,7 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { OrderRequest, useOrderItems, useUpdateOrderStatus } from '@/hooks/useOrderRequests';
+import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
 
@@ -42,9 +43,12 @@ const ORDER_STATUSES = [
 
 export function OrderRequestDrawer({ order, open, onOpenChange }: OrderRequestDrawerProps) {
   const { data: items, isLoading: itemsLoading } = useOrderItems(order?.id || null);
+  const { data: exchangeRates } = useExchangeRates();
   const updateStatus = useUpdateOrderStatus();
   const [status, setStatus] = useState(order?.status || 'pending');
   const [notes, setNotes] = useState(order?.notes || '');
+
+  const usdRate = exchangeRates?.find(r => r.currency_code === 'USD')?.rate_to_tzs || 2500;
 
   useEffect(() => {
     if (order) {
@@ -211,11 +215,19 @@ export function OrderRequestDrawer({ order, open, onOpenChange }: OrderRequestDr
                   <span>${Number(order.handling_fee).toFixed(2)}</span>
                 </div>
                 <Separator />
-                <div className="flex justify-between font-semibold text-base">
-                  <span>Grand Total</span>
-                  <span className="text-primary">
-                    ${(Number(order.total_product_cost) + Number(order.estimated_shipping_cost) + Number(order.handling_fee)).toFixed(2)}
-                  </span>
+                <div className="space-y-1">
+                  <div className="flex justify-between font-semibold text-base">
+                    <span>Grand Total</span>
+                    <span className="text-primary">
+                      ${(Number(order.total_product_cost) + Number(order.estimated_shipping_cost) + Number(order.handling_fee)).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm text-muted-foreground">
+                    <span>TZS Equivalent</span>
+                    <span>
+                      TZS {((Number(order.total_product_cost) + Number(order.estimated_shipping_cost) + Number(order.handling_fee)) * usdRate).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
