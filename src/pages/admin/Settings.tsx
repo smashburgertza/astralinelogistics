@@ -45,6 +45,7 @@ import { PricingCalculator } from '@/components/home/PricingCalculator';
 import { ShoppingAggregator } from '@/components/shopping/ShoppingAggregator';
 import { InvoiceEstimateSettings } from '@/components/admin/InvoiceEstimateSettings';
 import { PushNotificationSettings } from '@/components/admin/PushNotificationSettings';
+import { FeatureVisibilitySettings } from '@/components/admin/FeatureVisibilitySettings';
 import {
   Dialog,
   DialogContent,
@@ -404,6 +405,11 @@ export default function AdminSettingsPage() {
 
         {/* Shop For Me - All related settings */}
         <TabsContent value="shopforme" className="space-y-6">
+          <FeatureVisibilitySettings
+            featureKey="shop_for_me"
+            title="Feature Visibility"
+            description="Control where the Shop For Me feature is displayed"
+          />
           <div className="flex justify-end">
             <Dialog>
               <DialogTrigger asChild>
@@ -427,6 +433,11 @@ export default function AdminSettingsPage() {
 
         {/* Shipping Calculator - All related settings */}
         <TabsContent value="shipping" className="space-y-6">
+          <FeatureVisibilitySettings
+            featureKey="shipping_calculator"
+            title="Feature Visibility"
+            description="Control where the Shipping Calculator is displayed"
+          />
           <div className="flex justify-end">
             <Dialog>
               <DialogTrigger asChild>
