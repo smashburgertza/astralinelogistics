@@ -25,7 +25,7 @@ import { OrderRequest, useOrderItems, useUpdateOrderStatus } from '@/hooks/useOr
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
-import { CreateEstimateFromOrderDialog } from './CreateEstimateFromOrderDialog';
+import { CreateEstimateFromOrderDialog } from './billing/CreateEstimateFromOrderDialog';
 
 interface OrderRequestDrawerProps {
   order: OrderRequest | null;
