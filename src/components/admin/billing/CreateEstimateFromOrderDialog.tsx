@@ -107,15 +107,19 @@ export function CreateEstimateFromOrderDialog({
       });
     });
     
-    // Add customs/duty line item if present (match to customs service type)
+    // Add customs/duty line item if present (match to customs service type) - percentage based
     if (order.estimated_duty && order.estimated_duty > 0) {
       const customsService = findProductByType('customs');
+      // Calculate percentage rate based on product cost
+      const productTotal = items.reduce((sum, item) => sum + (item.product_price || 0) * (item.quantity || 1), 0);
+      const dutyPercent = productTotal > 0 ? (order.estimated_duty / productTotal) * 100 : 0;
+      
       lineItems.push({
         product_service_id: customsService?.id || '',
-        description: customsService?.name || 'Customs Duty',
+        description: customsService?.name || 'Customs Clearance',
         quantity: 1,
-        unit_price: order.estimated_duty,
-        unit_type: '',
+        unit_price: dutyPercent > 0 ? Number(dutyPercent.toFixed(2)) : (customsService?.unit_price || 0),
+        unit_type: 'percent',
       });
     }
     
@@ -133,15 +137,19 @@ export function CreateEstimateFromOrderDialog({
       });
     }
     
-    // Add handling fee (match to handling service type)
+    // Add handling fee (match to handling service type) - percentage based
     if (order.handling_fee > 0) {
       const handlingService = findProductByType('handling');
+      // Calculate percentage rate based on product cost
+      const productTotal = items.reduce((sum, item) => sum + (item.product_price || 0) * (item.quantity || 1), 0);
+      const handlingPercent = productTotal > 0 ? (order.handling_fee / productTotal) * 100 : 0;
+      
       lineItems.push({
         product_service_id: handlingService?.id || '',
         description: handlingService?.name || 'Handling Fee',
         quantity: 1,
-        unit_price: order.handling_fee,
-        unit_type: '',
+        unit_price: handlingPercent > 0 ? Number(handlingPercent.toFixed(2)) : (handlingService?.unit_price || 0),
+        unit_type: 'percent',
       });
     }
     
