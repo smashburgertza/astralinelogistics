@@ -1581,6 +1581,7 @@ export type Database = {
           customer_email: string
           customer_name: string
           customer_phone: string
+          estimate_id: string | null
           estimated_shipping_cost: number
           grand_total: number
           handling_fee: number
@@ -1597,6 +1598,7 @@ export type Database = {
           customer_email: string
           customer_name: string
           customer_phone: string
+          estimate_id?: string | null
           estimated_shipping_cost?: number
           grand_total?: number
           handling_fee?: number
@@ -1613,6 +1615,7 @@ export type Database = {
           customer_email?: string
           customer_name?: string
           customer_phone?: string
+          estimate_id?: string | null
           estimated_shipping_cost?: number
           grand_total?: number
           handling_fee?: number
@@ -1622,7 +1625,15 @@ export type Database = {
           total_product_cost?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "order_requests_estimate_id_fkey"
+            columns: ["estimate_id"]
+            isOneToOne: false
+            referencedRelation: "estimates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       page_content: {
         Row: {
