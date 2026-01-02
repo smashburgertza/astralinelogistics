@@ -70,15 +70,27 @@ export function useCreateEstimate() {
       estimate_type?: EstimateType;
       product_cost?: number;
       purchase_fee?: number;
+      subtotal?: number; // Allow passing pre-calculated subtotal
+      total?: number;    // Allow passing pre-calculated total
     }) => {
       const { data: estimateNumber } = await supabase.rpc('generate_document_number', { prefix: 'EST' });
       const { data: user } = await supabase.auth.getUser();
 
       const productCost = data.product_cost || 0;
       const purchaseFee = data.purchase_fee || 0;
-      const shippingSubtotal = data.weight_kg * data.rate_per_kg;
-      const subtotal = shippingSubtotal + productCost;
-      const total = subtotal + data.handling_fee + purchaseFee;
+      
+      // Use pre-calculated values if provided, otherwise calculate
+      let subtotal: number;
+      let total: number;
+      
+      if (data.subtotal !== undefined && data.total !== undefined) {
+        subtotal = data.subtotal;
+        total = data.total;
+      } else {
+        const shippingSubtotal = data.weight_kg * data.rate_per_kg;
+        subtotal = shippingSubtotal + productCost;
+        total = subtotal + data.handling_fee + purchaseFee;
+      }
 
       const validUntil = data.valid_days
         ? new Date(Date.now() + data.valid_days * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
