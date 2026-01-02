@@ -8,8 +8,12 @@ import { PartnersSection } from '@/components/home/PartnersSection';
 import { AgentAddresses } from '@/components/home/AgentAddresses';
 import { ContactSection } from '@/components/home/ContactSection';
 import { CTASection } from '@/components/home/CTASection';
+import { useFeatureVisibility } from '@/hooks/useFeatureVisibility';
 
 const Index = () => {
+  const { showOnPublic: showShopForMe } = useFeatureVisibility('shop_for_me');
+  const { showOnPublic: showShippingCalc } = useFeatureVisibility('shipping_calculator');
+
   return (
     <div className="scroll-smooth">
       <HeroSection />
@@ -20,12 +24,16 @@ const Index = () => {
       <section id="services">
         <ServicesSection />
       </section>
-      <section id="shop-for-me">
-        <ShopForMeSection />
-      </section>
-      <section id="pricing">
-        <PricingCalculator />
-      </section>
+      {showShopForMe && (
+        <section id="shop-for-me">
+          <ShopForMeSection />
+        </section>
+      )}
+      {showShippingCalc && (
+        <section id="pricing">
+          <PricingCalculator />
+        </section>
+      )}
       <TestimonialsSection />
       <AgentAddresses />
       <section id="contact">
