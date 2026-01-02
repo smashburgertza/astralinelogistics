@@ -895,8 +895,12 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
                     <span className="font-medium">XXX.XX</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Shipping</span>
+                    <span className="text-muted-foreground">Shipping Charges</span>
                     <span className="font-medium">XXX.XX</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Duty & Clearing</span>
+                    <span className="font-medium">XX.XX</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Handling Fee</span>
