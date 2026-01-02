@@ -344,12 +344,12 @@ export function SimpleTransactionDialog({ open, onOpenChange, preselectedAccount
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
+      <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>Record Transaction</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto space-y-4 pr-2">
           {/* Transaction Type Selection */}
           <div className="space-y-2">
             <Label>Transaction Type</Label>
@@ -643,7 +643,7 @@ export function SimpleTransactionDialog({ open, onOpenChange, preselectedAccount
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-4">
+          <div className="flex justify-end gap-2 pt-4 sticky bottom-0 bg-background border-t -mx-2 px-2 py-3 -mb-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
