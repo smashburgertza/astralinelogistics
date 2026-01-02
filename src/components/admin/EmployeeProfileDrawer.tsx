@@ -15,7 +15,7 @@ import {
   User, Mail, Phone, Calendar, FileText, DollarSign,
   Package, TrendingUp, Award, BarChart3, Clock, CheckCircle,
   XCircle, AlertCircle, ArrowUpRight, ArrowDownRight, Trophy, Medal,
-  ShieldCheck, Shield, History, Hash
+  ShieldCheck, Shield, History, Hash, Lock
 } from 'lucide-react';
 import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import {
@@ -26,6 +26,7 @@ import { MILESTONES } from '@/hooks/useEmployeeMilestones';
 import { useEmployeeBadges } from '@/hooks/useEmployeeBadges';
 import { BadgeShowcase } from '@/components/admin/EmployeeBadgesDisplay';
 import { PERMISSIONS } from '@/hooks/useEmployees';
+import { EmployeePermissionsManager } from '@/components/admin/EmployeePermissionsManager';
 
 interface AuditLogEntry {
   id: string;
@@ -422,30 +423,6 @@ export function EmployeeProfileDrawer({ open, onOpenChange, employeeId }: Employ
                   </div>
                 </div>
 
-                {/* Permissions */}
-                {!profile.isSuperAdmin && profile.permissions && (
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium flex items-center gap-2">
-                        <Shield className="w-4 h-4" />
-                        Permissions
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex flex-wrap gap-1.5">
-                        {PERMISSIONS.filter(p => profile.permissions?.[p.key]).map(p => (
-                          <Badge key={p.key} variant="secondary" className="text-xs">
-                            {p.label}
-                          </Badge>
-                        ))}
-                        {PERMISSIONS.filter(p => profile.permissions?.[p.key]).length === 0 && (
-                          <span className="text-sm text-muted-foreground">No permissions assigned</span>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
                 {/* Key Metrics */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <Card className="bg-violet-500/5 border-violet-500/20">
@@ -496,8 +473,12 @@ export function EmployeeProfileDrawer({ open, onOpenChange, employeeId }: Employ
                 </div>
 
                 {/* Tabs for Charts and Activity */}
-                <Tabs defaultValue="performance" className="w-full">
-                  <TabsList className="grid w-full grid-cols-6">
+                <Tabs defaultValue="permissions" className="w-full">
+                  <TabsList className="grid w-full grid-cols-7">
+                    <TabsTrigger value="permissions">
+                      <Lock className="w-3.5 h-3.5 mr-1" />
+                      Access
+                    </TabsTrigger>
                     <TabsTrigger value="performance">Performance</TabsTrigger>
                     <TabsTrigger value="revenue">Revenue</TabsTrigger>
                     <TabsTrigger value="badges">
@@ -511,9 +492,17 @@ export function EmployeeProfileDrawer({ open, onOpenChange, employeeId }: Employ
                     <TabsTrigger value="activity">Activity</TabsTrigger>
                     <TabsTrigger value="audit">
                       <History className="w-3.5 h-3.5 mr-1" />
-                      Audit Log
+                      Audit
                     </TabsTrigger>
                   </TabsList>
+                  
+                  <TabsContent value="permissions" className="mt-4">
+                    <EmployeePermissionsManager
+                      employeeId={profile.userId}
+                      employeeName={profile.fullName}
+                      isSuperAdmin={profile.isSuperAdmin}
+                    />
+                  </TabsContent>
 
                   <TabsContent value="performance" className="mt-4">
                     <Card>
