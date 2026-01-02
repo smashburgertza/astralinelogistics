@@ -103,16 +103,27 @@ function useAccountingSummary() {
         monthlyIncome += convertToTzs(inv.amount || 0, inv.currency || 'USD');
       });
 
-      // Get monthly expenses (approved expenses)
+      // Get monthly expenses (approved expenses from expenses table)
       const { data: approvedExpenses } = await supabase
         .from('expenses')
         .select('amount, currency')
         .eq('status', 'approved')
         .gte('approved_at', startOfMonth);
 
+      // Also get posted expense transactions from journal entries
+      const { data: expenseJournals } = await supabase
+        .from('journal_entries')
+        .select('expense_amount, expense_currency')
+        .eq('is_expense', true)
+        .eq('status', 'posted')
+        .gte('posted_at', startOfMonth);
+
       let monthlyExpenses = 0;
       approvedExpenses?.forEach(exp => {
         monthlyExpenses += convertToTzs(exp.amount || 0, exp.currency || 'USD');
+      });
+      expenseJournals?.forEach(je => {
+        monthlyExpenses += convertToTzs(je.expense_amount || 0, je.expense_currency || 'USD');
       });
 
       return {
