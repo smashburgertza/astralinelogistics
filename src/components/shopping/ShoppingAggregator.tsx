@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Loader2, ExternalLink, ShoppingCart, Calculator, Package, CheckCircle2, Globe, Search, Sparkles, Edit3, RefreshCw, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, Loader2, ExternalLink, ShoppingCart, Calculator, Package, CheckCircle2, Globe, Search, Sparkles, Edit3, RefreshCw, AlertCircle, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,6 +32,7 @@ import { useDeliveryTimes } from '@/hooks/useDeliveryTimes';
 import { useAuth } from '@/hooks/useAuth';
 import { InlineAuthGate } from '@/components/auth/InlineAuthGate';
 import { useActiveRegions, regionsToMap } from '@/hooks/useRegions';
+import { useCustomerProfile } from '@/hooks/useCustomerPortal';
 
 type LoadingStep = 'fetching' | 'extracting' | 'analyzing' | 'complete' | 'error';
 
@@ -98,7 +99,21 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
   const { data: charges } = useShopForMeCharges();
   const { times: deliveryTimes } = useDeliveryTimes();
   const { data: regions } = useActiveRegions();
+  const { user } = useAuth();
+  const { data: customerProfile } = useCustomerProfile();
   const regionsMap = regionsToMap(regions);
+
+  // Auto-fill customer details when signed in
+  useEffect(() => {
+    if (customerProfile && user) {
+      setCustomerDetails({
+        name: customerProfile.name || '',
+        email: customerProfile.email || user.email || '',
+        phone: customerProfile.phone || '',
+        address: customerProfile.address || '',
+      });
+    }
+  }, [customerProfile, user]);
 
   // Get currency for a region
   const getRegionCurrency = (regionCode: string) => {
@@ -945,57 +960,143 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
       {/* Customer Details */}
       <Card>
         <CardHeader>
-          <CardTitle>Your Details</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <User className="h-5 w-5" />
+            Your Details
+            {customerProfile && (
+              <Badge variant="secondary" className="ml-auto">
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                Signed In
+              </Badge>
+            )}
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
-              <Input
-                id="name"
-                placeholder="John Doe"
-                value={customerDetails.name}
-                onChange={(e) =>
-                  setCustomerDetails(prev => ({ ...prev, name: e.target.value }))
-                }
-              />
+          {customerProfile ? (
+            // Signed in - show read-only details
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-muted-foreground text-xs">Full Name</Label>
+                  <p className="font-medium">{customerDetails.name || '-'}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-muted-foreground text-xs">Email Address</Label>
+                  <p className="font-medium">{customerDetails.email || '-'}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-muted-foreground text-xs">Phone Number</Label>
+                  <p className="font-medium">{customerDetails.phone || '-'}</p>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-muted-foreground text-xs">Delivery Address</Label>
+                <p className="font-medium">{customerDetails.address || '-'}</p>
+              </div>
+              {(!customerDetails.name || !customerDetails.phone || !customerDetails.address) && (
+                <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+                  Some details are missing from your profile. Please update your profile in settings or fill in below.
+                </p>
+              )}
+              {/* Allow editing if profile is incomplete */}
+              {(!customerDetails.name || !customerDetails.phone || !customerDetails.address) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t">
+                  {!customerDetails.name && (
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Full Name</Label>
+                      <Input
+                        id="name"
+                        placeholder="John Doe"
+                        value={customerDetails.name}
+                        onChange={(e) =>
+                          setCustomerDetails(prev => ({ ...prev, name: e.target.value }))
+                        }
+                      />
+                    </div>
+                  )}
+                  {!customerDetails.phone && (
+                    <div className="space-y-2">
+                      <Label htmlFor="phone">Phone Number</Label>
+                      <Input
+                        id="phone"
+                        placeholder="+255 XXX XXX XXX"
+                        value={customerDetails.phone}
+                        onChange={(e) =>
+                          setCustomerDetails(prev => ({ ...prev, phone: e.target.value }))
+                        }
+                      />
+                    </div>
+                  )}
+                  {!customerDetails.address && (
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="address">Delivery Address in Tanzania</Label>
+                      <Textarea
+                        id="address"
+                        placeholder="Street address, City, Region..."
+                        value={customerDetails.address}
+                        onChange={(e) =>
+                          setCustomerDetails(prev => ({ ...prev, address: e.target.value }))
+                        }
+                        rows={2}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email Address</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="john@example.com"
-                value={customerDetails.email}
-                onChange={(e) =>
-                  setCustomerDetails(prev => ({ ...prev, email: e.target.value }))
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone Number</Label>
-              <Input
-                id="phone"
-                placeholder="+255 XXX XXX XXX"
-                value={customerDetails.phone}
-                onChange={(e) =>
-                  setCustomerDetails(prev => ({ ...prev, phone: e.target.value }))
-                }
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="address">Delivery Address in Tanzania</Label>
-            <Textarea
-              id="address"
-              placeholder="Street address, City, Region..."
-              value={customerDetails.address}
-              onChange={(e) =>
-                setCustomerDetails(prev => ({ ...prev, address: e.target.value }))
-              }
-              rows={3}
-            />
-          </div>
+          ) : (
+            // Not signed in - show editable form
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Full Name</Label>
+                  <Input
+                    id="name"
+                    placeholder="John Doe"
+                    value={customerDetails.name}
+                    onChange={(e) =>
+                      setCustomerDetails(prev => ({ ...prev, name: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="john@example.com"
+                    value={customerDetails.email}
+                    onChange={(e) =>
+                      setCustomerDetails(prev => ({ ...prev, email: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <Input
+                    id="phone"
+                    placeholder="+255 XXX XXX XXX"
+                    value={customerDetails.phone}
+                    onChange={(e) =>
+                      setCustomerDetails(prev => ({ ...prev, phone: e.target.value }))
+                    }
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="address">Delivery Address in Tanzania</Label>
+                <Textarea
+                  id="address"
+                  placeholder="Street address, City, Region..."
+                  value={customerDetails.address}
+                  onChange={(e) =>
+                    setCustomerDetails(prev => ({ ...prev, address: e.target.value }))
+                  }
+                  rows={3}
+                />
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
