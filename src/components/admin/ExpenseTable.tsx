@@ -51,6 +51,10 @@ interface ExpenseWithShipment {
     tracking_number: string;
     origin_region: string;
   } | null;
+  // Journal entry specific fields
+  _source?: 'expense' | 'journal_entry';
+  _entry_number?: string;
+  _vendor_name?: string | null;
 }
 
 interface ExpenseTableProps {
@@ -75,6 +79,15 @@ const getCategoryColor = (category: string) => {
     packaging: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300',
     storage: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
     fuel: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
+    // Accounting categories
+    utilities: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-300',
+    rent: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300',
+    salaries: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300',
+    office_supplies: 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-300',
+    marketing: 'bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-900 dark:text-fuchsia-300',
+    professional_services: 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300',
+    maintenance: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300',
+    travel: 'bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-300',
     other: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
   };
   return colors[category] || colors.other;
@@ -251,7 +264,8 @@ export function ExpenseTable({
               const regionInfo = expense.region ? regions.find(r => r.code === expense.region) : null;
               const isPending = expense.status === 'pending';
               const needsClarification = expense.status === 'needs_clarification';
-              const canTakeAction = isPending || needsClarification;
+              const isJournalEntry = expense._source === 'journal_entry';
+              const canTakeAction = (isPending || needsClarification) && !isJournalEntry;
               const currency = expense.currency || 'TZS';
               const amountInTZS = convertToTZS(Number(expense.amount), currency);
               const submitterName = getProfileName(expense.submitted_by);
@@ -269,9 +283,16 @@ export function ExpenseTable({
                     </TableCell>
                   )}
                   <TableCell>
-                    <Badge className={getCategoryColor(expense.category)} variant="secondary">
-                      {getCategoryLabel(expense.category)}
-                    </Badge>
+                    <div className="flex flex-col gap-1">
+                      <Badge className={getCategoryColor(expense.category)} variant="secondary">
+                        {getCategoryLabel(expense.category)}
+                      </Badge>
+                      {isJournalEntry && expense._entry_number && (
+                        <span className="text-xs text-muted-foreground font-mono">
+                          {expense._entry_number}
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <div>
@@ -288,6 +309,11 @@ export function ExpenseTable({
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <ExpenseStatusBadge status={expense.status || 'pending'} />
+                      {isJournalEntry && (
+                        <Badge variant="outline" className="text-xs">
+                          Accounting
+                        </Badge>
+                      )}
                       {expense.denial_reason && (
                         <Tooltip>
                           <TooltipTrigger>
@@ -311,7 +337,9 @@ export function ExpenseTable({
                     </div>
                   </TableCell>
                   <TableCell>
-                    {submitterName ? (
+                    {isJournalEntry && expense._vendor_name ? (
+                      <span className="text-sm">{expense._vendor_name}</span>
+                    ) : submitterName ? (
                       <span className="text-sm">{submitterName}</span>
                     ) : (
                       <span className="text-muted-foreground">—</span>
@@ -322,6 +350,17 @@ export function ExpenseTable({
                       <code className="font-mono text-sm text-brand-gold">
                         {expense.shipments.tracking_number}
                       </code>
+                    ) : isJournalEntry ? (
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <span className="text-xs text-muted-foreground truncate max-w-[150px] block">
+                            {expense.description}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="max-w-xs">{expense.description}</p>
+                        </TooltipContent>
+                      </Tooltip>
                     ) : (
                       <span className="text-muted-foreground text-xs">Not linked</span>
                     )}
@@ -356,46 +395,59 @@ export function ExpenseTable({
                   </TableCell>
                   {showActions && (
                     <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {canTakeAction && (
-                            <>
-                              <DropdownMenuItem
-                                onClick={() => handleApprove(expense)}
-                                className="text-green-600"
-                              >
-                                <Check className="h-4 w-4 mr-2" />
-                                Approve
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => openDenyDialog(expense.id)}
-                                className="text-red-600"
-                              >
-                                <X className="h-4 w-4 mr-2" />
-                                Deny
-                              </DropdownMenuItem>
-                              {isPending && (
+                      {isJournalEntry ? (
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Badge variant="outline" className="text-xs">
+                              Posted
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>This expense was created in Accounting and is already posted.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {canTakeAction && (
+                              <>
                                 <DropdownMenuItem
-                                  onClick={() => openClarificationDialog(expense.id)}
-                                  className="text-orange-600"
+                                  onClick={() => handleApprove(expense)}
+                                  className="text-green-600"
                                 >
-                                  <MessageSquare className="h-4 w-4 mr-2" />
-                                  Request Clarification
+                                  <Check className="h-4 w-4 mr-2" />
+                                  Approve
                                 </DropdownMenuItem>
-                              )}
-                            </>
-                          )}
-                          <DropdownMenuItem onClick={() => handleEdit(expense)}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                                <DropdownMenuItem
+                                  onClick={() => openDenyDialog(expense.id)}
+                                  className="text-red-600"
+                                >
+                                  <X className="h-4 w-4 mr-2" />
+                                  Deny
+                                </DropdownMenuItem>
+                                {isPending && (
+                                  <DropdownMenuItem
+                                    onClick={() => openClarificationDialog(expense.id)}
+                                    className="text-orange-600"
+                                  >
+                                    <MessageSquare className="h-4 w-4 mr-2" />
+                                    Request Clarification
+                                  </DropdownMenuItem>
+                                )}
+                              </>
+                            )}
+                            <DropdownMenuItem onClick={() => handleEdit(expense)}>
+                              <Pencil className="h-4 w-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                     </TableCell>
                   )}
                 </TableRow>
