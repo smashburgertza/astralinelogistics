@@ -82,18 +82,24 @@ export function CreateEstimateFromOrderDialog({
     return sum + (item.estimated_weight_kg || 0) * item.quantity;
   }, 0);
 
-  // Build default line items from order - include individual product details
+  // Find matching product/service by service_type
+  const findProductByType = (serviceType: string) => {
+    return productsServices?.find(p => p.service_type === serviceType);
+  };
+
+  // Build default line items from order - include individual product details and match to service catalog
   const defaultLineItems = useMemo(() => {
     const lineItems: Array<{ product_service_id: string; description: string; quantity: number; unit_price: number; unit_type: string }> = [];
     
-    // Add individual product items from the order
+    // Add individual product items from the order (use purchasing service type if available)
+    const purchasingService = findProductByType('purchasing');
     items.forEach((item) => {
       const productName = item.product_name || 'Product';
       const price = item.product_price || 0;
       const qty = item.quantity || 1;
       
       lineItems.push({
-        product_service_id: '',
+        product_service_id: purchasingService?.id || '',
         description: productName,
         quantity: qty,
         unit_price: price,
@@ -101,33 +107,38 @@ export function CreateEstimateFromOrderDialog({
       });
     });
     
-    // Add duty line item if present
+    // Add customs/duty line item if present (match to customs service type)
     if (order.estimated_duty && order.estimated_duty > 0) {
+      const customsService = findProductByType('customs');
       lineItems.push({
-        product_service_id: '',
-        description: 'Estimated Duty',
+        product_service_id: customsService?.id || '',
+        description: customsService?.name || 'Customs Duty',
         quantity: 1,
         unit_price: order.estimated_duty,
         unit_type: '',
       });
     }
     
-    // Add shipping line item
+    // Add shipping line item (match to air_cargo service type)
     if (order.estimated_shipping_cost > 0 || totalWeight > 0) {
+      const airCargoService = findProductByType('air_cargo');
       lineItems.push({
-        product_service_id: '',
-        description: `Shipping (${totalWeight.toFixed(2)} kg estimated)`,
-        quantity: 1,
-        unit_price: order.estimated_shipping_cost,
-        unit_type: '',
+        product_service_id: airCargoService?.id || '',
+        description: airCargoService?.name || `Shipping (${totalWeight.toFixed(2)} kg)`,
+        quantity: totalWeight > 0 ? totalWeight : 1,
+        unit_price: totalWeight > 0 && order.estimated_shipping_cost > 0 
+          ? order.estimated_shipping_cost / totalWeight 
+          : order.estimated_shipping_cost,
+        unit_type: totalWeight > 0 ? 'kg' : '',
       });
     }
     
-    // Add handling fee
+    // Add handling fee (match to handling service type)
     if (order.handling_fee > 0) {
+      const handlingService = findProductByType('handling');
       lineItems.push({
-        product_service_id: '',
-        description: 'Handling Fee',
+        product_service_id: handlingService?.id || '',
+        description: handlingService?.name || 'Handling Fee',
         quantity: 1,
         unit_price: order.handling_fee,
         unit_type: '',
@@ -135,7 +146,7 @@ export function CreateEstimateFromOrderDialog({
     }
     
     return lineItems.length > 0 ? lineItems : [{ product_service_id: '', description: '', quantity: 1, unit_price: 0, unit_type: '' }];
-  }, [order, items, totalWeight]);
+  }, [order, items, totalWeight, productsServices]);
 
   const form = useForm<EstimateFormData>({
     resolver: zodResolver(estimateSchema),
