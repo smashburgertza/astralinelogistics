@@ -130,7 +130,7 @@ export function OrderRequestDrawer({ order, open, onOpenChange }: OrderRequestDr
                 </div>
                 <div className="flex items-start gap-2 text-sm text-muted-foreground">
                   <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                  <span>{order.customer_address}</span>
+                  <span className="break-words">{order.customer_address}</span>
                 </div>
               </div>
             </div>
@@ -153,23 +153,23 @@ export function OrderRequestDrawer({ order, open, onOpenChange }: OrderRequestDr
                   {items?.map((item) => (
                     <div
                       key={item.id}
-                      className="p-3 rounded-lg bg-muted/50 space-y-2"
+                      className="p-4 rounded-lg bg-muted/50 space-y-3"
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <p className="font-medium text-sm leading-snug break-words">
                             {item.product_name || 'Unknown Product'}
                           </p>
                           <a
                             href={item.product_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1"
+                            className="text-xs text-primary hover:underline flex items-center gap-1 mt-1"
                           >
                             View product <ExternalLink className="h-3 w-3" />
                           </a>
                         </div>
-                        <Badge variant="secondary">×{item.quantity}</Badge>
+                        <Badge variant="secondary" className="flex-shrink-0">×{item.quantity}</Badge>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">
