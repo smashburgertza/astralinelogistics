@@ -116,7 +116,7 @@ export function OrderRequestTable({ orders, isLoading }: OrderRequestTableProps)
                   </TableCell>
                   <TableCell className="text-right">
                     <span className="font-semibold text-primary">
-                      ${(Number(order.total_product_cost) + Number(order.estimated_shipping_cost) + Number(order.handling_fee)).toFixed(2)}
+                      ${(Number(order.total_product_cost) + Number(order.estimated_duty || 0) + Number(order.estimated_shipping_cost) + Number(order.handling_fee)).toFixed(2)}
                     </span>
                   </TableCell>
                   <TableCell>

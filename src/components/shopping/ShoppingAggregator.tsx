@@ -480,6 +480,10 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
         const handling = rb.charges.find(c => c.key === 'handling_fee');
         return sum + (handling?.amount || 0);
       }, 0);
+      const totalDuty = totals.regionBreakdowns.reduce((sum, rb) => {
+        const duty = rb.charges.find(c => c.key === 'duty_clearing');
+        return sum + (duty?.amount || 0);
+      }, 0);
 
       const { data: orderRequest, error: orderError } = await supabase
         .from('order_requests')
@@ -491,7 +495,8 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
           total_product_cost: totalProductCost,
           estimated_shipping_cost: totalShipping,
           handling_fee: totalHandling,
-          grand_total: totalProductCost + totalShipping + totalHandling,
+          estimated_duty: totalDuty,
+          grand_total: totalProductCost + totalShipping + totalHandling + totalDuty,
           category: category || 'products',
         })
         .select()
