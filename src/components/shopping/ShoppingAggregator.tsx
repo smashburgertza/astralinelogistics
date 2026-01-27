@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Loader2, ExternalLink, ShoppingCart, Calculator, Package, CheckCircle2, Globe, Search, Sparkles, Edit3, RefreshCw, AlertCircle, User } from 'lucide-react';
+import { Plus, Trash2, Loader2, ExternalLink, ShoppingCart, Calculator, Package, CheckCircle2, Globe, Search, Sparkles, Edit3, RefreshCw, AlertCircle, User, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -36,6 +36,13 @@ import { useCustomerProfile } from '@/hooks/useCustomerPortal';
 
 type LoadingStep = 'fetching' | 'extracting' | 'analyzing' | 'complete' | 'error';
 
+interface HazardDetails {
+  category: 'battery' | 'flammable' | 'pressurized' | 'chemical' | 'fragrance';
+  severity: 'restricted' | 'special_handling' | 'prohibited';
+  reason: string;
+  confidence: 'high' | 'medium' | 'low';
+}
+
 interface ProductItem {
   id: string;
   url: string;
@@ -55,6 +62,7 @@ interface ProductItem {
   isPriceManual?: boolean;
   isWeightManual?: boolean;
   productCategory?: 'general' | 'hazardous' | 'cosmetics' | 'electronics' | 'spare_parts';
+  hazardDetails?: HazardDetails;
 }
 
 interface CustomerDetails {
@@ -165,6 +173,7 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
 
     const detectedRegion = response.data.origin_region as string | undefined;
     const detectedCategory = response.data.product_category as ProductItem['productCategory'] | undefined;
+    const hazardDetails = response.data.hazard_details as HazardDetails | undefined;
     
     return {
       productName: response.data.product_name || 'Unknown Product',
@@ -176,6 +185,7 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
       originRegion: detectedRegion,
       detectedRegion: detectedRegion,
       productCategory: detectedCategory || 'general',
+      hazardDetails: hazardDetails,
     };
   };
 
@@ -759,6 +769,22 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
                           View original
                           <ExternalLink className="h-3 w-3" />
                         </a>
+                        
+                        {/* Hazardous goods warning */}
+                        {item.productCategory === 'hazardous' && item.hazardDetails && (
+                          <div className="flex items-center gap-2 text-amber-700 bg-amber-50 border border-amber-200 p-2 rounded-md mt-2">
+                            <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                            <div className="text-sm">
+                              <span className="font-medium">Special handling required</span>
+                              {item.hazardDetails.reason && (
+                                <span className="text-amber-600"> — {item.hazardDetails.reason}</span>
+                              )}
+                              {item.hazardDetails.severity === 'prohibited' && (
+                                <span className="block text-xs text-red-600 mt-1">This item may not be shippable by air</span>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* Price and Weight Inputs */}

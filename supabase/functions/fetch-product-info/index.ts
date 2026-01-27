@@ -5,6 +5,165 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Enhanced hazardous goods detection patterns with exclusions
+interface HazardousPattern {
+  keywords: string[];
+  excludePatterns: string[];
+  category: 'battery' | 'flammable' | 'pressurized' | 'chemical' | 'fragrance';
+  severity: 'restricted' | 'special_handling' | 'prohibited';
+}
+
+const HAZARDOUS_PATTERNS: HazardousPattern[] = [
+  {
+    keywords: ['lithium battery', 'lithium-ion', 'li-ion', 'lipo', 'lithium polymer'],
+    excludePatterns: ['charger only', 'battery charger', 'replacement charger', 'charger for'],
+    category: 'battery',
+    severity: 'restricted'
+  },
+  {
+    keywords: ['battery', 'batteries'],
+    excludePatterns: [
+      'battery-operated', 'battery powered', 'battery-powered', 'uses batteries', 
+      'batteries included', 'batteries not included', 'charger', 'battery case', 
+      'battery holder', 'battery cover', 'battery door', 'battery compartment',
+      'remote control', 'rc car', 'rc drone', 'toy', 'kids', 'children', 'game'
+    ],
+    category: 'battery',
+    severity: 'special_handling'
+  },
+  {
+    keywords: ['perfume', 'cologne', 'eau de parfum', 'eau de toilette', 'fragrance spray', 'body spray', 'body mist'],
+    excludePatterns: ['fragrance-free', 'unscented', 'perfume bottle empty', 'atomizer only', 'empty bottle'],
+    category: 'fragrance',
+    severity: 'restricted'
+  },
+  {
+    keywords: ['aerosol', 'spray can', 'compressed gas', 'pressurized'],
+    excludePatterns: ['non-aerosol', 'pump spray', 'trigger spray', 'mist spray', 'spray bottle'],
+    category: 'pressurized',
+    severity: 'restricted'
+  },
+  {
+    keywords: ['nail polish', 'nail lacquer', 'nail varnish', 'gel polish'],
+    excludePatterns: [
+      'nail polish remover pads', 'nail stickers', 'press-on nails', 
+      'nail tips', 'nail art', 'nail file', 'nail brush', 'nail clipper'
+    ],
+    category: 'flammable',
+    severity: 'special_handling'
+  },
+  {
+    keywords: ['paint', 'solvent', 'thinner', 'acetone', 'turpentine', 'lacquer'],
+    excludePatterns: [
+      'paint brush', 'paint roller', 'paint tray', 'dried paint', 
+      'paint sample', 'color sample', 'paint chip', 'paint bucket empty',
+      'acrylic paint tubes', 'watercolor', 'oil paint tubes'
+    ],
+    category: 'chemical',
+    severity: 'restricted'
+  },
+  {
+    keywords: ['alcohol', 'ethanol', 'isopropyl', 'rubbing alcohol'],
+    excludePatterns: ['alcohol-free', 'non-alcoholic', 'zero alcohol', '0% alcohol', 'alcohol free'],
+    category: 'flammable',
+    severity: 'special_handling'
+  },
+  {
+    keywords: ['fuel', 'gasoline', 'petrol', 'kerosene', 'propane', 'butane'],
+    excludePatterns: [
+      'fuel pump', 'fuel filter', 'fuel line', 'fuel tank empty', 
+      'fuel gauge', 'fuel efficient', 'fuel cap', 'fuel injector'
+    ],
+    category: 'flammable',
+    severity: 'prohibited'
+  }
+];
+
+interface HazardousResult {
+  isHazardous: boolean;
+  category: 'battery' | 'flammable' | 'pressurized' | 'chemical' | 'fragrance' | null;
+  severity: 'restricted' | 'special_handling' | 'prohibited' | null;
+  matchedKeyword: string | null;
+  confidence: 'high' | 'medium' | 'low';
+  reason: string;
+}
+
+function detectHazardousGoods(
+  productName: string, 
+  productDescription: string | null,
+  url: string
+): HazardousResult {
+  const textToAnalyze = `${productName} ${productDescription || ''} ${url}`.toLowerCase();
+  
+  for (const pattern of HAZARDOUS_PATTERNS) {
+    // Check if any keyword matches
+    const matchedKeyword = pattern.keywords.find(k => textToAnalyze.includes(k));
+    
+    if (matchedKeyword) {
+      // Check if any exclusion pattern is present
+      const hasExclusion = pattern.excludePatterns.some(ex => textToAnalyze.includes(ex));
+      
+      if (!hasExclusion) {
+        return {
+          isHazardous: true,
+          category: pattern.category,
+          severity: pattern.severity,
+          matchedKeyword,
+          confidence: pattern.keywords.length > 1 ? 'high' : 'medium',
+          reason: `Contains "${matchedKeyword}" - classified as ${pattern.category}`
+        };
+      }
+    }
+  }
+  
+  return {
+    isHazardous: false,
+    category: null,
+    severity: null,
+    matchedKeyword: null,
+    confidence: 'high',
+    reason: 'No hazardous indicators found'
+  };
+}
+
+function refineHazardousClassification(
+  hazardResult: HazardousResult,
+  weightKg: number,
+  productName: string
+): HazardousResult {
+  const productNameLower = productName.toLowerCase();
+  
+  // Small battery products (< 0.5kg) are often battery-operated toys
+  if (hazardResult.category === 'battery' && weightKg < 0.5) {
+    const toyIndicators = ['toy', 'kids', 'children', 'game', 'remote control', 
+                          'rc car', 'drone', 'robot', 'action figure', 'doll'];
+    if (toyIndicators.some(t => productNameLower.includes(t))) {
+      return {
+        isHazardous: false,
+        category: null,
+        severity: null,
+        matchedKeyword: null,
+        confidence: 'medium',
+        reason: 'Appears to be battery-operated toy, not standalone battery'
+      };
+    }
+  }
+  
+  // Large battery products (> 5kg) like car batteries are definitely hazardous
+  if (hazardResult.category === 'battery' && weightKg > 5) {
+    return {
+      isHazardous: true,
+      category: 'battery',
+      severity: 'restricted',
+      matchedKeyword: hazardResult.matchedKeyword,
+      confidence: 'high',
+      reason: 'Large battery product requires special handling'
+    };
+  }
+  
+  return hazardResult;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -51,10 +210,6 @@ serve(async (req) => {
     const isEbay = urlLower.includes('ebay.');
     const isAmazon = urlLower.includes('amazon.');
     const isAliExpress = urlLower.includes('aliexpress.');
-    const isEtsy = urlLower.includes('etsy.');
-    const isWalmart = urlLower.includes('walmart.');
-    const isTarget = urlLower.includes('target.');
-    const isBestBuy = urlLower.includes('bestbuy.');
     
     // Try to extract price from structured data first (JSON-LD, meta tags)
     let extractedPrice: number | null = null;
@@ -80,12 +235,11 @@ serve(async (req) => {
       extractedCurrency = 'AED';
       detectedRegion = 'dubai';
     } else if (urlLower.includes('.com') && !urlLower.includes('.co.')) {
-      // Generic .com sites default to USA
       extractedCurrency = 'USD';
       detectedRegion = 'usa';
     }
     
-    // Detect product category from URL domain patterns
+    // Detect product category from URL domain patterns (initial detection)
     type ProductCategory = 'general' | 'hazardous' | 'cosmetics' | 'electronics' | 'spare_parts';
     let detectedCategory: ProductCategory = 'general';
     
@@ -97,7 +251,7 @@ serve(async (req) => {
     
     // Electronics sites
     const electronicsSites = ['bestbuy', 'newegg', 'bhphoto', 'currys', 'adorama', 'microcenter', 'apple.com', 'samsung.com', 'dell.com', 'hp.com', 'lenovo.com', 'asus.com', 'radioshack', 'frys', 'tigerdirect', 'crutchfield'];
-    if (electronicsSites.some(site => urlLower.includes(site)) || isBestBuy) {
+    if (electronicsSites.some(site => urlLower.includes(site))) {
       detectedCategory = 'electronics';
     }
     
@@ -107,13 +261,7 @@ serve(async (req) => {
       detectedCategory = 'spare_parts';
     }
     
-    // Hazardous goods detection (keywords - will also check product name later)
-    const hazardousKeywords = ['battery', 'lithium', 'perfume', 'fragrance', 'aerosol', 'nail-polish', 'flammable', 'chemical', 'paint', 'solvent', 'alcohol', 'fuel'];
-    if (hazardousKeywords.some(keyword => urlLower.includes(keyword))) {
-      detectedCategory = 'hazardous';
-    }
-    
-    console.log('Detected region:', detectedRegion, 'currency:', extractedCurrency, 'category:', detectedCategory);
+    console.log('Detected region:', detectedRegion, 'currency:', extractedCurrency, 'initial category:', detectedCategory);
     
     // Look for JSON-LD structured data (most reliable)
     const jsonLdMatches = html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
@@ -122,7 +270,6 @@ serve(async (req) => {
         const jsonData = JSON.parse(match[1]);
         const items = Array.isArray(jsonData) ? jsonData : [jsonData];
         for (const item of items) {
-          // Check for Product schema
           if (item['@type'] === 'Product' || item['@type']?.includes('Product')) {
             if (item.name && !extractedName) extractedName = item.name;
             if (item.image) {
@@ -155,9 +302,7 @@ serve(async (req) => {
     if (!extractedPrice && isEbay) {
       console.log('Attempting eBay-specific price extraction...');
       
-      // eBay price patterns (multiple formats)
       const ebayPatterns = [
-        // Main price display patterns
         /class="x-price-primary"[^>]*>[\s\S]*?<span[^>]*>([£$€]\s*[\d,]+\.?\d*)/i,
         /class="x-bin-price"[^>]*>[\s\S]*?<span[^>]*>([£$€]\s*[\d,]+\.?\d*)/i,
         /itemprop="price"[^>]*content="([\d.]+)"/i,
@@ -166,14 +311,10 @@ serve(async (req) => {
         /data-testid="x-price-primary"[^>]*>[\s\S]*?([£$€]\s*[\d,]+\.?\d*)/i,
         /<span[^>]*class="[^"]*ux-textspans[^"]*"[^>]*>([£$€]\s*[\d,]+\.?\d*)<\/span>/i,
         /class="display-price"[^>]*>([£$€]\s*[\d,]+\.?\d*)/i,
-        // BIN (Buy It Now) price
         /"BIN_PRICE":"([£$€]?[\d,]+\.?\d*)"/i,
         /"convertedBinPrice":"([£$€]?[\d,]+\.?\d*)"/i,
-        // Auction current price
         /"currentPrice":\s*\{[^}]*"value":\s*([\d.]+)/i,
-        // Price in hidden inputs
         /name="binPriceDouble"[^>]*value="([\d.]+)"/i,
-        // Generic price patterns with currency symbols
         />([£$€]\s*[\d,]+\.?\d*)<\/span>/g,
       ];
       
@@ -182,7 +323,7 @@ serve(async (req) => {
         if (match) {
           const priceStr = match[1].replace(/[£$€,\s]/g, '');
           const price = parseFloat(priceStr);
-          if (price > 0 && price < 1000000) { // Sanity check
+          if (price > 0 && price < 1000000) {
             extractedPrice = price;
             console.log('Found eBay price:', extractedPrice, 'from pattern:', pattern.source.substring(0, 50));
             break;
@@ -190,7 +331,6 @@ serve(async (req) => {
         }
       }
       
-      // Try to find currency from eBay page
       if (html.includes('£') || urlLower.includes('.co.uk')) extractedCurrency = 'GBP';
       else if (html.includes('€')) extractedCurrency = 'EUR';
       else extractedCurrency = 'USD';
@@ -201,7 +341,6 @@ serve(async (req) => {
       console.log('Attempting Amazon-specific price extraction...');
       
       const amazonPatterns = [
-        // Price whole and fraction
         /class="a-price-whole"[^>]*>([\d,]+)/i,
         /class="a-offscreen"[^>]*>([£$€]\s*[\d,]+\.?\d*)/i,
         /"priceAmount":\s*([\d.]+)/i,
@@ -285,11 +424,9 @@ serve(async (req) => {
       console.log('Attempting generic price pattern extraction...');
       
       const genericPatterns = [
-        // Currency symbol followed by numbers
         /(?:price|cost|amount)[^>]*>[\s]*([£$€]\s*[\d,]+\.?\d*)/gi,
         /class="[^"]*price[^"]*"[^>]*>[\s]*([£$€]\s*[\d,]+\.?\d*)/gi,
         /id="[^"]*price[^"]*"[^>]*>[\s]*([£$€]\s*[\d,]+\.?\d*)/gi,
-        // Data attributes with price
         /data-price="([\d.]+)"/i,
         /data-product-price="([\d.]+)"/i,
       ];
@@ -299,7 +436,7 @@ serve(async (req) => {
         for (const match of matches) {
           const priceStr = match[1].replace(/[£$€,\s]/g, '');
           const price = parseFloat(priceStr);
-          if (price > 0 && price < 100000) { // Reasonable price range
+          if (price > 0 && price < 100000) {
             extractedPrice = price;
             console.log('Found generic price:', extractedPrice);
             break;
@@ -311,7 +448,7 @@ serve(async (req) => {
     
     console.log('Pre-extracted data:', { extractedPrice, extractedCurrency, extractedImage, extractedName });
     
-    // Truncate HTML to avoid token limits (keep first 30000 chars for better context)
+    // Truncate HTML to avoid token limits
     const truncatedHtml = html.substring(0, 30000);
 
     // Use Lovable AI to extract product info with detailed weight reasoning
@@ -370,6 +507,7 @@ AUTOMOTIVE PARTS:
 - Wheels/tires: 10-25 kg each
 - Car seats: 15-30 kg each
 - Bumper: 5-15 kg
+- Car battery/leisure battery: 15-35 kg
 
 ELECTRONICS:
 - Smartphone: 0.2-0.3 kg
@@ -382,6 +520,16 @@ CLOTHING:
 - Jacket: 0.5-1.5 kg
 - Jeans: 0.5-0.8 kg
 
+## HAZARDOUS GOODS ANALYSIS
+
+Analyze if this product requires special shipping handling. Consider:
+- Standalone lithium batteries or power banks: HAZARDOUS
+- Battery-operated toys or devices: NOT hazardous (batteries are incidental)
+- Perfumes/colognes/fragrances: HAZARDOUS (flammable liquids)
+- Aerosol sprays: HAZARDOUS (pressurized containers)
+- Nail polish, paints, solvents: HAZARDOUS (flammable)
+- Alcohol-based products (not alcohol-free): HAZARDOUS
+
 ## OUTPUT FORMAT
 
 Return ONLY valid JSON:
@@ -392,7 +540,10 @@ Return ONLY valid JSON:
   "product_price": number (WITHOUT currency symbol) or null,
   "currency": "GBP/USD/EUR/etc",
   "estimated_weight_kg": number (rounded UP, minimum 1),
-  "weight_reasoning": "brief explanation"
+  "weight_reasoning": "brief explanation",
+  "is_hazardous": true/false,
+  "hazard_category": "battery|flammable|pressurized|chemical|fragrance|none",
+  "hazard_reason": "brief explanation or null"
 }
 
 CRITICAL: 
@@ -454,7 +605,6 @@ ${truncatedHtml}`
     // Parse the JSON from AI response
     let productInfo;
     try {
-      // Try to extract JSON from the response (in case there's extra text)
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         productInfo = JSON.parse(jsonMatch[0]);
@@ -492,47 +642,89 @@ ${truncatedHtml}`
         product_price: extractedPrice,
         currency: extractedCurrency,
         estimated_weight_kg: 1,
-        weight_reasoning: 'Could not analyze product, using default weight'
+        weight_reasoning: 'Could not analyze product, using default weight',
+        is_hazardous: false,
+        hazard_category: 'none',
+        hazard_reason: null
       };
     }
 
-    // Remove weight_reasoning from response and add detected region + category
-    const { weight_reasoning, ...responseData } = productInfo;
+    // Apply multi-layer hazardous goods detection
+    const productName = productInfo.product_name || '';
+    const productDescription = productInfo.product_description || '';
     
-    // Refine category based on product name if AI extracted it
-    let finalCategory = detectedCategory;
-    const productNameLower = (productInfo.product_name || '').toLowerCase();
+    // Layer 1: Pattern-based detection with exclusions
+    let hazardResult = detectHazardousGoods(productName, productDescription, url);
     
-    // Check for hazardous keywords in product name
-    const hazardousProductKeywords = ['battery', 'lithium', 'perfume', 'cologne', 'fragrance', 'nail polish', 'aerosol', 'spray paint', 'flammable'];
-    if (hazardousProductKeywords.some(k => productNameLower.includes(k))) {
+    // Layer 2: Refine based on weight (for battery products)
+    if (hazardResult.isHazardous) {
+      hazardResult = refineHazardousClassification(
+        hazardResult,
+        productInfo.estimated_weight_kg,
+        productName
+      );
+    }
+    
+    // Layer 3: Consider AI analysis (if AI detected hazardous but we didn't, trust AI)
+    if (!hazardResult.isHazardous && productInfo.is_hazardous === true) {
+      hazardResult = {
+        isHazardous: true,
+        category: productInfo.hazard_category as HazardousResult['category'] || 'chemical',
+        severity: 'special_handling',
+        matchedKeyword: null,
+        confidence: 'low',
+        reason: productInfo.hazard_reason || 'AI detected potential hazard'
+      };
+    }
+    
+    console.log('Final hazard detection:', hazardResult);
+    
+    // Determine final category
+    let finalCategory: ProductCategory = detectedCategory;
+    
+    if (hazardResult.isHazardous) {
       finalCategory = 'hazardous';
+    } else {
+      // Check for other category keywords in product name
+      const productNameLower = productName.toLowerCase();
+      
+      // Electronics keywords
+      const electronicsProductKeywords = ['laptop', 'phone', 'tablet', 'computer', 'monitor', 'tv', 'television', 'camera', 'headphone', 'speaker', 'console', 'playstation', 'xbox', 'nintendo', 'gpu', 'graphics card', 'processor', 'cpu'];
+      if (electronicsProductKeywords.some(k => productNameLower.includes(k)) && finalCategory === 'general') {
+        finalCategory = 'electronics';
+      }
+      
+      // Cosmetics keywords
+      const cosmeticsProductKeywords = ['lipstick', 'mascara', 'foundation', 'eyeshadow', 'blush', 'concealer', 'moisturizer', 'serum', 'skincare', 'makeup', 'cosmetic', 'beauty'];
+      if (cosmeticsProductKeywords.some(k => productNameLower.includes(k)) && finalCategory === 'general') {
+        finalCategory = 'cosmetics';
+      }
+      
+      // Spare parts keywords
+      const sparePartsProductKeywords = ['engine', 'transmission', 'brake', 'filter', 'radiator', 'alternator', 'starter', 'exhaust', 'suspension', 'carburetor', 'ignition', 'clutch', 'gasket', 'bearing', 'piston'];
+      if (sparePartsProductKeywords.some(k => productNameLower.includes(k)) && finalCategory === 'general') {
+        finalCategory = 'spare_parts';
+      }
     }
+
+    // Build response - remove internal fields
+    const { weight_reasoning, is_hazardous, hazard_category, hazard_reason, ...baseResponse } = productInfo;
     
-    // Check for electronics keywords
-    const electronicsProductKeywords = ['laptop', 'phone', 'tablet', 'computer', 'monitor', 'tv', 'television', 'camera', 'headphone', 'speaker', 'console', 'playstation', 'xbox', 'nintendo', 'gpu', 'graphics card', 'processor', 'cpu'];
-    if (electronicsProductKeywords.some(k => productNameLower.includes(k)) && finalCategory === 'general') {
-      finalCategory = 'electronics';
-    }
-    
-    // Check for cosmetics keywords
-    const cosmeticsProductKeywords = ['lipstick', 'mascara', 'foundation', 'eyeshadow', 'blush', 'concealer', 'moisturizer', 'serum', 'skincare', 'makeup', 'cosmetic', 'beauty'];
-    if (cosmeticsProductKeywords.some(k => productNameLower.includes(k)) && finalCategory === 'general') {
-      finalCategory = 'cosmetics';
-    }
-    
-    // Check for spare parts keywords
-    const sparePartsProductKeywords = ['engine', 'transmission', 'brake', 'filter', 'radiator', 'alternator', 'starter', 'exhaust', 'suspension', 'carburetor', 'ignition', 'clutch', 'gasket', 'bearing', 'piston'];
-    if (sparePartsProductKeywords.some(k => productNameLower.includes(k)) && finalCategory === 'general') {
-      finalCategory = 'spare_parts';
-    }
-    
-    // Add the detected origin region and category to the response
-    const finalResponse = {
-      ...responseData,
+    const finalResponse: Record<string, unknown> = {
+      ...baseResponse,
       origin_region: detectedRegion,
       product_category: finalCategory,
     };
+    
+    // Add hazard_details only if hazardous
+    if (hazardResult.isHazardous && hazardResult.category) {
+      finalResponse.hazard_details = {
+        category: hazardResult.category,
+        severity: hazardResult.severity,
+        reason: hazardResult.reason,
+        confidence: hazardResult.confidence,
+      };
+    }
 
     return new Response(JSON.stringify(finalResponse), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
