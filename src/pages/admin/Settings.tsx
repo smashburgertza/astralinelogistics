@@ -46,6 +46,8 @@ import { ShoppingAggregator } from '@/components/shopping/ShoppingAggregator';
 import { InvoiceEstimateSettings } from '@/components/admin/InvoiceEstimateSettings';
 import { PushNotificationSettings } from '@/components/admin/PushNotificationSettings';
 import { FeatureVisibilitySettings } from '@/components/admin/FeatureVisibilitySettings';
+import { ShopForMeProductRatesManagement } from '@/components/admin/ShopForMeProductRatesManagement';
+import { ShopForMeVehicleRatesManagement } from '@/components/admin/ShopForMeVehicleRatesManagement';
 import {
   Dialog,
   DialogContent,
@@ -428,7 +430,33 @@ export default function AdminSettingsPage() {
               </DialogContent>
             </Dialog>
           </div>
-          <ShopForMeChargesManagement />
+          
+          {/* Sub-tabs for Products and Vehicles */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Pricing Configuration</CardTitle>
+              <CardDescription>
+                Configure rates, duties, and fees for products and vehicles separately
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Tabs defaultValue="products" className="space-y-4">
+                <TabsList>
+                  <TabsTrigger value="products">Products</TabsTrigger>
+                  <TabsTrigger value="vehicles">Vehicles</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="products" className="space-y-6">
+                  <ShopForMeProductRatesManagement />
+                  <ShopForMeChargesManagement />
+                </TabsContent>
+                
+                <TabsContent value="vehicles" className="space-y-6">
+                  <ShopForMeVehicleRatesManagement />
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Shipping Calculator - All related settings */}

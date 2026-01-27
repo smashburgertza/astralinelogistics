@@ -2666,6 +2666,96 @@ export type Database = {
         }
         Relationships: []
       }
+      shop_for_me_product_rates: {
+        Row: {
+          created_at: string | null
+          currency: string
+          display_order: number
+          duty_percentage: number
+          handling_fee_percentage: number
+          id: string
+          is_active: boolean
+          markup_percentage: number
+          product_category: string
+          rate_per_kg: number
+          region: Database["public"]["Enums"]["agent_region"]
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          currency?: string
+          display_order?: number
+          duty_percentage?: number
+          handling_fee_percentage?: number
+          id?: string
+          is_active?: boolean
+          markup_percentage?: number
+          product_category: string
+          rate_per_kg?: number
+          region: Database["public"]["Enums"]["agent_region"]
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          currency?: string
+          display_order?: number
+          duty_percentage?: number
+          handling_fee_percentage?: number
+          id?: string
+          is_active?: boolean
+          markup_percentage?: number
+          product_category?: string
+          rate_per_kg?: number
+          region?: Database["public"]["Enums"]["agent_region"]
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      shop_for_me_vehicle_rates: {
+        Row: {
+          base_shipping_price: number
+          created_at: string | null
+          currency: string
+          duty_percentage: number
+          handling_fee: number
+          id: string
+          is_active: boolean
+          markup_percentage: number
+          region: Database["public"]["Enums"]["agent_region"]
+          shipping_method: string
+          updated_at: string | null
+          vehicle_type: string
+        }
+        Insert: {
+          base_shipping_price?: number
+          created_at?: string | null
+          currency?: string
+          duty_percentage?: number
+          handling_fee?: number
+          id?: string
+          is_active?: boolean
+          markup_percentage?: number
+          region: Database["public"]["Enums"]["agent_region"]
+          shipping_method: string
+          updated_at?: string | null
+          vehicle_type: string
+        }
+        Update: {
+          base_shipping_price?: number
+          created_at?: string | null
+          currency?: string
+          duty_percentage?: number
+          handling_fee?: number
+          id?: string
+          is_active?: boolean
+          markup_percentage?: number
+          region?: Database["public"]["Enums"]["agent_region"]
+          shipping_method?: string
+          updated_at?: string | null
+          vehicle_type?: string
+        }
+        Relationships: []
+      }
       tax_rates: {
         Row: {
           account_id: string | null

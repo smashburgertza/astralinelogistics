@@ -9,3 +9,5 @@ export { RegionDeliveryTimesManagement } from '../RegionDeliveryTimesManagement'
 export { ShippingCalculatorChargesManagement } from '../ShippingCalculatorChargesManagement';
 export { AirCargoPricingManagement } from '../AirCargoPricingManagement';
 export { PushNotificationSettings } from '../PushNotificationSettings';
+export { ShopForMeProductRatesManagement } from '../ShopForMeProductRatesManagement';
+export { ShopForMeVehicleRatesManagement } from '../ShopForMeVehicleRatesManagement';
