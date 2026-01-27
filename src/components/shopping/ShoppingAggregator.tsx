@@ -25,9 +25,12 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { useRegionPricing } from '@/hooks/useRegionPricing';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
-import { useShopForMeCharges, calculateShopForMeCharges } from '@/hooks/useShopForMeCharges';
+import { 
+  useAllShopForMeProductRates, 
+  calculateProductCost,
+  type ShopForMeProductRate 
+} from '@/hooks/useShopForMeProductRates';
 import { useDeliveryTimes } from '@/hooks/useDeliveryTimes';
 import { useAuth } from '@/hooks/useAuth';
 import { InlineAuthGate } from '@/components/auth/InlineAuthGate';
@@ -103,9 +106,8 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
     address: '',
   });
 
-  const { data: regionPricing } = useRegionPricing();
+  const { data: productRates } = useAllShopForMeProductRates();
   const { data: exchangeRates } = useExchangeRates();
-  const { data: charges } = useShopForMeCharges();
   const { times: deliveryTimes } = useDeliveryTimes();
   const { data: regions } = useActiveRegions();
   const { user } = useAuth();
@@ -132,11 +134,27 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
     return 'USD';
   };
 
-
-  // Get shipping rate for selected region
-  const getShippingRate = (region: string) => {
-    const pricing = regionPricing?.find(r => r.region === region);
-    return pricing?.customer_rate_per_kg ?? 8;
+  // Get product rate for specific region + category with fallback
+  const getProductRate = (region: string, category: string): ShopForMeProductRate | null => {
+    if (!productRates) return null;
+    
+    // Try exact match first
+    let rate = productRates.find(
+      r => r.region === region && 
+           r.product_category === category && 
+           r.is_active
+    );
+    
+    // Fallback to 'general' category for same region
+    if (!rate && category !== 'general') {
+      rate = productRates.find(
+        r => r.region === region && 
+             r.product_category === 'general' && 
+             r.is_active
+      );
+    }
+    
+    return rate || null;
   };
 
   // Get exchange rate to TZS
@@ -401,16 +419,19 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
   const roundWeight = (weight: number) => Math.ceil(weight);
 
   const calculateTotals = () => {
-    // Group items by region
-    const itemsByRegion = items.reduce((acc, item) => {
+    // Group items by region AND category for accurate per-category pricing
+    const itemsByRegionCategory = items.reduce((acc, item) => {
       const region = item.originRegion || selectedRegion;
-      if (!acc[region]) acc[region] = [];
-      acc[region].push(item);
+      const category = item.productCategory || 'general';
+      const key = `${region}:${category}`;
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(item);
       return acc;
     }, {} as Record<string, ProductItem[]>);
 
     const regionBreakdowns: {
       region: string;
+      category: string;
       currency: string;
       productCost: number;
       weight: number;
@@ -423,41 +444,59 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
 
     let grandTotalInTZS = 0;
 
-    Object.entries(itemsByRegion).forEach(([region, regionItems]) => {
-      const regionKey = region;
-      const currency = getRegionCurrency(regionKey);
-      const shippingRate = getShippingRate(regionKey);
+    Object.entries(itemsByRegionCategory).forEach(([key, groupItems]) => {
+      const [region, category] = key.split(':');
+      const rate = getProductRate(region, category);
+      
+      // Use rate's currency, falling back to region-based currency
+      const currency = rate?.currency || getRegionCurrency(region);
       const exchangeRate = getExchangeRate(currency);
 
-      const productCost = regionItems.reduce((sum, item) => {
+      const productCost = groupItems.reduce((sum, item) => {
         if (item.productPrice) {
           return sum + item.productPrice * item.quantity;
         }
         return sum;
       }, 0);
 
-      const weight = regionItems.reduce((sum, item) => {
+      const weight = groupItems.reduce((sum, item) => {
         return sum + roundWeight(item.estimatedWeightKg) * item.quantity;
       }, 0);
 
-      const chargeCalc = calculateShopForMeCharges(
-        productCost,
-        weight,
-        shippingRate,
-        charges || []
-      );
+      let charges: { name: string; key: string; amount: number; percentage?: number }[] = [];
+      let subtotal = 0;
 
-      const subtotalInTZS = chargeCalc.total * exchangeRate;
+      if (rate) {
+        // Use category-specific rates from shop_for_me_product_rates
+        const calc = calculateProductCost(productCost, weight, rate);
+        charges = calc.breakdown;
+        subtotal = calc.total;
+      } else {
+        // Fallback: simple calculation if no rate found
+        const shippingCost = weight * 8; // default rate
+        const dutyAmount = productCost * 0.35;
+        const handlingAmount = (productCost + shippingCost) * 0.03;
+        subtotal = productCost + shippingCost + dutyAmount + handlingAmount;
+        charges = [
+          { name: 'Product Cost', key: 'product_cost', amount: productCost },
+          { name: 'Shipping', key: 'shipping', amount: shippingCost },
+          { name: 'Duty', key: 'duty', amount: dutyAmount, percentage: 35 },
+          { name: 'Handling Fee', key: 'handling_fee', amount: handlingAmount, percentage: 3 },
+        ];
+      }
+
+      const subtotalInTZS = subtotal * exchangeRate;
       grandTotalInTZS += subtotalInTZS;
 
       regionBreakdowns.push({
-        region: regionKey,
+        region,
+        category,
         currency,
         productCost,
         weight,
-        shippingRate,
-        charges: chargeCalc.breakdown,
-        subtotal: chargeCalc.total,
+        shippingRate: rate?.rate_per_kg || 8,
+        charges,
+        subtotal,
         subtotalInTZS,
         exchangeRate,
       });
