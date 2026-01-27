@@ -1,171 +1,331 @@
 
-# Shop For Me Configuration Separation & Full Customization
+# Improved Hazardous Goods Detection System
 
 ## Overview
-This plan restructures the Shop For Me admin settings to be completely independent from the Shipping Calculator, with dedicated configuration for **Products** and **Vehicles** sections. Products will have category-specific rates for general goods, hazardous goods, cosmetics, electronics, and spare parts.
+Enhance the product category detection system to provide more accurate hazardous goods identification with reduced false positives, contextual analysis, and optional AI-powered classification.
 
 ---
 
-## Completed Implementation
+## Current State Analysis
 
-### ✅ Phase 1: Database Schema (COMPLETE)
+### Existing Detection Logic
+The current system uses two-stage keyword matching:
 
-**1.1 Created `shop_for_me_product_rates` table**
-- Columns: id, region, product_category, rate_per_kg, handling_fee_percentage, duty_percentage, markup_percentage, currency, is_active, display_order, created_at, updated_at
-- Product categories: `general`, `hazardous`, `cosmetics`, `electronics`, `spare_parts`
-- Regions: usa, uk, europe, dubai, china, india
-- RLS enabled with admin access policies
-
-**1.2 Created `shop_for_me_vehicle_rates` table**
-- Columns: id, region, vehicle_type, shipping_method, base_shipping_price, handling_fee, duty_percentage, markup_percentage, currency, is_active, created_at, updated_at
-- Vehicle types: motorcycle, sedan, suv, truck
-- Shipping methods: sea_roro, sea_container, air
-- RLS enabled with admin access policies
-
-**1.3 Seeded initial data**
-- Product rates seeded for all 6 regions × 5 categories = 30 rows
-- Vehicle rates seeded for all 6 regions × 4 types × 3 methods = 72 rows
-
----
-
-### ✅ Phase 2: Admin Settings UI Restructure (COMPLETE)
-
-**2.1 Reorganized Shop For Me Tab**
-New structure:
-```
-Shop For Me
-├── Feature Visibility
-├── Preview Button
-└── Pricing Configuration Card
-    ├── Products Tab
-    │   ├── ShopForMeProductRatesManagement (region tabs + category table)
-    │   └── ShopForMeChargesManagement
-    └── Vehicles Tab
-        └── ShopForMeVehicleRatesManagement (region tabs + vehicle/method table)
-```
-
-**2.2 Created new admin components**
-- `src/components/admin/ShopForMeProductRatesManagement.tsx`
-- `src/components/admin/ShopForMeVehicleRatesManagement.tsx`
-
-**2.3 Updated Settings page**
-- Added nested tabs within Shop For Me for "Products" and "Vehicles"
-- Each region shows as a tab with editable rate table
-
----
-
-### ✅ Phase 3: Hooks and Data Layer (COMPLETE)
-
-**3.1 Created new hooks**
-- `src/hooks/useShopForMeProductRates.ts`
-  - useShopForMeProductRates(region)
-  - useActiveProductRate(region, category)
-  - useCreateShopForMeProductRate()
-  - useUpdateShopForMeProductRate()
-  - useDeleteShopForMeProductRate()
-  - calculateProductCost() helper
-
-- `src/hooks/useShopForMeVehicleRates.ts`
-  - useShopForMeVehicleRates(region)
-  - useActiveVehicleRate(region, vehicleType, shippingMethod)
-  - useCreateShopForMeVehicleRate()
-  - useUpdateShopForMeVehicleRate()
-  - useDeleteShopForMeVehicleRate()
-  - calculateVehicleCost() helper
-
-**3.2 Updated barrel exports**
-- `src/hooks/settings/index.ts` - Added new hook exports
-- `src/components/admin/settings/index.ts` - Added new component exports
-
----
-
-## Remaining Tasks
-
-### Phase 4: Customer-Facing Updates (TODO)
-
-**4.1 Update ShopForMeSection.tsx**
-- Reduce categories from 5 to 2 main tabs: "Products" and "Vehicles"
-- Products section internally categorizes items (user doesn't see sub-categories directly)
-
-**4.2 Update ShoppingAggregator.tsx**
-- Accept `category` prop to determine rate lookup
-- Behind the scenes, detect product type from URL/description:
-  - Cosmetics sites (Sephora, Ulta) → cosmetics rates
-  - Electronics sites (Best Buy, Newegg) → electronics rates
-  - Auto parts sites → spare_parts rates
-  - Hazardous indicators → hazardous rates
-  - Default → general rates
-
-**4.3 Vehicle-specific flow**
-- Vehicles tab uses dedicated vehicle rate lookup
-- Shows CIF and Duty Paid options
-- Uses new `shop_for_me_vehicle_rates` instead of shipping calculator rates
-
----
-
-### Phase 5: Category Auto-Detection (TODO)
-
-**5.1 Enhance product info extraction**
-Update `fetch-product-info` edge function to:
-- Detect product category from URL domain patterns
-- Parse product descriptions for category keywords
-- Return `product_category` field in response
-
-**5.2 Domain-to-category mapping**
+**Stage 1 - URL Pattern Detection (lines 110-114):**
 ```typescript
-const CATEGORY_DOMAINS = {
-  cosmetics: ['sephora', 'ulta', 'beautybay', 'cultbeauty'],
-  electronics: ['bestbuy', 'newegg', 'bhphoto', 'currys'],
-  spare_parts: ['autozone', 'rockauto', 'parts', 'autoparts'],
-  hazardous: [], // Detected by keywords: battery, lithium, flammable, etc.
-};
+const hazardousKeywords = ['battery', 'lithium', 'perfume', 'fragrance', 
+  'aerosol', 'nail-polish', 'flammable', 'chemical', 'paint', 'solvent', 
+  'alcohol', 'fuel'];
+```
+
+**Stage 2 - Product Name Detection (lines 506-510):**
+```typescript
+const hazardousProductKeywords = ['battery', 'lithium', 'perfume', 
+  'cologne', 'fragrance', 'nail polish', 'aerosol', 'spray paint', 'flammable'];
+```
+
+### Current Limitations
+| Problem | Example |
+|---------|---------|
+| False positives | "Battery-operated toy" → marked hazardous |
+| False positives | "Alcohol-free sanitizer" → marked hazardous |
+| False positives | "Nail polish remover pads" (dry) → marked hazardous |
+| Missing context | Small AA batteries vs large lithium car batteries |
+| No severity levels | All hazardous items treated equally |
+| No exclusion patterns | Can't distinguish "battery charger" from "battery" |
+
+---
+
+## Proposed Solution
+
+### Multi-Layer Detection Strategy
+
+```text
++------------------+     +------------------+     +------------------+
+|  Layer 1         |     |  Layer 2         |     |  Layer 3         |
+|  URL & Site      | --> |  Product Name    | --> |  AI Contextual   |
+|  Pattern Match   |     |  Analysis        |     |  Analysis        |
++------------------+     +------------------+     +------------------+
+        |                        |                        |
+        v                        v                        v
+   Quick flags            Refined match           Final decision
+   (high recall)          (exclusion patterns)    (high precision)
 ```
 
 ---
 
-## Files Created/Modified
+## Implementation Details
 
-| Status | Action | File |
-|--------|--------|------|
-| ✅ | Create | `src/hooks/useShopForMeProductRates.ts` |
-| ✅ | Create | `src/hooks/useShopForMeVehicleRates.ts` |
-| ✅ | Create | `src/components/admin/ShopForMeProductRatesManagement.tsx` |
-| ✅ | Create | `src/components/admin/ShopForMeVehicleRatesManagement.tsx` |
-| ✅ | Modify | `src/pages/admin/Settings.tsx` - Restructured Shop For Me tab |
-| ✅ | Modify | `src/hooks/settings/index.ts` - Added new exports |
-| ✅ | Modify | `src/components/admin/settings/index.ts` - Added new exports |
-| ⏳ | Modify | `src/components/home/ShopForMeSection.tsx` - Reduce to 2 main tabs |
-| ⏳ | Modify | `src/components/shopping/ShoppingAggregator.tsx` - Category detection |
-| ⏳ | Modify | `supabase/functions/fetch-product-info/index.ts` - Category detection |
+### 1. Enhanced Keyword System with Exclusions
+
+Replace simple keyword matching with pattern-based detection that includes exclusion rules:
+
+```typescript
+interface HazardousPattern {
+  keywords: string[];           // Match these words
+  excludePatterns: string[];    // Don't match if these present
+  category: 'battery' | 'flammable' | 'pressurized' | 'chemical' | 'fragrance';
+  severity: 'restricted' | 'special_handling' | 'prohibited';
+}
+
+const HAZARDOUS_PATTERNS: HazardousPattern[] = [
+  {
+    keywords: ['lithium battery', 'lithium-ion', 'li-ion', 'lipo'],
+    excludePatterns: ['charger only', 'battery charger', 'replacement charger'],
+    category: 'battery',
+    severity: 'restricted'
+  },
+  {
+    keywords: ['battery'],
+    excludePatterns: ['battery-operated', 'battery powered', 'uses batteries', 
+                     'batteries included', 'batteries not included', 'charger', 
+                     'battery case', 'battery holder', 'battery cover'],
+    category: 'battery',
+    severity: 'special_handling'
+  },
+  {
+    keywords: ['perfume', 'cologne', 'eau de parfum', 'eau de toilette', 'fragrance spray'],
+    excludePatterns: ['fragrance-free', 'unscented', 'perfume bottle empty', 'atomizer only'],
+    category: 'fragrance',
+    severity: 'restricted'
+  },
+  {
+    keywords: ['aerosol', 'spray can', 'compressed gas'],
+    excludePatterns: ['non-aerosol', 'pump spray', 'trigger spray', 'mist spray'],
+    category: 'pressurized',
+    severity: 'restricted'
+  },
+  {
+    keywords: ['nail polish', 'nail lacquer', 'nail varnish'],
+    excludePatterns: ['nail polish remover pads', 'nail stickers', 'press-on nails', 
+                     'nail tips', 'nail art', 'nail file'],
+    category: 'flammable',
+    severity: 'special_handling'
+  },
+  {
+    keywords: ['paint', 'solvent', 'thinner', 'acetone', 'turpentine'],
+    excludePatterns: ['paint brush', 'paint roller', 'paint tray', 'dried paint', 
+                     'paint sample', 'color sample', 'paint chip'],
+    category: 'chemical',
+    severity: 'restricted'
+  },
+  {
+    keywords: ['alcohol', 'ethanol', 'isopropyl'],
+    excludePatterns: ['alcohol-free', 'non-alcoholic', 'zero alcohol', '0% alcohol'],
+    category: 'flammable',
+    severity: 'special_handling'
+  },
+  {
+    keywords: ['fuel', 'gasoline', 'petrol', 'kerosene', 'propane'],
+    excludePatterns: ['fuel pump', 'fuel filter', 'fuel line', 'fuel tank empty', 
+                     'fuel gauge', 'fuel efficient'],
+    category: 'flammable',
+    severity: 'prohibited'
+  }
+];
+```
+
+### 2. Smart Detection Function
+
+```typescript
+interface HazardousResult {
+  isHazardous: boolean;
+  category: string | null;
+  severity: 'restricted' | 'special_handling' | 'prohibited' | null;
+  matchedKeyword: string | null;
+  confidence: 'high' | 'medium' | 'low';
+  reason: string;
+}
+
+function detectHazardousGoods(
+  productName: string, 
+  productDescription: string | null,
+  url: string
+): HazardousResult {
+  const textToAnalyze = `${productName} ${productDescription || ''} ${url}`.toLowerCase();
+  
+  for (const pattern of HAZARDOUS_PATTERNS) {
+    // Check if any keyword matches
+    const matchedKeyword = pattern.keywords.find(k => textToAnalyze.includes(k));
+    
+    if (matchedKeyword) {
+      // Check if any exclusion pattern is present
+      const hasExclusion = pattern.excludePatterns.some(ex => textToAnalyze.includes(ex));
+      
+      if (!hasExclusion) {
+        return {
+          isHazardous: true,
+          category: pattern.category,
+          severity: pattern.severity,
+          matchedKeyword,
+          confidence: pattern.keywords.length > 1 ? 'high' : 'medium',
+          reason: `Contains "${matchedKeyword}" which is classified as ${pattern.category}`
+        };
+      }
+    }
+  }
+  
+  return {
+    isHazardous: false,
+    category: null,
+    severity: null,
+    matchedKeyword: null,
+    confidence: 'high',
+    reason: 'No hazardous indicators found'
+  };
+}
+```
+
+### 3. AI-Powered Contextual Analysis
+
+Add hazardous classification to the existing AI prompt for ambiguous cases:
+
+```typescript
+// Add to the AI system prompt
+const hazardousAnalysisPrompt = `
+## HAZARDOUS GOODS CLASSIFICATION
+
+Analyze if this product is hazardous for air/sea shipping:
+
+HAZARDOUS CATEGORIES:
+- Battery products: Standalone lithium batteries, power banks, battery packs
+  (NOT battery-operated toys, battery chargers, battery cases)
+- Flammable liquids: Perfumes, nail polish, paint, solvents, alcohol
+  (NOT alcohol-free products, dry items, empty containers)
+- Pressurized containers: Aerosols, compressed gas
+  (NOT pump sprays, non-aerosol alternatives)
+- Chemicals: Acids, corrosives, oxidizers
+
+Return in your JSON:
+{
+  "is_hazardous": true/false,
+  "hazard_category": "battery|flammable|pressurized|chemical|none",
+  "hazard_reason": "brief explanation or null"
+}
+`;
+```
+
+### 4. Weight-Based Battery Detection
+
+For battery products, use weight as an additional signal:
+
+```typescript
+function refineHazardousClassification(
+  category: string,
+  weightKg: number,
+  productName: string
+): HazardousResult {
+  // Small battery products (< 0.5kg) are often battery-operated toys
+  if (category === 'battery' && weightKg < 0.5) {
+    const toyIndicators = ['toy', 'kids', 'children', 'game', 'remote control', 
+                          'rc car', 'drone', 'robot'];
+    if (toyIndicators.some(t => productName.toLowerCase().includes(t))) {
+      return {
+        isHazardous: false,
+        category: null,
+        severity: null,
+        matchedKeyword: null,
+        confidence: 'medium',
+        reason: 'Appears to be battery-operated toy, not standalone battery'
+      };
+    }
+  }
+  
+  // Large battery products (> 5kg) like car batteries are definitely hazardous
+  if (category === 'battery' && weightKg > 5) {
+    return {
+      isHazardous: true,
+      category: 'battery',
+      severity: 'restricted',
+      matchedKeyword: 'battery',
+      confidence: 'high',
+      reason: 'Large battery product requires special handling'
+    };
+  }
+  
+  // ... return original classification
+}
+```
 
 ---
 
-## Database Tables
+## Response Structure Enhancement
 
-### shop_for_me_product_rates
-| Column | Type | Description |
-|--------|------|-------------|
-| id | UUID | Primary key |
-| region | agent_region | Region code (usa, uk, europe, dubai, china, india) |
-| product_category | TEXT | Category (general, hazardous, cosmetics, electronics, spare_parts) |
-| rate_per_kg | DECIMAL | Shipping rate per kilogram |
-| handling_fee_percentage | DECIMAL | Handling fee as % of product + shipping |
-| duty_percentage | DECIMAL | Import duty as % of product cost |
-| markup_percentage | DECIMAL | Profit margin % |
-| currency | TEXT | Currency code (default: USD) |
-| is_active | BOOLEAN | Whether this rate is active |
-| display_order | INTEGER | Display ordering |
+### Updated API Response
 
-### shop_for_me_vehicle_rates
-| Column | Type | Description |
-|--------|------|-------------|
-| id | UUID | Primary key |
-| region | agent_region | Region code |
-| vehicle_type | TEXT | Type (motorcycle, sedan, suv, truck) |
-| shipping_method | TEXT | Method (sea_roro, sea_container, air) |
-| base_shipping_price | DECIMAL | Fixed shipping cost |
-| handling_fee | DECIMAL | Fixed handling fee |
-| duty_percentage | DECIMAL | Import duty as % of vehicle price |
-| markup_percentage | DECIMAL | Profit margin % |
-| currency | TEXT | Currency code (default: USD) |
-| is_active | BOOLEAN | Whether this rate is active |
+```typescript
+interface ProductInfoResponse {
+  product_name: string;
+  product_description: string | null;
+  product_image: string | null;
+  product_price: number | null;
+  currency: string;
+  estimated_weight_kg: number;
+  origin_region: string;
+  product_category: 'general' | 'hazardous' | 'cosmetics' | 'electronics' | 'spare_parts';
+  // NEW FIELDS
+  hazard_details?: {
+    category: 'battery' | 'flammable' | 'pressurized' | 'chemical' | 'fragrance';
+    severity: 'restricted' | 'special_handling' | 'prohibited';
+    reason: string;
+    confidence: 'high' | 'medium' | 'low';
+  };
+}
+```
+
+---
+
+## Customer-Facing Display
+
+### Show Hazardous Warning in ShoppingAggregator
+
+Add a visual indicator when a product is detected as hazardous:
+
+```tsx
+{item.productCategory === 'hazardous' && (
+  <div className="flex items-center gap-2 text-amber-600 bg-amber-50 p-2 rounded-md mt-2">
+    <AlertTriangle className="h-4 w-4" />
+    <span className="text-sm">
+      This item may require special shipping handling
+      {item.hazardDetails?.reason && `: ${item.hazardDetails.reason}`}
+    </span>
+  </div>
+)}
+```
+
+---
+
+## File Changes Summary
+
+| File | Changes |
+|------|---------|
+| `supabase/functions/fetch-product-info/index.ts` | Replace keyword arrays with pattern-based detection, add exclusion logic, enhance AI prompt |
+| `src/components/shopping/ShoppingAggregator.tsx` | Add hazard warning display, show confidence indicator |
+| `src/hooks/useShopForMeProductRates.ts` | No changes (rates already support hazardous category) |
+
+---
+
+## Testing Scenarios
+
+| Product | Expected Result |
+|---------|-----------------|
+| "Energizer AA Batteries 8-pack" | Hazardous (battery) |
+| "PAW Patrol Battery-Operated Toy Car" | NOT hazardous (exclusion) |
+| "Milwaukee M18 Lithium Battery" | Hazardous (lithium battery) |
+| "Battery Charger for DeWalt" | NOT hazardous (exclusion) |
+| "Chanel No. 5 Perfume 100ml" | Hazardous (fragrance) |
+| "Fragrance-Free Moisturizer" | NOT hazardous (exclusion) |
+| "Rust-Oleum Spray Paint" | Hazardous (aerosol + paint) |
+| "Acrylic Paint Set - 12 Tubes" | NOT hazardous (not aerosol/solvent) |
+| "Isopropyl Alcohol 70% 500ml" | Hazardous (flammable) |
+| "Alcohol-Free Hand Sanitizer" | NOT hazardous (exclusion) |
+
+---
+
+## Technical Implementation Notes
+
+1. **Order of operations**: Exclusions are checked AFTER keyword match to avoid performance overhead
+2. **Case insensitivity**: All text normalized to lowercase before matching
+3. **Combined text analysis**: Checks URL + product name + description together for better context
+4. **Confidence scoring**: High = multiple keyword match, Medium = single keyword, Low = AI inference only
+5. **Backward compatibility**: Existing `product_category: 'hazardous'` still works, new `hazard_details` is optional
