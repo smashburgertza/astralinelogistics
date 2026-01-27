@@ -85,7 +85,35 @@ serve(async (req) => {
       detectedRegion = 'usa';
     }
     
-    console.log('Detected region:', detectedRegion, 'currency:', extractedCurrency);
+    // Detect product category from URL domain patterns
+    type ProductCategory = 'general' | 'hazardous' | 'cosmetics' | 'electronics' | 'spare_parts';
+    let detectedCategory: ProductCategory = 'general';
+    
+    // Cosmetics sites
+    const cosmeticsSites = ['sephora', 'ulta', 'beautybay', 'cultbeauty', 'lookfantastic', 'dermstore', 'feelunique', 'spacenk', 'mecca', 'boots.com/beauty', 'superdrug', 'theordinary', 'glossier', 'fenty', 'nars', 'mac', 'clinique', 'loreal', 'maybelline', 'nyxcosmetics'];
+    if (cosmeticsSites.some(site => urlLower.includes(site))) {
+      detectedCategory = 'cosmetics';
+    }
+    
+    // Electronics sites
+    const electronicsSites = ['bestbuy', 'newegg', 'bhphoto', 'currys', 'adorama', 'microcenter', 'apple.com', 'samsung.com', 'dell.com', 'hp.com', 'lenovo.com', 'asus.com', 'radioshack', 'frys', 'tigerdirect', 'crutchfield'];
+    if (electronicsSites.some(site => urlLower.includes(site)) || isBestBuy) {
+      detectedCategory = 'electronics';
+    }
+    
+    // Spare parts / automotive sites
+    const sparePartsSites = ['autozone', 'rockauto', 'advanceautoparts', 'orielly', 'napa', 'pepboys', 'partsgeek', 'carid', 'carparts', 'autoparts', 'ebay.com/motors', 'amazon.com/automotive', 'summitracing', 'jcwhitney'];
+    if (sparePartsSites.some(site => urlLower.includes(site)) || urlLower.includes('/automotive') || urlLower.includes('/car-parts') || urlLower.includes('/auto-parts')) {
+      detectedCategory = 'spare_parts';
+    }
+    
+    // Hazardous goods detection (keywords - will also check product name later)
+    const hazardousKeywords = ['battery', 'lithium', 'perfume', 'fragrance', 'aerosol', 'nail-polish', 'flammable', 'chemical', 'paint', 'solvent', 'alcohol', 'fuel'];
+    if (hazardousKeywords.some(keyword => urlLower.includes(keyword))) {
+      detectedCategory = 'hazardous';
+    }
+    
+    console.log('Detected region:', detectedRegion, 'currency:', extractedCurrency, 'category:', detectedCategory);
     
     // Look for JSON-LD structured data (most reliable)
     const jsonLdMatches = html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
@@ -468,13 +496,42 @@ ${truncatedHtml}`
       };
     }
 
-    // Remove weight_reasoning from response and add detected region
+    // Remove weight_reasoning from response and add detected region + category
     const { weight_reasoning, ...responseData } = productInfo;
     
-    // Add the detected origin region to the response
+    // Refine category based on product name if AI extracted it
+    let finalCategory = detectedCategory;
+    const productNameLower = (productInfo.product_name || '').toLowerCase();
+    
+    // Check for hazardous keywords in product name
+    const hazardousProductKeywords = ['battery', 'lithium', 'perfume', 'cologne', 'fragrance', 'nail polish', 'aerosol', 'spray paint', 'flammable'];
+    if (hazardousProductKeywords.some(k => productNameLower.includes(k))) {
+      finalCategory = 'hazardous';
+    }
+    
+    // Check for electronics keywords
+    const electronicsProductKeywords = ['laptop', 'phone', 'tablet', 'computer', 'monitor', 'tv', 'television', 'camera', 'headphone', 'speaker', 'console', 'playstation', 'xbox', 'nintendo', 'gpu', 'graphics card', 'processor', 'cpu'];
+    if (electronicsProductKeywords.some(k => productNameLower.includes(k)) && finalCategory === 'general') {
+      finalCategory = 'electronics';
+    }
+    
+    // Check for cosmetics keywords
+    const cosmeticsProductKeywords = ['lipstick', 'mascara', 'foundation', 'eyeshadow', 'blush', 'concealer', 'moisturizer', 'serum', 'skincare', 'makeup', 'cosmetic', 'beauty'];
+    if (cosmeticsProductKeywords.some(k => productNameLower.includes(k)) && finalCategory === 'general') {
+      finalCategory = 'cosmetics';
+    }
+    
+    // Check for spare parts keywords
+    const sparePartsProductKeywords = ['engine', 'transmission', 'brake', 'filter', 'radiator', 'alternator', 'starter', 'exhaust', 'suspension', 'carburetor', 'ignition', 'clutch', 'gasket', 'bearing', 'piston'];
+    if (sparePartsProductKeywords.some(k => productNameLower.includes(k)) && finalCategory === 'general') {
+      finalCategory = 'spare_parts';
+    }
+    
+    // Add the detected origin region and category to the response
     const finalResponse = {
       ...responseData,
       origin_region: detectedRegion,
+      product_category: finalCategory,
     };
 
     return new Response(JSON.stringify(finalResponse), {

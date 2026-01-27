@@ -1,17 +1,14 @@
 import { ShoppingAggregator } from '@/components/shopping/ShoppingAggregator';
 import { useScrollAnimation } from '@/hooks/useScrollAnimation';
 import { cn } from '@/lib/utils';
-import { Link, ShoppingCart, CreditCard, Package, Truck, CheckCircle, Globe, Shield, Clock, LucideIcon, Car, Sparkles, Cpu, Cog } from 'lucide-react';
+import { Link, ShoppingCart, CreditCard, Package, Truck, CheckCircle, Globe, Shield, Clock, LucideIcon, Car } from 'lucide-react';
 import { usePageContent, PageContent } from '@/hooks/usePageContent';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { useState } from 'react';
 
+// Only 2 main categories - product types are detected automatically behind the scenes
 const SHOP_CATEGORIES = [
   { id: 'products', label: 'Products', icon: Package },
   { id: 'vehicles', label: 'Vehicles', icon: Car },
-  { id: 'cosmetics', label: 'Cosmetics', icon: Sparkles },
-  { id: 'electronics', label: 'Electronics', icon: Cpu },
-  { id: 'spare-parts', label: 'Spare Parts', icon: Cog },
 ] as const;
 const iconMap: Record<string, LucideIcon> = {
   Link: Link,
@@ -219,16 +216,15 @@ export function ShopForMeSection() {
           className={cn("max-w-3xl mx-auto scroll-animate-scale", contentVisible && "visible")}
         >
           <Tabs defaultValue="products" className="w-full">
-            <TabsList className="w-full grid grid-cols-5 mb-6 h-auto p-1 bg-muted/50">
+            <TabsList className="w-full grid grid-cols-2 mb-6 h-auto p-1 bg-muted/50">
               {SHOP_CATEGORIES.map((category) => (
                 <TabsTrigger 
                   key={category.id} 
                   value={category.id}
-                  className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 py-2 sm:py-3 text-xs sm:text-sm data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm"
+                  className="flex items-center justify-center gap-2 py-3 text-sm data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm"
                 >
-                  <category.icon className="w-4 h-4" />
-                  <span className="hidden sm:inline">{category.label}</span>
-                  <span className="sm:hidden text-[10px]">{category.label.split(' ')[0]}</span>
+                  <category.icon className="w-5 h-5" />
+                  <span>{category.label}</span>
                 </TabsTrigger>
               ))}
             </TabsList>
