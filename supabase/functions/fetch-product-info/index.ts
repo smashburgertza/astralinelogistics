@@ -468,7 +468,7 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are an expert product analyst specializing in e-commerce price extraction and logistics. Your PRIMARY task is to extract the PRODUCT PRICE and estimate shipping weight.
+            content: `You are an expert product analyst specializing in e-commerce price extraction and logistics. Your PRIMARY task is to extract the PRODUCT PRICE, estimate shipping weight, and classify the product category.
 
 ## PRICE EXTRACTION - THIS IS CRITICAL
 
@@ -520,6 +520,35 @@ CLOTHING:
 - Jacket: 0.5-1.5 kg
 - Jeans: 0.5-0.8 kg
 
+## PRODUCT CATEGORY CLASSIFICATION
+
+Classify this product into ONE of these categories:
+
+1. **general** - Everyday cargo that doesn't fall into special regulatory classes
+   - Clothing, household items, non-restricted consumer products
+   - Requires standard documentation and handling
+   - Examples: furniture, textiles, toys (without batteries), kitchenware
+
+2. **hazardous** - Materials classified as dangerous under international transport rules
+   - Flammable, toxic, corrosive, explosive substances
+   - Requires special packaging, labeling, and safety compliance
+   - Examples: standalone batteries, perfumes, aerosols, paints, solvents, fuel
+
+3. **cosmetics** - Beauty and personal care products
+   - Subject to health and safety regulations
+   - Examples: creams, moisturizers, makeup, skincare, hair products
+   - NOTE: Perfumes and aerosol sprays should be classified as HAZARDOUS instead
+
+4. **electronics** - Consumer and industrial electronic devices or components
+   - May involve restrictions on batteries (lithium)
+   - Requires careful handling to avoid damage
+   - Examples: phones, laptops, tablets, appliances, circuit boards, gaming consoles
+
+5. **spare_parts** - Mechanical or automotive components for repairs/maintenance
+   - Can include metals, plastics, or assemblies
+   - Often bulky, subject to customs classification
+   - Examples: engines, transmissions, brake pads, filters, radiators, alternators
+
 ## HAZARDOUS GOODS ANALYSIS
 
 Analyze if this product requires special shipping handling. Consider:
@@ -541,6 +570,7 @@ Return ONLY valid JSON:
   "currency": "GBP/USD/EUR/etc",
   "estimated_weight_kg": number (rounded UP, minimum 1),
   "weight_reasoning": "brief explanation",
+  "product_category": "general|hazardous|cosmetics|electronics|spare_parts",
   "is_hazardous": true/false,
   "hazard_category": "battery|flammable|pressurized|chemical|fragrance|none",
   "hazard_reason": "brief explanation or null"
@@ -685,23 +715,50 @@ ${truncatedHtml}`
     if (hazardResult.isHazardous) {
       finalCategory = 'hazardous';
     } else {
-      // Check for other category keywords in product name
+      // First check if AI suggested a category
+      const aiCategory = productInfo.product_category;
+      if (aiCategory && ['general', 'hazardous', 'cosmetics', 'electronics', 'spare_parts'].includes(aiCategory)) {
+        finalCategory = aiCategory as ProductCategory;
+      }
+      
+      // Then apply keyword-based detection as additional validation
       const productNameLower = productName.toLowerCase();
       
-      // Electronics keywords
-      const electronicsProductKeywords = ['laptop', 'phone', 'tablet', 'computer', 'monitor', 'tv', 'television', 'camera', 'headphone', 'speaker', 'console', 'playstation', 'xbox', 'nintendo', 'gpu', 'graphics card', 'processor', 'cpu'];
+      // Electronics keywords (expanded)
+      const electronicsProductKeywords = [
+        'laptop', 'phone', 'smartphone', 'tablet', 'computer', 'pc',
+        'monitor', 'tv', 'television', 'camera', 'headphone', 'earbuds',
+        'speaker', 'console', 'playstation', 'xbox', 'nintendo', 'gpu', 
+        'graphics card', 'processor', 'cpu', 'motherboard', 'ram',
+        'ssd', 'hard drive', 'keyboard', 'mouse', 'router', 'modem',
+        'smart watch', 'fitness tracker', 'drone', 'projector', 'printer'
+      ];
       if (electronicsProductKeywords.some(k => productNameLower.includes(k)) && finalCategory === 'general') {
         finalCategory = 'electronics';
       }
       
-      // Cosmetics keywords
-      const cosmeticsProductKeywords = ['lipstick', 'mascara', 'foundation', 'eyeshadow', 'blush', 'concealer', 'moisturizer', 'serum', 'skincare', 'makeup', 'cosmetic', 'beauty'];
+      // Cosmetics keywords (expanded - non-hazardous beauty products)
+      const cosmeticsProductKeywords = [
+        'lipstick', 'mascara', 'foundation', 'eyeshadow', 'blush', 
+        'concealer', 'moisturizer', 'serum', 'skincare', 'makeup', 
+        'cosmetic', 'beauty', 'lotion', 'cream', 'cleanser', 'toner',
+        'sunscreen', 'hair conditioner', 'shampoo', 'body lotion',
+        'face mask', 'exfoliator', 'primer', 'bronzer', 'highlighter'
+      ];
       if (cosmeticsProductKeywords.some(k => productNameLower.includes(k)) && finalCategory === 'general') {
         finalCategory = 'cosmetics';
       }
       
-      // Spare parts keywords
-      const sparePartsProductKeywords = ['engine', 'transmission', 'brake', 'filter', 'radiator', 'alternator', 'starter', 'exhaust', 'suspension', 'carburetor', 'ignition', 'clutch', 'gasket', 'bearing', 'piston'];
+      // Spare parts keywords (expanded - automotive/mechanical)
+      const sparePartsProductKeywords = [
+        'engine', 'transmission', 'gearbox', 'brake', 'brake pad',
+        'filter', 'oil filter', 'air filter', 'radiator', 'alternator', 
+        'starter motor', 'exhaust', 'muffler', 'suspension', 'shock absorber',
+        'carburetor', 'ignition', 'spark plug', 'clutch', 'gasket', 
+        'bearing', 'piston', 'crankshaft', 'camshaft', 'timing belt',
+        'water pump', 'fuel pump', 'turbo', 'turbocharger', 'injector',
+        'axle', 'cv joint', 'wheel bearing', 'control arm', 'tie rod'
+      ];
       if (sparePartsProductKeywords.some(k => productNameLower.includes(k)) && finalCategory === 'general') {
         finalCategory = 'spare_parts';
       }
