@@ -1,201 +1,168 @@
 
 
-# Enhanced Product Category Classification System
+# Fix noon.com Product Fetching with Firecrawl Fallback
 
-## Overview
+## Problem
 
-Update the product category detection system to use your detailed classification definitions. This will improve both the AI-powered analysis and the keyword-based detection, while also updating the user-facing descriptions.
+The `fetch-product-info` edge function fails when fetching from noon.com because:
+- noon.com has strong anti-bot protection
+- The site blocks direct HTTP requests from server environments
+- HTTP/2 stream errors occur when the request is rejected
+
+Error message:
+```
+http2 error: stream error received: unexpected internal error encountered
+```
+
+## Solution
+
+Implement a two-tier fetching strategy:
+1. **Primary**: Try direct fetch (works for most sites)
+2. **Fallback**: Use Firecrawl API (for protected sites like noon.com)
+
+Firecrawl is a professional web scraping service that handles JavaScript rendering and anti-bot bypass. It's available as a connector in the workspace.
 
 ---
 
-## Category Definitions (Your Specifications)
+## Implementation Steps
 
-| Category | Description | Key Characteristics |
-|----------|-------------|---------------------|
-| **General Goods** | Everyday cargo that doesn't fall into special regulatory classes | Clothing, household items, non-restricted consumer products. Standard documentation and handling. |
-| **Hazardous Goods** | Materials classified as dangerous under international transport rules | Flammable, toxic, corrosive, explosive. Special packaging, labeling, safety regulations. Higher risk. |
-| **Cosmetics** | Beauty and personal care products | Creams, perfumes, makeup. Subject to health/safety regulations, chemical composition, labeling requirements. |
-| **Electronics** | Consumer and industrial electronic devices or components | Phones, laptops, appliances, circuit boards. May involve battery restrictions, careful handling. |
-| **Spare Parts** | Mechanical or automotive components for repairs/maintenance | Metals, plastics, assemblies. Often bulky, subject to customs classification. |
+### Step 1: Connect Firecrawl
 
----
+Link the Firecrawl connector to your project. This will make `FIRECRAWL_API_KEY` available as an environment variable in edge functions.
 
-## Implementation Changes
-
-### 1. Update Product Categories Constant
-
-**File:** `src/hooks/useShopForMeProductRates.ts`
-
-Add detailed descriptions to the category definitions:
-
-```typescript
-export const PRODUCT_CATEGORIES: { 
-  value: ProductCategory; 
-  label: string;
-  description: string;
-}[] = [
-  { 
-    value: 'general', 
-    label: 'General Goods',
-    description: 'Everyday cargo like clothing and household items. Standard handling.'
-  },
-  { 
-    value: 'hazardous', 
-    label: 'Hazardous Goods',
-    description: 'Flammable, toxic, or dangerous materials. Special packaging required.'
-  },
-  { 
-    value: 'cosmetics', 
-    label: 'Cosmetics',
-    description: 'Beauty and personal care products. Subject to health regulations.'
-  },
-  { 
-    value: 'electronics', 
-    label: 'Electronics',
-    description: 'Phones, laptops, and electronic devices. May have battery restrictions.'
-  },
-  { 
-    value: 'spare_parts', 
-    label: 'Spare Parts',
-    description: 'Automotive and mechanical components for repairs and maintenance.'
-  },
-];
-```
-
-### 2. Enhance Edge Function AI Prompt
+### Step 2: Update Edge Function with Retry and Fallback Logic
 
 **File:** `supabase/functions/fetch-product-info/index.ts`
 
-Update the AI system prompt to use your exact category definitions for more accurate classification:
+Add retry logic and Firecrawl fallback:
 
 ```typescript
-## PRODUCT CATEGORY CLASSIFICATION
+// Retry-enabled fetch with multiple user agents
+async function fetchWithRetry(url: string, maxRetries = 2): Promise<Response | null> {
+  const userAgents = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15',
+  ];
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': userAgents[attempt % userAgents.length],
+          'Accept': 'text/html,application/xhtml+xml',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+      });
+      if (response.ok) return response;
+    } catch (error) {
+      console.log(`Direct fetch attempt ${attempt + 1} failed:`, error.message);
+    }
+  }
+  return null;
+}
 
-Classify this product into ONE of these categories:
-
-1. **general** - Everyday cargo that doesn't fall into special regulatory classes
-   - Clothing, household items, non-restricted consumer products
-   - Requires standard documentation and handling
-   - Examples: furniture, textiles, toys (without batteries), kitchenware
-
-2. **hazardous** - Materials classified as dangerous under international transport rules
-   - Flammable, toxic, corrosive, explosive substances
-   - Requires special packaging, labeling, and safety compliance
-   - Examples: standalone batteries, perfumes, aerosols, paints, solvents, fuel
-
-3. **cosmetics** - Beauty and personal care products
-   - Subject to health and safety regulations
-   - Examples: creams, moisturizers, makeup, skincare, hair products
-   - NOTE: Perfumes and aerosol sprays should be classified as HAZARDOUS instead
-
-4. **electronics** - Consumer and industrial electronic devices or components
-   - May involve restrictions on batteries (lithium)
-   - Requires careful handling to avoid damage
-   - Examples: phones, laptops, tablets, appliances, circuit boards, gaming consoles
-
-5. **spare_parts** - Mechanical or automotive components for repairs/maintenance
-   - Can include metals, plastics, or assemblies
-   - Often bulky, subject to customs classification
-   - Examples: engines, transmissions, brake pads, filters, radiators, alternators
-
-Return in your JSON: "product_category": "general|hazardous|cosmetics|electronics|spare_parts"
+// Firecrawl fallback for difficult sites
+async function fetchWithFirecrawl(url: string): Promise<string | null> {
+  const apiKey = Deno.env.get('FIRECRAWL_API_KEY');
+  if (!apiKey) {
+    console.log('Firecrawl API key not configured, skipping fallback');
+    return null;
+  }
+  
+  try {
+    const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        url,
+        formats: ['markdown', 'html'],
+        onlyMainContent: false,
+      }),
+    });
+    
+    if (!response.ok) {
+      console.log('Firecrawl request failed:', response.status);
+      return null;
+    }
+    
+    const data = await response.json();
+    return data.data?.html || data.html || null;
+  } catch (error) {
+    console.error('Firecrawl error:', error);
+    return null;
+  }
+}
 ```
 
-### 3. Expand Keyword Detection Lists
-
-**File:** `supabase/functions/fetch-product-info/index.ts`
-
-Update the keyword arrays to cover more products in each category:
+Update the main fetch logic to use both strategies:
 
 ```typescript
-// Cosmetics keywords (non-hazardous beauty products)
-const cosmeticsProductKeywords = [
-  'lipstick', 'mascara', 'foundation', 'eyeshadow', 'blush', 
-  'concealer', 'moisturizer', 'serum', 'skincare', 'makeup', 
-  'cosmetic', 'beauty', 'lotion', 'cream', 'cleanser', 'toner',
-  'sunscreen', 'hair conditioner', 'shampoo', 'body lotion',
-  'face mask', 'exfoliator', 'primer', 'bronzer', 'highlighter'
-];
+// Primary: Try direct fetch
+let html: string | null = null;
+const pageResponse = await fetchWithRetry(url);
 
-// Electronics keywords
-const electronicsProductKeywords = [
-  'laptop', 'phone', 'smartphone', 'tablet', 'computer', 'pc',
-  'monitor', 'tv', 'television', 'camera', 'headphone', 'earbuds',
-  'speaker', 'console', 'playstation', 'xbox', 'nintendo', 'gpu', 
-  'graphics card', 'processor', 'cpu', 'motherboard', 'ram',
-  'ssd', 'hard drive', 'keyboard', 'mouse', 'router', 'modem',
-  'smart watch', 'fitness tracker', 'drone', 'projector', 'printer'
-];
+if (pageResponse) {
+  html = await pageResponse.text();
+  console.log('Direct fetch successful');
+} else {
+  // Fallback: Use Firecrawl for difficult sites
+  console.log('Direct fetch failed, trying Firecrawl fallback...');
+  html = await fetchWithFirecrawl(url);
+  
+  if (html) {
+    console.log('Firecrawl fetch successful');
+  }
+}
 
-// Spare parts keywords (automotive/mechanical)
-const sparePartsProductKeywords = [
-  'engine', 'transmission', 'gearbox', 'brake', 'brake pad',
-  'filter', 'oil filter', 'air filter', 'radiator', 'alternator', 
-  'starter motor', 'exhaust', 'muffler', 'suspension', 'shock absorber',
-  'carburetor', 'ignition', 'spark plug', 'clutch', 'gasket', 
-  'bearing', 'piston', 'crankshaft', 'camshaft', 'timing belt',
-  'water pump', 'fuel pump', 'turbo', 'turbocharger', 'injector',
-  'axle', 'cv joint', 'wheel bearing', 'control arm', 'tie rod'
-];
+// If both methods fail, return error
+if (!html) {
+  console.error('All fetch methods failed for:', url);
+  return new Response(JSON.stringify({ 
+    error: 'Failed to fetch the webpage. The site may be blocking automated requests.',
+    product_name: null,
+    product_price: null,
+    currency: 'AED', // Detected from noon.com
+    estimated_weight_kg: 1,
+    origin_region: 'dubai'
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
 ```
 
-### 4. Update Admin UI (Product Rates Management)
+### Step 3: Add noon.com-Specific Extraction
 
-**File:** `src/components/admin/ShopForMeProductRatesManagement.tsx`
+Since noon.com is a common UAE shopping site, add specific extraction patterns:
 
-Show category descriptions in the management table:
-
-```tsx
-// In table header, add tooltip or description column
-<TableHead>
-  <div className="flex items-center gap-1">
-    Category
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger>
-          <Info className="h-3 w-3 text-muted-foreground" />
-        </TooltipTrigger>
-        <TooltipContent>
-          Categories determine pricing based on product type
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  </div>
-</TableHead>
-```
-
-### 5. Show Category Info in ShoppingAggregator
-
-**File:** `src/components/shopping/ShoppingAggregator.tsx`
-
-Add a tooltip to the category badge showing the description:
-
-```tsx
-import { PRODUCT_CATEGORIES } from '@/hooks/useShopForMeProductRates';
-
-// Helper to get category info
-const getCategoryInfo = (category: string) => {
-  return PRODUCT_CATEGORIES.find(c => c.value === category) || {
-    label: 'General Goods',
-    description: 'Standard cargo with regular handling'
-  };
-};
-
-// In the product card
-const categoryInfo = getCategoryInfo(item.productCategory || 'general');
-
-<TooltipProvider>
-  <Tooltip>
-    <TooltipTrigger>
-      <Badge variant={...}>
-        {categoryInfo.label}
-      </Badge>
-    </TooltipTrigger>
-    <TooltipContent>
-      <p className="max-w-xs">{categoryInfo.description}</p>
-    </TooltipContent>
-  </Tooltip>
-</TooltipProvider>
+```typescript
+// Noon.com-specific extraction
+const isNoon = urlLower.includes('noon.com');
+if (isNoon) {
+  console.log('Applying noon.com-specific extraction...');
+  
+  const noonPricePatterns = [
+    /"price":\s*"?([\d.]+)"?/,
+    /"salePrice":\s*"?([\d.]+)"?/,
+    /"now":\s*([\d.]+)/,
+    /class="[^"]*priceNow[^"]*"[^>]*>([\d.]+)/i,
+  ];
+  
+  for (const pattern of noonPricePatterns) {
+    const match = html.match(pattern);
+    if (match) {
+      const price = parseFloat(match[1]);
+      if (price > 0) {
+        extractedPrice = price;
+        extractedCurrency = 'AED';
+        console.log('Found noon.com price:', price, 'AED');
+        break;
+      }
+    }
+  }
+}
 ```
 
 ---
@@ -204,73 +171,54 @@ const categoryInfo = getCategoryInfo(item.productCategory || 'general');
 
 | File | Changes |
 |------|---------|
-| `src/hooks/useShopForMeProductRates.ts` | Add `description` field to `PRODUCT_CATEGORIES` array |
-| `supabase/functions/fetch-product-info/index.ts` | Update AI prompt with detailed category definitions, expand keyword lists |
-| `src/components/shopping/ShoppingAggregator.tsx` | Add tooltip to category badge showing description |
-| `src/components/admin/ShopForMeProductRatesManagement.tsx` | Optional: Add info tooltip to category column |
+| Connector setup | Link Firecrawl connector to project |
+| `supabase/functions/fetch-product-info/index.ts` | Add `fetchWithRetry()`, `fetchWithFirecrawl()` functions, noon.com extraction patterns |
 
 ---
 
-## Classification Logic Flow
+## How It Will Work
 
 ```text
-Product URL Submitted
-        |
-        v
+User submits noon.com URL
+         |
+         v
 +-------------------+
-| 1. Site Detection |  Check if URL is from known category-specific sites
-| (Electronics,     |  (BestBuy → electronics, Sephora → cosmetics, AutoZone → spare_parts)
-| Cosmetics, etc.)  |
+| Direct Fetch      |  Try direct HTTP request with retry
+| (2 attempts)      |
 +-------------------+
-        |
-        v
+         |
+    FAILS (HTTP/2 error)
+         |
+         v
 +-------------------+
-| 2. AI Analysis    |  Use Gemini to analyze product name/description
-| with Category     |  with detailed classification criteria
-| Definitions       |
+| Firecrawl API     |  Use professional scraper as fallback
+| (Handles anti-bot)|
 +-------------------+
-        |
-        v
+         |
+    SUCCESS
+         |
+         v
 +-------------------+
-| 3. Hazard Check   |  Apply pattern matching with exclusions
-| (Overrides other  |  If hazardous detected, override to 'hazardous'
-| categories)       |
+| Extract product   |  Use noon.com-specific patterns
+| info from HTML    |  + AI analysis
 +-------------------+
-        |
-        v
-+-------------------+
-| 4. Keyword        |  If still 'general', check product name
-| Fallback          |  against expanded keyword lists
-+-------------------+
-        |
-        v
-  Final Category
+         |
+         v
+  Return product data with
+  AED currency (Dubai region)
 ```
 
 ---
 
-## Expected Behavior
+## Expected Result
 
-| Product | Site | Expected Category |
-|---------|------|-------------------|
-| iPhone 15 Pro | apple.com | Electronics |
-| Engine block | eBay Motors | Spare Parts |
-| MAC Foundation | Sephora | Cosmetics |
-| Lithium battery pack | Amazon | Hazardous |
-| Men's jacket | ASOS | General Goods |
-| Chanel No. 5 Perfume | Amazon | Hazardous (not Cosmetics - flammable) |
-| Brake pads | AutoZone | Spare Parts |
-| Moisturizer cream | Boots | Cosmetics |
+After implementation, noon.com products will be fetched successfully:
 
----
-
-## Technical Notes
-
-1. **Cosmetics vs Hazardous**: Perfumes, aerosol sprays, and nail polish are classified as **Hazardous** (not Cosmetics) due to flammable/pressurized contents
-
-2. **Electronics with batteries**: Devices with integrated batteries are classified as **Electronics** (not Hazardous) unless they are standalone battery products
-
-3. **Priority order**: Hazardous detection takes priority over other categories to ensure safety compliance
-
-4. **Fallback**: Products that don't match any specific criteria default to **General Goods**
+| Field | Value |
+|-------|-------|
+| Product Name | 20 Pcs Car Wheel Tire Brush Set... |
+| Price | ~AED XX.XX |
+| Currency | AED |
+| Region | Dubai |
+| Category | General Goods |
 
