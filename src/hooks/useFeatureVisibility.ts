@@ -16,9 +16,13 @@ export function useFeatureVisibility(featureKey: 'shop_for_me' | 'shipping_calcu
   const { data: settings, isLoading } = useAllSettings();
   
   const settingsKey = `feature_${featureKey}`;
-  const visibility = settings?.[settingsKey] 
+  
+  // While loading, don't show anything - wait for actual settings
+  // Once loaded, use saved settings or fall back to defaults
+  const hasSettings = settings && settings[settingsKey] !== undefined;
+  const visibility = hasSettings
     ? { ...defaultVisibility, ...(settings[settingsKey] as unknown as FeatureVisibility) }
-    : defaultVisibility;
+    : (isLoading ? { enabled: false, show_on_public: false, show_on_customer: false } : defaultVisibility);
 
   return {
     isLoading,
