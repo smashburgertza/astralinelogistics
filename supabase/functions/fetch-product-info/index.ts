@@ -5,6 +5,23 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Helper function for word boundary matching - prevents partial word matches
+function matchesKeyword(text: string, keyword: string): boolean {
+  // Escape special regex characters in keyword
+  const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // Match word boundaries - allows plurals (laptops matches laptop)
+  const regex = new RegExp(`\\b${escapedKeyword}s?\\b`, 'i');
+  return regex.test(text);
+}
+
+// Car care/cleaning product exclusions - these should NOT be classified as spare_parts
+const carCareExclusions = [
+  'brush', 'cleaner', 'cleaning', 'wash', 'wax', 'polish', 
+  'detailing', 'mitt', 'towel', 'microfiber', 'sponge', 'shampoo',
+  'vacuum', 'duster', 'organizer', 'mat', 'cover', 'seat cover',
+  'air freshener', 'protectant', 'kit set', 'accessory'
+];
+
 // Retry-enabled fetch with multiple user agents
 async function fetchWithRetry(url: string, maxRetries = 2): Promise<Response | null> {
   const userAgents = [
@@ -841,6 +858,11 @@ ${truncatedHtml}`
     
     // Determine final category
     let finalCategory: ProductCategory = detectedCategory;
+    const productNameLower = productName.toLowerCase();
+    
+    // Check if this is a car care/cleaning product (should be general, not spare_parts)
+    const isCarCareProduct = carCareExclusions.some(ex => productNameLower.includes(ex));
+    console.log('Car care product check:', isCarCareProduct, '| Product name:', productName.substring(0, 50));
     
     if (hazardResult.isHazardous) {
       finalCategory = 'hazardous';
@@ -849,12 +871,16 @@ ${truncatedHtml}`
       const aiCategory = productInfo.product_category;
       if (aiCategory && ['general', 'hazardous', 'cosmetics', 'electronics', 'spare_parts'].includes(aiCategory)) {
         finalCategory = aiCategory as ProductCategory;
+        
+        // CRITICAL FIX: Override AI's spare_parts or electronics classification for car care products
+        // Car cleaning/detailing products should be "general" not "spare_parts" or "electronics"
+        if ((finalCategory === 'spare_parts' || finalCategory === 'electronics') && isCarCareProduct) {
+          console.log(`Overriding ${finalCategory} to general for car care product`);
+          finalCategory = 'general';
+        }
       }
       
-      // Then apply keyword-based detection as additional validation
-      const productNameLower = productName.toLowerCase();
-      
-      // Electronics keywords (expanded)
+      // Electronics keywords - use word boundary matching
       const electronicsProductKeywords = [
         'laptop', 'phone', 'smartphone', 'tablet', 'computer', 'pc',
         'monitor', 'tv', 'television', 'camera', 'headphone', 'earbuds',
@@ -863,11 +889,12 @@ ${truncatedHtml}`
         'ssd', 'hard drive', 'keyboard', 'mouse', 'router', 'modem',
         'smart watch', 'fitness tracker', 'drone', 'projector', 'printer'
       ];
-      if (electronicsProductKeywords.some(k => productNameLower.includes(k)) && finalCategory === 'general') {
+      if (electronicsProductKeywords.some(k => matchesKeyword(productNameLower, k)) && finalCategory === 'general' && !isCarCareProduct) {
         finalCategory = 'electronics';
+        console.log('Keyword override: electronics');
       }
       
-      // Cosmetics keywords (expanded - non-hazardous beauty products)
+      // Cosmetics keywords - use word boundary matching
       const cosmeticsProductKeywords = [
         'lipstick', 'mascara', 'foundation', 'eyeshadow', 'blush', 
         'concealer', 'moisturizer', 'serum', 'skincare', 'makeup', 
@@ -875,23 +902,28 @@ ${truncatedHtml}`
         'sunscreen', 'hair conditioner', 'shampoo', 'body lotion',
         'face mask', 'exfoliator', 'primer', 'bronzer', 'highlighter'
       ];
-      if (cosmeticsProductKeywords.some(k => productNameLower.includes(k)) && finalCategory === 'general') {
+      if (cosmeticsProductKeywords.some(k => matchesKeyword(productNameLower, k)) && finalCategory === 'general') {
         finalCategory = 'cosmetics';
+        console.log('Keyword override: cosmetics');
       }
       
-      // Spare parts keywords (expanded - automotive/mechanical)
+      // Spare parts keywords - use specific multi-word phrases to avoid false positives
       const sparePartsProductKeywords = [
-        'engine', 'transmission', 'gearbox', 'brake', 'brake pad',
-        'filter', 'oil filter', 'air filter', 'radiator', 'alternator', 
-        'starter motor', 'exhaust', 'muffler', 'suspension', 'shock absorber',
-        'carburetor', 'ignition', 'spark plug', 'clutch', 'gasket', 
-        'bearing', 'piston', 'crankshaft', 'camshaft', 'timing belt',
-        'water pump', 'fuel pump', 'turbo', 'turbocharger', 'injector',
-        'axle', 'cv joint', 'wheel bearing', 'control arm', 'tie rod'
+        'engine block', 'transmission', 'gearbox', 'brake pad', 'brake disc', 'brake rotor',
+        'oil filter', 'air filter', 'fuel filter', 'radiator', 'alternator', 
+        'starter motor', 'exhaust pipe', 'muffler', 'suspension spring', 'shock absorber',
+        'carburetor', 'ignition coil', 'spark plug', 'clutch plate', 'gasket', 
+        'wheel bearing', 'piston', 'crankshaft', 'camshaft', 'timing belt', 'timing chain',
+        'water pump', 'fuel pump', 'turbocharger', 'fuel injector',
+        'cv joint', 'control arm', 'tie rod', 'ball joint'
       ];
-      if (sparePartsProductKeywords.some(k => productNameLower.includes(k)) && finalCategory === 'general') {
+      
+      if (sparePartsProductKeywords.some(k => matchesKeyword(productNameLower, k)) && finalCategory === 'general' && !isCarCareProduct) {
         finalCategory = 'spare_parts';
+        console.log('Keyword override: spare_parts');
       }
+      
+      console.log('Final category after keyword checks:', finalCategory);
     }
 
     // Build response - remove internal fields
