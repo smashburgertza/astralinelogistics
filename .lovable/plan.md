@@ -1,296 +1,214 @@
 
-# Improved Hazardous Goods Detection System
+# Fix Category-Specific Pricing with Correct Regional Currencies
 
-## Overview
-Enhance the product category detection system to provide more accurate hazardous goods identification with reduced false positives, contextual analysis, and optional AI-powered classification.
+## Problem Summary
 
----
+The Shop For Me calculator has two issues:
 
-## Current State Analysis
+1. **Wrong data source**: Uses generic `region_pricing` + `shop_for_me_charges` instead of category-specific `shop_for_me_product_rates`
+2. **Currency mismatch**: Product rates in database are all stored in USD, but should use regional currencies
 
-### Existing Detection Logic
-The current system uses two-stage keyword matching:
+### Current Currency Configuration (from regions table)
+| Region | Currency |
+|--------|----------|
+| UK | GBP |
+| Europe | EUR |
+| USA | USD |
+| China | USD |
+| Dubai | USD |
+| India | USD |
 
-**Stage 1 - URL Pattern Detection (lines 110-114):**
-```typescript
-const hazardousKeywords = ['battery', 'lithium', 'perfume', 'fragrance', 
-  'aerosol', 'nail-polish', 'flammable', 'chemical', 'paint', 'solvent', 
-  'alcohol', 'fuel'];
-```
-
-**Stage 2 - Product Name Detection (lines 506-510):**
-```typescript
-const hazardousProductKeywords = ['battery', 'lithium', 'perfume', 
-  'cologne', 'fragrance', 'nail polish', 'aerosol', 'spray paint', 'flammable'];
-```
-
-### Current Limitations
-| Problem | Example |
-|---------|---------|
-| False positives | "Battery-operated toy" → marked hazardous |
-| False positives | "Alcohol-free sanitizer" → marked hazardous |
-| False positives | "Nail polish remover pads" (dry) → marked hazardous |
-| Missing context | Small AA batteries vs large lithium car batteries |
-| No severity levels | All hazardous items treated equally |
-| No exclusion patterns | Can't distinguish "battery charger" from "battery" |
+### Current Rates (all in USD - needs fixing)
+The `shop_for_me_product_rates` table currently stores all rates in USD. This needs to be updated to match regional currencies.
 
 ---
 
-## Proposed Solution
+## Solution Overview
 
-### Multi-Layer Detection Strategy
+### Part 1: Update Database - Store Rates in Regional Currencies
+
+Update the existing product rates to use the correct currency per region:
+
+| Region | Currency | Example: Hazardous Rate |
+|--------|----------|-------------------------|
+| UK | GBP | £30/kg |
+| Europe | EUR | €16/kg |
+| USA | USD | $15/kg |
+| China | USD | $10/kg |
+| Dubai | USD | $12/kg |
+| India | USD | $11/kg |
+
+**Database update needed:**
+- Update `shop_for_me_product_rates` where region = 'uk' SET currency = 'GBP'
+- Update `shop_for_me_product_rates` where region = 'europe' SET currency = 'EUR'
+- All other regions remain USD (correct)
+
+### Part 2: Update Calculator Logic
+
+Replace the current calculation flow with category-aware pricing:
 
 ```text
-+------------------+     +------------------+     +------------------+
-|  Layer 1         |     |  Layer 2         |     |  Layer 3         |
-|  URL & Site      | --> |  Product Name    | --> |  AI Contextual   |
-|  Pattern Match   |     |  Analysis        |     |  Analysis        |
-+------------------+     +------------------+     +------------------+
-        |                        |                        |
-        v                        v                        v
-   Quick flags            Refined match           Final decision
-   (high recall)          (exclusion patterns)    (high precision)
+CURRENT FLOW (incorrect):
++-------------------+     +---------------------+     +------------------+
+| region_pricing    | --> | shop_for_me_charges | --> | Calculate total  |
+| (generic rate/kg) |     | (global %)          |     |                  |
++-------------------+     +---------------------+     +------------------+
+
+NEW FLOW (correct):
++---------------------------+     +------------------+
+| shop_for_me_product_rates | --> | Calculate total  |
+| (region + category)       |     | in region's      |
+| Uses: rate_per_kg,        |     | currency         |
+|       duty_percentage,    |     +------------------+
+|       handling_fee_%,     |
+|       markup_%            |
++---------------------------+
 ```
 
 ---
 
-## Implementation Details
+## Implementation Steps
 
-### 1. Enhanced Keyword System with Exclusions
+### Step 1: Database Migration
 
-Replace simple keyword matching with pattern-based detection that includes exclusion rules:
+Update currencies in `shop_for_me_product_rates` to match regional settings:
 
-```typescript
-interface HazardousPattern {
-  keywords: string[];           // Match these words
-  excludePatterns: string[];    // Don't match if these present
-  category: 'battery' | 'flammable' | 'pressurized' | 'chemical' | 'fragrance';
-  severity: 'restricted' | 'special_handling' | 'prohibited';
-}
+```sql
+-- Update UK rates to use GBP
+UPDATE shop_for_me_product_rates 
+SET currency = 'GBP' 
+WHERE region = 'uk';
 
-const HAZARDOUS_PATTERNS: HazardousPattern[] = [
-  {
-    keywords: ['lithium battery', 'lithium-ion', 'li-ion', 'lipo'],
-    excludePatterns: ['charger only', 'battery charger', 'replacement charger'],
-    category: 'battery',
-    severity: 'restricted'
-  },
-  {
-    keywords: ['battery'],
-    excludePatterns: ['battery-operated', 'battery powered', 'uses batteries', 
-                     'batteries included', 'batteries not included', 'charger', 
-                     'battery case', 'battery holder', 'battery cover'],
-    category: 'battery',
-    severity: 'special_handling'
-  },
-  {
-    keywords: ['perfume', 'cologne', 'eau de parfum', 'eau de toilette', 'fragrance spray'],
-    excludePatterns: ['fragrance-free', 'unscented', 'perfume bottle empty', 'atomizer only'],
-    category: 'fragrance',
-    severity: 'restricted'
-  },
-  {
-    keywords: ['aerosol', 'spray can', 'compressed gas'],
-    excludePatterns: ['non-aerosol', 'pump spray', 'trigger spray', 'mist spray'],
-    category: 'pressurized',
-    severity: 'restricted'
-  },
-  {
-    keywords: ['nail polish', 'nail lacquer', 'nail varnish'],
-    excludePatterns: ['nail polish remover pads', 'nail stickers', 'press-on nails', 
-                     'nail tips', 'nail art', 'nail file'],
-    category: 'flammable',
-    severity: 'special_handling'
-  },
-  {
-    keywords: ['paint', 'solvent', 'thinner', 'acetone', 'turpentine'],
-    excludePatterns: ['paint brush', 'paint roller', 'paint tray', 'dried paint', 
-                     'paint sample', 'color sample', 'paint chip'],
-    category: 'chemical',
-    severity: 'restricted'
-  },
-  {
-    keywords: ['alcohol', 'ethanol', 'isopropyl'],
-    excludePatterns: ['alcohol-free', 'non-alcoholic', 'zero alcohol', '0% alcohol'],
-    category: 'flammable',
-    severity: 'special_handling'
-  },
-  {
-    keywords: ['fuel', 'gasoline', 'petrol', 'kerosene', 'propane'],
-    excludePatterns: ['fuel pump', 'fuel filter', 'fuel line', 'fuel tank empty', 
-                     'fuel gauge', 'fuel efficient'],
-    category: 'flammable',
-    severity: 'prohibited'
-  }
-];
+-- Update Europe rates to use EUR
+UPDATE shop_for_me_product_rates 
+SET currency = 'EUR' 
+WHERE region = 'europe';
+
+-- USA, China, Dubai, India remain USD (already correct)
 ```
 
-### 2. Smart Detection Function
+### Step 2: Update ShoppingAggregator.tsx
 
+**Changes to imports and hooks:**
 ```typescript
-interface HazardousResult {
-  isHazardous: boolean;
-  category: string | null;
-  severity: 'restricted' | 'special_handling' | 'prohibited' | null;
-  matchedKeyword: string | null;
-  confidence: 'high' | 'medium' | 'low';
-  reason: string;
-}
+// Add import for product rates
+import { 
+  useAllShopForMeProductRates, 
+  calculateProductCost,
+  type ShopForMeProductRate 
+} from '@/hooks/useShopForMeProductRates';
 
-function detectHazardousGoods(
-  productName: string, 
-  productDescription: string | null,
-  url: string
-): HazardousResult {
-  const textToAnalyze = `${productName} ${productDescription || ''} ${url}`.toLowerCase();
+// Inside component
+const { data: productRates } = useAllShopForMeProductRates();
+```
+
+**Add helper function to find rates:**
+```typescript
+// Find rate for specific region + category
+const getProductRate = (region: string, category: string): ShopForMeProductRate | null => {
+  if (!productRates) return null;
   
-  for (const pattern of HAZARDOUS_PATTERNS) {
-    // Check if any keyword matches
-    const matchedKeyword = pattern.keywords.find(k => textToAnalyze.includes(k));
+  // Try exact match first
+  let rate = productRates.find(
+    r => r.region === region && 
+         r.product_category === category && 
+         r.is_active
+  );
+  
+  // Fallback to 'general' category for same region
+  if (!rate && category !== 'general') {
+    rate = productRates.find(
+      r => r.region === region && 
+           r.product_category === 'general' && 
+           r.is_active
+    );
+  }
+  
+  return rate || null;
+};
+```
+
+**Update calculateTotals function:**
+```typescript
+const calculateTotals = () => {
+  // Group items by region AND category
+  const groupedItems: Record<string, ProductItem[]> = {};
+  
+  items.forEach(item => {
+    const region = item.originRegion || selectedRegion;
+    const category = item.productCategory || 'general';
+    const key = `${region}:${category}`;
     
-    if (matchedKeyword) {
-      // Check if any exclusion pattern is present
-      const hasExclusion = pattern.excludePatterns.some(ex => textToAnalyze.includes(ex));
+    if (!groupedItems[key]) groupedItems[key] = [];
+    groupedItems[key].push(item);
+  });
+
+  const regionBreakdowns: RegionBreakdown[] = [];
+  let grandTotalInTZS = 0;
+
+  Object.entries(groupedItems).forEach(([key, groupItems]) => {
+    const [region, category] = key.split(':');
+    const rate = getProductRate(region, category);
+    
+    if (!rate) {
+      // Fallback to legacy calculation if no rate found
+      // ... existing logic
+      return;
+    }
+
+    // Use rate's currency (GBP for UK, EUR for Europe, USD for others)
+    const currency = rate.currency;
+    const exchangeRate = getExchangeRate(currency);
+
+    // Calculate for each item using category-specific rates
+    let groupTotal = 0;
+    const breakdown: BreakdownItem[] = [];
+    
+    groupItems.forEach(item => {
+      const productCost = (item.productPrice || 0) * item.quantity;
+      const weight = roundWeight(item.estimatedWeightKg) * item.quantity;
       
-      if (!hasExclusion) {
-        return {
-          isHazardous: true,
-          category: pattern.category,
-          severity: pattern.severity,
-          matchedKeyword,
-          confidence: pattern.keywords.length > 1 ? 'high' : 'medium',
-          reason: `Contains "${matchedKeyword}" which is classified as ${pattern.category}`
-        };
-      }
-    }
-  }
-  
-  return {
-    isHazardous: false,
-    category: null,
-    severity: null,
-    matchedKeyword: null,
-    confidence: 'high',
-    reason: 'No hazardous indicators found'
-  };
-}
+      const calc = calculateProductCost(productCost, weight, rate);
+      groupTotal += calc.total;
+    });
+
+    // Build breakdown using rate's percentages
+    // Product Cost → Shipping → Duty → Handling → Markup
+    
+    const subtotalInTZS = groupTotal * exchangeRate;
+    grandTotalInTZS += subtotalInTZS;
+
+    regionBreakdowns.push({
+      region,
+      category,
+      currency,
+      charges: breakdown,
+      subtotal: groupTotal,
+      subtotalInTZS,
+      exchangeRate,
+    });
+  });
+
+  // ... rest of calculation
+};
 ```
 
-### 3. AI-Powered Contextual Analysis
+### Step 3: Update Breakdown Display
 
-Add hazardous classification to the existing AI prompt for ambiguous cases:
+Consolidate items from same region into single regional breakdown, showing:
 
-```typescript
-// Add to the AI system prompt
-const hazardousAnalysisPrompt = `
-## HAZARDOUS GOODS CLASSIFICATION
+```text
+🇬🇧 United Kingdom (Hazardous)
 
-Analyze if this product is hazardous for air/sea shipping:
-
-HAZARDOUS CATEGORIES:
-- Battery products: Standalone lithium batteries, power banks, battery packs
-  (NOT battery-operated toys, battery chargers, battery cases)
-- Flammable liquids: Perfumes, nail polish, paint, solvents, alcohol
-  (NOT alcohol-free products, dry items, empty containers)
-- Pressurized containers: Aerosols, compressed gas
-  (NOT pump sprays, non-aerosol alternatives)
-- Chemicals: Acids, corrosives, oxidizers
-
-Return in your JSON:
-{
-  "is_hazardous": true/false,
-  "hazard_category": "battery|flammable|pressurized|chemical|none",
-  "hazard_reason": "brief explanation or null"
-}
-`;
-```
-
-### 4. Weight-Based Battery Detection
-
-For battery products, use weight as an additional signal:
-
-```typescript
-function refineHazardousClassification(
-  category: string,
-  weightKg: number,
-  productName: string
-): HazardousResult {
-  // Small battery products (< 0.5kg) are often battery-operated toys
-  if (category === 'battery' && weightKg < 0.5) {
-    const toyIndicators = ['toy', 'kids', 'children', 'game', 'remote control', 
-                          'rc car', 'drone', 'robot'];
-    if (toyIndicators.some(t => productName.toLowerCase().includes(t))) {
-      return {
-        isHazardous: false,
-        category: null,
-        severity: null,
-        matchedKeyword: null,
-        confidence: 'medium',
-        reason: 'Appears to be battery-operated toy, not standalone battery'
-      };
-    }
-  }
-  
-  // Large battery products (> 5kg) like car batteries are definitely hazardous
-  if (category === 'battery' && weightKg > 5) {
-    return {
-      isHazardous: true,
-      category: 'battery',
-      severity: 'restricted',
-      matchedKeyword: 'battery',
-      confidence: 'high',
-      reason: 'Large battery product requires special handling'
-    };
-  }
-  
-  // ... return original classification
-}
-```
-
----
-
-## Response Structure Enhancement
-
-### Updated API Response
-
-```typescript
-interface ProductInfoResponse {
-  product_name: string;
-  product_description: string | null;
-  product_image: string | null;
-  product_price: number | null;
-  currency: string;
-  estimated_weight_kg: number;
-  origin_region: string;
-  product_category: 'general' | 'hazardous' | 'cosmetics' | 'electronics' | 'spare_parts';
-  // NEW FIELDS
-  hazard_details?: {
-    category: 'battery' | 'flammable' | 'pressurized' | 'chemical' | 'fragrance';
-    severity: 'restricted' | 'special_handling' | 'prohibited';
-    reason: string;
-    confidence: 'high' | 'medium' | 'low';
-  };
-}
-```
-
----
-
-## Customer-Facing Display
-
-### Show Hazardous Warning in ShoppingAggregator
-
-Add a visual indicator when a product is detected as hazardous:
-
-```tsx
-{item.productCategory === 'hazardous' && (
-  <div className="flex items-center gap-2 text-amber-600 bg-amber-50 p-2 rounded-md mt-2">
-    <AlertTriangle className="h-4 w-4" />
-    <span className="text-sm">
-      This item may require special shipping handling
-      {item.hazardDetails?.reason && `: ${item.hazardDetails.reason}`}
-    </span>
-  </div>
-)}
+Line Item          | Amount (GBP)
+-------------------|-------------
+Product Cost       | £150.00
+Shipping (35kg)    | £1,050.00 (35 × £30/kg)
+Duty (45%)         | £67.50
+Handling (5%)      | £60.00
+-------------------|-------------
+Subtotal           | £1,327.50
+                   | ≈ TZS 4,379,325
 ```
 
 ---
@@ -299,33 +217,42 @@ Add a visual indicator when a product is detected as hazardous:
 
 | File | Changes |
 |------|---------|
-| `supabase/functions/fetch-product-info/index.ts` | Replace keyword arrays with pattern-based detection, add exclusion logic, enhance AI prompt |
-| `src/components/shopping/ShoppingAggregator.tsx` | Add hazard warning display, show confidence indicator |
-| `src/hooks/useShopForMeProductRates.ts` | No changes (rates already support hazardous category) |
+| `shop_for_me_product_rates` table | Update UK currency to GBP, Europe to EUR |
+| `src/components/shopping/ShoppingAggregator.tsx` | Import product rates hook, update `calculateTotals()` to use category-specific rates and regional currencies |
+| `src/hooks/useShopForMeProductRates.ts` | No changes (already has `calculateProductCost`) |
 
 ---
 
-## Testing Scenarios
+## Expected Results
 
-| Product | Expected Result |
-|---------|-----------------|
-| "Energizer AA Batteries 8-pack" | Hazardous (battery) |
-| "PAW Patrol Battery-Operated Toy Car" | NOT hazardous (exclusion) |
-| "Milwaukee M18 Lithium Battery" | Hazardous (lithium battery) |
-| "Battery Charger for DeWalt" | NOT hazardous (exclusion) |
-| "Chanel No. 5 Perfume 100ml" | Hazardous (fragrance) |
-| "Fragrance-Free Moisturizer" | NOT hazardous (exclusion) |
-| "Rust-Oleum Spray Paint" | Hazardous (aerosol + paint) |
-| "Acrylic Paint Set - 12 Tubes" | NOT hazardous (not aerosol/solvent) |
-| "Isopropyl Alcohol 70% 500ml" | Hazardous (flammable) |
-| "Alcohol-Free Hand Sanitizer" | NOT hazardous (exclusion) |
+### For UK Hazardous Product (35kg Battery at £150):
+
+| Line Item | Before (Wrong) | After (Fixed) |
+|-----------|----------------|---------------|
+| Product Cost | £150 | £150 |
+| Shipping | £280 (£8/kg generic) | £1,050 (£30/kg hazardous) |
+| Duty | 35% global | 45% hazardous |
+| Handling | 3% global | 5% hazardous |
+| **Currency** | USD rate shown as GBP | **GBP** (correct) |
+
+### For China Electronics (5kg Laptop at $800):
+
+| Line Item | Rate Used |
+|-----------|-----------|
+| Product Cost | $800 |
+| Shipping | $40 ($8/kg electronics) |
+| Duty (25%) | $200 |
+| Handling (4%) | $33.60 |
+| **Currency** | **USD** |
 
 ---
 
-## Technical Implementation Notes
+## Testing Checklist
 
-1. **Order of operations**: Exclusions are checked AFTER keyword match to avoid performance overhead
-2. **Case insensitivity**: All text normalized to lowercase before matching
-3. **Combined text analysis**: Checks URL + product name + description together for better context
-4. **Confidence scoring**: High = multiple keyword match, Medium = single keyword, Low = AI inference only
-5. **Backward compatibility**: Existing `product_category: 'hazardous'` still works, new `hazard_details` is optional
+- [ ] UK product shows prices in GBP (£)
+- [ ] Europe product shows prices in EUR (€)
+- [ ] USA/China/Dubai/India products show USD ($)
+- [ ] Hazardous category uses higher rates than general
+- [ ] Electronics category uses electronics-specific rates
+- [ ] TZS equivalent calculated correctly using exchange rates
+- [ ] Fallback to 'general' category if specific category not configured
