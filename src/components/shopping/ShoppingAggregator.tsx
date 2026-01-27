@@ -54,6 +54,7 @@ interface ProductItem {
   isRegionConfirmed?: boolean;
   isPriceManual?: boolean;
   isWeightManual?: boolean;
+  productCategory?: 'general' | 'hazardous' | 'cosmetics' | 'electronics' | 'spare_parts';
 }
 
 interface CustomerDetails {
@@ -163,6 +164,7 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
     }
 
     const detectedRegion = response.data.origin_region as string | undefined;
+    const detectedCategory = response.data.product_category as ProductItem['productCategory'] | undefined;
     
     return {
       productName: response.data.product_name || 'Unknown Product',
@@ -173,6 +175,7 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
       estimatedWeightKg: response.data.estimated_weight_kg || 0.5,
       originRegion: detectedRegion,
       detectedRegion: detectedRegion,
+      productCategory: detectedCategory || 'general',
     };
   };
 
