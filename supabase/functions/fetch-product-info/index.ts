@@ -5,6 +5,75 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Retry-enabled fetch with multiple user agents
+async function fetchWithRetry(url: string, maxRetries = 2): Promise<Response | null> {
+  const userAgents = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
+  ];
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      console.log(`Direct fetch attempt ${attempt + 1}...`);
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': userAgents[attempt % userAgents.length],
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+      });
+      if (response.ok) {
+        console.log(`Direct fetch successful on attempt ${attempt + 1}`);
+        return response;
+      }
+      console.log(`Direct fetch attempt ${attempt + 1} returned status:`, response.status);
+    } catch (error) {
+      console.log(`Direct fetch attempt ${attempt + 1} failed:`, error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+  return null;
+}
+
+// Firecrawl fallback for difficult sites like noon.com
+async function fetchWithFirecrawl(url: string): Promise<string | null> {
+  const apiKey = Deno.env.get('FIRECRAWL_API_KEY');
+  if (!apiKey) {
+    console.log('Firecrawl API key not configured, skipping fallback');
+    return null;
+  }
+  
+  try {
+    console.log('Attempting Firecrawl fallback for:', url);
+    const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        url,
+        formats: ['html'],
+        onlyMainContent: false,
+      }),
+    });
+    
+    if (!response.ok) {
+      console.log('Firecrawl request failed:', response.status);
+      return null;
+    }
+    
+    const data = await response.json();
+    const html = data.data?.html || data.html || null;
+    if (html) {
+      console.log('Firecrawl fetch successful, got HTML length:', html.length);
+    }
+    return html;
+  } catch (error) {
+    console.error('Firecrawl error:', error instanceof Error ? error.message : 'Unknown error');
+    return null;
+  }
+}
+
 // Enhanced hazardous goods detection patterns with exclusions
 interface HazardousPattern {
   keywords: string[];
@@ -181,35 +250,47 @@ serve(async (req) => {
 
     console.log('Fetching URL:', url);
 
-    // Fetch the webpage
-    const pageResponse = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-      },
-    });
+    // Two-tier fetching strategy: Direct fetch with retry, then Firecrawl fallback
+    let html: string | null = null;
+    const pageResponse = await fetchWithRetry(url);
 
-    if (!pageResponse.ok) {
-      console.error('Failed to fetch page:', pageResponse.status);
+    if (pageResponse) {
+      html = await pageResponse.text();
+      console.log('Got HTML from direct fetch, length:', html.length);
+    } else {
+      // Fallback: Use Firecrawl for difficult sites (noon.com, etc.)
+      console.log('Direct fetch failed, trying Firecrawl fallback...');
+      html = await fetchWithFirecrawl(url);
+    }
+
+    // If both methods fail, return error
+    if (!html) {
+      console.error('All fetch methods failed for:', url);
+      // Try to detect region from URL for better error response
+      let fallbackCurrency = 'USD';
+      let fallbackRegion = 'usa';
+      if (url.toLowerCase().includes('noon.com') || url.toLowerCase().includes('.ae')) {
+        fallbackCurrency = 'AED';
+        fallbackRegion = 'dubai';
+      }
       return new Response(JSON.stringify({ 
-        error: 'Failed to fetch the webpage',
-        product_name: 'Unknown Product',
+        error: 'Failed to fetch the webpage. The site may be blocking automated requests.',
+        product_name: null,
         product_price: null,
-        currency: 'USD',
-        estimated_weight_kg: 1
+        currency: fallbackCurrency,
+        estimated_weight_kg: 1,
+        origin_region: fallbackRegion
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-
-    const html = await pageResponse.text();
     
     // Detect the site for targeted extraction
     const urlLower = url.toLowerCase();
     const isEbay = urlLower.includes('ebay.');
     const isAmazon = urlLower.includes('amazon.');
     const isAliExpress = urlLower.includes('aliexpress.');
+    const isNoon = urlLower.includes('noon.com');
     
     // Try to extract price from structured data first (JSON-LD, meta tags)
     let extractedPrice: number | null = null;
@@ -383,6 +464,55 @@ serve(async (req) => {
           if (price > 0) {
             extractedPrice = price;
             console.log('Found AliExpress price:', extractedPrice);
+            break;
+          }
+        }
+      }
+    }
+    
+    // Noon.com-specific extraction
+    if (!extractedPrice && isNoon) {
+      console.log('Attempting noon.com-specific price extraction...');
+      
+      const noonPatterns = [
+        /"price":\s*"?([\d.]+)"?/,
+        /"salePrice":\s*"?([\d.]+)"?/,
+        /"now":\s*([\d.]+)/,
+        /"offer_price":\s*([\d.]+)/,
+        /"special_price":\s*"?([\d.]+)"?/,
+        /"final_price":\s*"?([\d.]+)"?/,
+        /class="[^"]*priceNow[^"]*"[^>]*>[\s\S]*?([\d.]+)/i,
+        /class="[^"]*price[^"]*"[^>]*>[\s]*AED[\s]*([\d,.]+)/i,
+        /AED[\s]*([\d,.]+)/i,
+        /data-price="([\d.]+)"/i,
+      ];
+      
+      for (const pattern of noonPatterns) {
+        const match = html.match(pattern);
+        if (match) {
+          const priceStr = match[1].replace(/,/g, '');
+          const price = parseFloat(priceStr);
+          if (price > 0 && price < 1000000) {
+            extractedPrice = price;
+            extractedCurrency = 'AED';
+            console.log('Found noon.com price:', extractedPrice, 'AED from pattern:', pattern.source.substring(0, 50));
+            break;
+          }
+        }
+      }
+      
+      // Also try to extract product name from noon.com specific patterns
+      if (!extractedName) {
+        const noonNamePatterns = [
+          /"name":\s*"([^"]+)"/,
+          /<h1[^>]*>([^<]+)<\/h1>/i,
+          /<title>([^<|]+)/i,
+        ];
+        for (const pattern of noonNamePatterns) {
+          const match = html.match(pattern);
+          if (match && match[1].length > 5) {
+            extractedName = match[1].trim();
+            console.log('Found noon.com product name:', extractedName.substring(0, 50));
             break;
           }
         }
