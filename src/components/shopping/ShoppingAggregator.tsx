@@ -29,8 +29,10 @@ import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { 
   useAllShopForMeProductRates, 
   calculateProductCost,
+  PRODUCT_CATEGORIES,
   type ShopForMeProductRate 
 } from '@/hooks/useShopForMeProductRates';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useDeliveryTimes } from '@/hooks/useDeliveryTimes';
 import { useAuth } from '@/hooks/useAuth';
 import { InlineAuthGate } from '@/components/auth/InlineAuthGate';
@@ -793,15 +795,30 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
                             className="font-semibold text-base h-8 border-dashed"
                             placeholder="Enter product name"
                           />
-                          {/* Product Category Badge */}
-                          {item.productCategory && (
-                            <Badge 
-                              variant={item.productCategory === 'hazardous' ? 'warning' : item.productCategory === 'electronics' ? 'info' : 'secondary'}
-                              className="flex-shrink-0 capitalize"
-                            >
-                              {item.productCategory === 'spare_parts' ? 'Spare Parts' : item.productCategory}
-                            </Badge>
-                          )}
+                          {/* Product Category Badge with Tooltip */}
+                          {item.productCategory && (() => {
+                            const categoryInfo = PRODUCT_CATEGORIES.find(c => c.value === item.productCategory) || {
+                              label: 'General Goods',
+                              description: 'Standard cargo with regular handling'
+                            };
+                            return (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger>
+                                    <Badge 
+                                      variant={item.productCategory === 'hazardous' ? 'warning' : item.productCategory === 'electronics' ? 'info' : 'secondary'}
+                                      className="flex-shrink-0 cursor-help"
+                                    >
+                                      {categoryInfo.label}
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="max-w-xs">{categoryInfo.description}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            );
+                          })()}
                         </div>
                         {item.productDescription && (
                           <p className="text-sm text-muted-foreground line-clamp-2 mt-1">

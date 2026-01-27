@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Save, Loader2 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Save, Loader2, Info } from 'lucide-react';
 import { useRegions } from '@/hooks/useRegions';
 import {
   useShopForMeProductRates,
@@ -108,7 +109,21 @@ export function ShopForMeProductRatesManagement() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Category</TableHead>
+                      <TableHead>
+                        <div className="flex items-center gap-1">
+                          Category
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Info className="h-3 w-3 text-muted-foreground" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="max-w-xs">Categories determine pricing based on product type and regulatory requirements</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      </TableHead>
                       <TableHead>Rate/kg ($)</TableHead>
                       <TableHead>Duty (%)</TableHead>
                       <TableHead>Handling (%)</TableHead>
@@ -124,7 +139,18 @@ export function ShopForMeProductRatesManagement() {
 
                       return (
                         <TableRow key={rate.id}>
-                          <TableCell className="font-medium">{category.label}</TableCell>
+                          <TableCell className="font-medium">
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger className="text-left cursor-help underline-offset-2 decoration-dotted underline">
+                                  {category.label}
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="max-w-xs">{category.description}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </TableCell>
                           <TableCell>
                             <Input
                               type="number"

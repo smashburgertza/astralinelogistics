@@ -21,12 +21,32 @@ export interface ShopForMeProductRate {
   updated_at: string;
 }
 
-export const PRODUCT_CATEGORIES: { value: ProductCategory; label: string }[] = [
-  { value: 'general', label: 'General Goods' },
-  { value: 'hazardous', label: 'Hazardous Goods' },
-  { value: 'cosmetics', label: 'Cosmetics' },
-  { value: 'electronics', label: 'Electronics' },
-  { value: 'spare_parts', label: 'Spare Parts' },
+export const PRODUCT_CATEGORIES: { value: ProductCategory; label: string; description: string }[] = [
+  { 
+    value: 'general', 
+    label: 'General Goods',
+    description: 'Everyday cargo like clothing and household items. Standard handling.'
+  },
+  { 
+    value: 'hazardous', 
+    label: 'Hazardous Goods',
+    description: 'Flammable, toxic, or dangerous materials. Special packaging required.'
+  },
+  { 
+    value: 'cosmetics', 
+    label: 'Cosmetics',
+    description: 'Beauty and personal care products. Subject to health regulations.'
+  },
+  { 
+    value: 'electronics', 
+    label: 'Electronics',
+    description: 'Phones, laptops, and electronic devices. May have battery restrictions.'
+  },
+  { 
+    value: 'spare_parts', 
+    label: 'Spare Parts',
+    description: 'Automotive and mechanical components for repairs and maintenance.'
+  },
 ];
 
 export function useShopForMeProductRates(region?: AgentRegion) {
