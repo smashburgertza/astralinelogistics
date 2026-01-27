@@ -754,6 +754,15 @@ export function ShoppingAggregator({ category }: ShoppingAggregatorProps) {
                             className="font-semibold text-base h-8 border-dashed"
                             placeholder="Enter product name"
                           />
+                          {/* Product Category Badge */}
+                          {item.productCategory && (
+                            <Badge 
+                              variant={item.productCategory === 'hazardous' ? 'warning' : item.productCategory === 'electronics' ? 'info' : 'secondary'}
+                              className="flex-shrink-0 capitalize"
+                            >
+                              {item.productCategory === 'spare_parts' ? 'Spare Parts' : item.productCategory}
+                            </Badge>
+                          )}
                         </div>
                         {item.productDescription && (
                           <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
