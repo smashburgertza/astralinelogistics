@@ -1,170 +1,84 @@
 
 
-# Consolidate Agent Portal into Admin Portal
+# Consolidate Agent Portal into Admin Portal ✅ COMPLETED
 
-## Current Understanding
+## Summary
 
-### Your Actual Workflow
-1. **Agents communicate via WhatsApp** - they send parcel information and bills to your team
-2. **Astraline staff enter all data** - shipments, customer info, tracking updates
-3. **Agents send their invoices/bills via WhatsApp** - staff upload these to track payables
-4. **System tracks what you owe agents** - for settlement and payment reconciliation
-
-### What Currently Exists
-- **Agent Portal** (`/agent/*`): 6 pages for agents to self-serve
-  - Dashboard, Upload Shipments, View Shipments, Invoices, Settlements, Settings
-- **Admin B2B Agent section** (`/admin/settlements`): Already handles agent invoices and payments
-- The agent portal duplicates functionality that admins can already do
+Agent portal has been successfully removed. All agent-related workflows are now handled through the Admin Portal's existing B2B Agent section.
 
 ---
 
-## Proposed Architecture
+## What Was Done
 
-### What Gets Removed
-| Component | Path | Reason |
-|-----------|------|--------|
-| Agent Dashboard | `/agent` | Not used - agents use WhatsApp |
-| Agent Upload | `/agent/upload` | Admins create shipments instead |
-| Agent Shipments | `/agent/shipments` | Admins manage all shipments |
-| Agent Invoices | `/agent/invoices` | Admins handle via B2B section |
-| Agent Settlements | `/agent/settlements` | Admins manage settlements |
-| Agent Settings | `/agent/settings` | Not needed |
-| AgentLayout component | Layout file | No longer needed |
-| Agent hooks | Various | Keep core logic, remove auth-scoped versions |
+### 1. Removed Agent Portal Routes (App.tsx)
+- Deleted all `/agent/*` route definitions
+- Removed lazy imports for agent pages
 
-### What Gets Enhanced in Admin Portal
+### 2. Updated System Auth (SystemAuth.tsx)
+- Removed agent login tab - now employee-only login
+- Simplified to single form for Staff ID/Email login
+- All authenticated users redirect to `/admin`
 
-#### 1. Agent Bill Upload Feature (New)
-Add ability to upload agent bills/invoices received via WhatsApp:
-- Upload PDF/image of agent's bill
-- Enter bill details (amount, currency, region, date)
-- Link to shipments (optional)
-- Auto-create "from_agent" invoice for payables tracking
+### 3. Deleted Agent Portal Files (13 files)
+**Pages deleted:**
+- `src/pages/agent/Dashboard.tsx`
+- `src/pages/agent/Upload.tsx`
+- `src/pages/agent/Shipments.tsx`
+- `src/pages/agent/Invoices.tsx`
+- `src/pages/agent/Settlements.tsx`
+- `src/pages/agent/Settings.tsx`
 
-#### 2. Enhanced Shipment Creation
-Already exists but ensure it supports:
-- Selecting which agent the shipment came from
-- Tracking agent's cargo vs customer cargo
-- Weight and rate tracking per agent
+**Components deleted:**
+- `src/components/layout/AgentLayout.tsx`
+- `src/components/agent/BatchGroupedShipmentTable.tsx`
+- `src/components/agent/CustomerSelector.tsx` (moved to shared)
+- `src/components/agent/EditShipmentDialog.tsx`
+- `src/components/agent/MarkPaymentDialog.tsx`
+- `src/components/agent/ShipmentFilters.tsx`
+- `src/components/agent/ShipmentTable.tsx`
 
-#### 3. Agent Payables Dashboard
-Already partially exists in `/admin/settlements` - enhance with:
-- Clear view of what's owed to each agent
-- Bill upload history
-- Payment recording with proof upload
+### 4. Cleaned Up Agent-Scoped Hooks
+- Deleted `src/hooks/useAgentShipments.ts`
+- Updated `src/hooks/agents/index.ts` to remove agent-scoped exports
+- Removed `useAgentInvoicesToMe` and `useAgentMarkInvoicePaid` from `useAgentInvoices.ts`
+- Kept admin-focused hooks: `usePaymentsPendingVerification`, `useVerifyPayment`
 
----
+### 5. Preserved Shared Utilities
+**Files kept and updated:**
+- `src/components/agent/InvoicePDF.tsx` - Used for printing
+- `src/components/agent/ParcelLabel.tsx` - Used for label printing
+- `src/components/agent/PrintableLabels.tsx` - Used for printing
+- `src/components/agent/ShipmentUploadForm.tsx` - For admin shipment creation
 
-## Technical Changes
-
-### Files to Delete (13 files)
-```
-src/pages/agent/Dashboard.tsx
-src/pages/agent/Upload.tsx
-src/pages/agent/Shipments.tsx
-src/pages/agent/Invoices.tsx
-src/pages/agent/Settlements.tsx
-src/pages/agent/Settings.tsx
-src/components/layout/AgentLayout.tsx
-src/components/agent/BatchGroupedShipmentTable.tsx (duplicate of admin version)
-src/components/agent/CustomerSelector.tsx
-src/components/agent/EditShipmentDialog.tsx
-src/components/agent/MarkPaymentDialog.tsx
-src/components/agent/ShipmentFilters.tsx
-src/components/agent/ShipmentTable.tsx
-```
-
-### Files to Keep (Shared utilities)
-```
-src/components/agent/InvoicePDF.tsx - Used for printing
-src/components/agent/ParcelLabel.tsx - Used for label printing
-src/components/agent/PrintableLabels.tsx - Used for printing
-src/components/agent/ShipmentUploadForm.tsx - Repurpose for admin use
-```
-
-### Route Changes (App.tsx)
-Remove all `/agent/*` routes:
-```typescript
-// DELETE these routes:
-<Route path="/agent" ... />
-<Route path="/agent/upload" ... />
-<Route path="/agent/shipments" ... />
-<Route path="/agent/invoices" ... />
-<Route path="/agent/settlements" ... />
-<Route path="/agent/settings" ... />
-```
-
-### Authentication Changes (SystemAuth.tsx)
-Remove agent login flow - agents no longer access the system:
-```typescript
-// Remove 'agent' role handling from login redirect logic
-// All system logins go to /admin
-```
-
-### New Feature: Agent Bill Upload
-
-Add to `/admin/settlements` page:
-
-**UploadAgentBillDialog component:**
-```typescript
-interface AgentBill {
-  agent_id: string;
-  amount: number;
-  currency: string;
-  bill_date: string;
-  bill_reference: string;
-  notes?: string;
-  attachment_url?: string; // Uploaded bill image/PDF
-}
-```
-
-This creates a `from_agent` invoice representing what Astraline owes the agent.
-
-### Hook Changes
-
-| Hook | Action |
-|------|--------|
-| `useAgentShipments.ts` | Delete (admin hooks cover this) |
-| `useAgentBalance.ts` | Keep - used by admin for agent balance tracking |
-| `useAgentInvoices.ts` | Keep `usePaymentsPendingVerification` and `useVerifyPayment`, remove agent-scoped functions |
-| `useAgentSettings.ts` | Keep - used for agent configuration |
-| `useSettlements.ts` | Keep - already admin-focused |
+**New shared component:**
+- `src/components/shared/CustomerSelector.tsx` - Extracted for reuse
 
 ---
 
-## Summary of Benefits
+## Current Architecture
 
-1. **Simpler System**: One portal for internal staff, one for customers
-2. **Matches Reality**: Your actual workflow is WhatsApp-based for agents
-3. **Less Maintenance**: No duplicate components to maintain
-4. **Clearer Data Flow**: All data entry happens in admin portal
-5. **Better Audit Trail**: Staff enter everything, full accountability
+### Portals
+1. **Public Site** - No auth required
+2. **Customer Portal** (`/customer/*`) - For registered customers
+3. **Admin Portal** (`/admin/*`) - For all internal staff (employees + super admins)
 
-## What You Still Need
+### Agent Workflow (WhatsApp-based)
+1. Agents send parcel info via WhatsApp
+2. Staff enter shipments in Admin Portal
+3. Agents send bills via WhatsApp
+4. Staff create "from_agent" invoices to track payables
+5. B2B Agent section (`/admin/settlements`) handles all agent billing
 
-1. **Agent records in database**: Keep agent profiles for assignment and billing
-2. **Agent bill upload**: New feature to record incoming agent invoices
-3. **Agent payables tracking**: Already exists in B2B section
+### Hooks Retained
+- `useAgentBalance.ts` - Agent balance tracking for admin
+- `useAgentInvoices.ts` - Payment verification (admin functions only)
+- `useAgentSettings.ts` - Agent configuration
+- `useSettlements.ts` - Settlement management
+- `useAgents.ts` - Agent CRUD operations
 
 ---
 
-## Implementation Steps
-
-### Step 1: Add Agent Bill Upload Feature
-Create dialog for uploading agent bills with file attachment support
-
-### Step 2: Remove Agent Portal Routes
-Update App.tsx to remove `/agent/*` routes
-
-### Step 3: Update System Auth
-Redirect any agent logins appropriately (or disable agent login)
-
-### Step 4: Delete Agent Portal Files
-Remove unused pages and components
-
-### Step 5: Clean Up Hooks
-Remove agent-scoped hook functions no longer needed
-
-### Step 6: Test Admin Workflow
-Ensure all agent-related functionality works from admin side
-
+## Future Enhancements (Not Yet Implemented)
+1. **Agent Bill Upload Feature** - Dialog to upload PDF/image of agent bills
+2. **Agent Payables Dashboard** - Enhanced view of what's owed to each agent
+3. **Bill attachment storage** - Supabase storage for uploaded bill documents

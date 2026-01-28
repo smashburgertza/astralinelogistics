@@ -31,13 +31,6 @@ const CustomerOrdersPage = lazy(() => import("./pages/customer/Orders"));
 const CustomerSettingsPage = lazy(() => import("./pages/customer/Settings"));
 const CustomerPaymentsPage = lazy(() => import("./pages/customer/Payments"));
 
-// Agent Portal - lazy loaded
-const AgentDashboard = lazy(() => import("./pages/agent/Dashboard"));
-const AgentUploadPage = lazy(() => import("./pages/agent/Upload"));
-const AgentShipmentsPage = lazy(() => import("./pages/agent/Shipments"));
-const AgentInvoicesPage = lazy(() => import("./pages/agent/Invoices"));
-const AgentSettlementsPage = lazy(() => import("./pages/agent/Settlements"));
-const AgentSettingsPage = lazy(() => import("./pages/agent/Settings"));
 
 // Admin Portal - lazy loaded
 const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
@@ -111,13 +104,6 @@ const App = () => (
             <Route path="/customer/settings" element={<Suspense fallback={<PageLoader />}><CustomerSettingsPage /></Suspense>} />
             <Route path="/customer/payments" element={<Suspense fallback={<PageLoader />}><CustomerPaymentsPage /></Suspense>} />
             
-            {/* Agent Portal - Lazy Loaded */}
-            <Route path="/agent" element={<Suspense fallback={<PageLoader />}><AgentDashboard /></Suspense>} />
-            <Route path="/agent/upload" element={<Suspense fallback={<PageLoader />}><AgentUploadPage /></Suspense>} />
-            <Route path="/agent/shipments" element={<Suspense fallback={<PageLoader />}><AgentShipmentsPage /></Suspense>} />
-            <Route path="/agent/invoices" element={<Suspense fallback={<PageLoader />}><AgentInvoicesPage /></Suspense>} />
-            <Route path="/agent/settlements" element={<Suspense fallback={<PageLoader />}><AgentSettlementsPage /></Suspense>} />
-            <Route path="/agent/settings" element={<Suspense fallback={<PageLoader />}><AgentSettingsPage /></Suspense>} />
             
             {/* Admin Portal - Lazy Loaded with Permission Gates */}
             <Route path="/admin" element={<Suspense fallback={<PageLoader />}><AdminDashboard /></Suspense>} />

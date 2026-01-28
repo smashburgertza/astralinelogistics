@@ -43,7 +43,7 @@ import { useGetOrCreateBatch, useCurrentBatch } from '@/hooks/useCargoBatches';
 import { Database } from '@/integrations/supabase/types';
 import { BillingPartyType } from '@/lib/billingParty';
 import { useAgentSettings } from '@/hooks/useAgents';
-import { CustomerSelector } from './CustomerSelector';
+import { CustomerSelector } from '@/components/shared/CustomerSelector';
 
 type AgentRegion = Database['public']['Enums']['agent_region'];
 
@@ -1052,11 +1052,10 @@ export function ShipmentUploadForm() {
                   {/* Customer Name */}
                   <div className="col-span-4">
                     <CustomerSelector
-                      value={line.customer_id}
+                      selectedCustomerId={line.customer_id}
                       customerName={line.customer_name}
-                      onChange={(id, name) => updateLineCustomer(line.id, id, name)}
+                      onCustomerChange={(id, name) => updateLineCustomer(line.id, id, name)}
                       customers={customers}
-                      isLoading={customersLoading}
                     />
                   </div>
 

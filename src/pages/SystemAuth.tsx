@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Mail, Lock, ArrowRight, Shield, Truck, User } from 'lucide-react';
+import { Lock, ArrowRight, Shield, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,7 +14,6 @@ export default function SystemAuthPage() {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'employee' | 'agent'>('employee');
   const { signIn } = useAuth();
   const navigate = useNavigate();
 
@@ -25,11 +23,11 @@ export default function SystemAuthPage() {
       return input;
     }
     
-    // Otherwise, try to find email by employee_code or agent_code
+    // Otherwise, try to find email by employee_code
     const { data: profile } = await supabase
       .from('profiles')
       .select('email')
-      .or(`employee_code.ilike.${input},agent_code.ilike.${input}`)
+      .ilike('employee_code', input)
       .maybeSingle();
     
     if (profile?.email) {
@@ -64,22 +62,13 @@ export default function SystemAuthPage() {
 
       const userRole = roles[0];
 
-      if (activeTab === 'employee') {
-        if (userRole.role === 'super_admin' || userRole.role === 'employee') {
-          toast.success('Welcome to Employee Portal!');
-          navigate('/admin');
-        } else {
-          await supabase.auth.signOut();
-          throw new Error('You do not have employee access. Please use the agent login.');
-        }
+      // Only employees and super_admins can access via system login
+      if (userRole.role === 'super_admin' || userRole.role === 'employee') {
+        toast.success('Welcome to Employee Portal!');
+        navigate('/admin');
       } else {
-        if (userRole.role === 'agent') {
-          toast.success('Welcome to Agent Portal!');
-          navigate('/agent');
-        } else {
-          await supabase.auth.signOut();
-          throw new Error('You do not have agent access. Please use the employee login.');
-        }
+        await supabase.auth.signOut();
+        throw new Error('You do not have employee access. Please contact administrator.');
       }
     } catch (error: any) {
       toast.error(error.message || 'An error occurred');
@@ -107,118 +96,59 @@ export default function SystemAuthPage() {
 
         <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur-sm">
           <CardHeader className="text-center pb-2">
-            <CardTitle className="text-2xl font-bold text-slate-800">System Access</CardTitle>
+            <div className="mx-auto mb-4 w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-full flex items-center justify-center">
+              <Shield className="w-6 h-6 text-white" />
+            </div>
+            <CardTitle className="text-2xl font-bold text-slate-800">Employee Portal</CardTitle>
             <CardDescription className="text-slate-600">
-              Login to Employee or Agent portal
+              Login with your staff credentials
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'employee' | 'agent')} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-6">
-                <TabsTrigger value="employee" className="flex items-center gap-2">
-                  <Shield className="w-4 h-4" />
-                  Employee
-                </TabsTrigger>
-                <TabsTrigger value="agent" className="flex items-center gap-2">
-                  <Truck className="w-4 h-4" />
-                  Agent
-                </TabsTrigger>
-              </TabsList>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="employee-identifier">Staff ID or Email</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="employee-identifier"
+                    type="text"
+                    placeholder="EMP001 or email@company.com"
+                    className="pl-10"
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
 
-              <TabsContent value="employee" className="mt-0">
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="employee-identifier">Staff ID or Email</Label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        id="employee-identifier"
-                        type="text"
-                        placeholder="EMP001 or email@company.com"
-                        className="pl-10"
-                        value={identifier}
-                        onChange={(e) => setIdentifier(e.target.value)}
-                        required
-                      />
-                    </div>
-                  </div>
+              <div className="space-y-2">
+                <Label htmlFor="employee-password">Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="employee-password"
+                    type="password"
+                    placeholder="••••••••"
+                    className="pl-10"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={6}
+                  />
+                </div>
+              </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="employee-password">Password</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        id="employee-password"
-                        type="password"
-                        placeholder="••••••••"
-                        className="pl-10"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                        minLength={6}
-                      />
-                    </div>
-                  </div>
-
-                  <Button 
-                    type="submit" 
-                    className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700" 
-                    size="lg" 
-                    disabled={loading}
-                  >
-                    {loading ? 'Signing in...' : 'Access Employee Portal'}
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
-                </form>
-              </TabsContent>
-
-              <TabsContent value="agent" className="mt-0">
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="agent-identifier">Agent ID or Email</Label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        id="agent-identifier"
-                        type="text"
-                        placeholder="AGT001 or email@region.com"
-                        className="pl-10"
-                        value={identifier}
-                        onChange={(e) => setIdentifier(e.target.value)}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="agent-password">Password</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        id="agent-password"
-                        type="password"
-                        placeholder="••••••••"
-                        className="pl-10"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                        minLength={6}
-                      />
-                    </div>
-                  </div>
-
-                  <Button 
-                    type="submit" 
-                    className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600" 
-                    size="lg" 
-                    disabled={loading}
-                  >
-                    {loading ? 'Signing in...' : 'Access Agent Portal'}
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
-                </form>
-              </TabsContent>
-            </Tabs>
+              <Button 
+                type="submit" 
+                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700" 
+                size="lg" 
+                disabled={loading}
+              >
+                {loading ? 'Signing in...' : 'Access Portal'}
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            </form>
 
             <div className="mt-6 pt-4 border-t text-center text-sm text-muted-foreground">
               <p>For customer access, please use the</p>
