@@ -115,20 +115,18 @@ export default function AdminDashboard() {
       const todayEnd = endOfDay(now).toISOString();
 
       // Fetch all data in parallel
-      const [shipmentsRes, customersRes, invoicesRes, expensesRes, parcelsRes, arrivedShipmentsRes, journalExpensesRes] = await Promise.all([
+      const [shipmentsRes, customersRes, invoicesRes, expensesRes, parcelsRes, arrivedShipmentsRes] = await Promise.all([
         supabase.from('shipments').select('id, origin_region, status, tracking_number, total_weight_kg, created_at'),
         supabase.from('customers').select('id', { count: 'exact' }),
         supabase.from('invoices').select('amount, amount_in_tzs, status, paid_at, created_at'),
         supabase.from('expenses').select('amount, category, created_at'),
         supabase.from('parcels').select('id, picked_up_at'),
         supabase.from('shipments').select('id').eq('status', 'arrived'),
-        supabase.from('journal_entries').select('expense_amount, expense_category, expense_currency, created_at, status').eq('is_expense', true).eq('status', 'posted'),
       ]);
 
       const shipments = shipmentsRes.data || [];
       const invoices = invoicesRes.data || [];
       const expenses = expensesRes.data || [];
-      const journalExpenses = journalExpensesRes.data || [];
       const parcels = parcelsRes.data || [];
       const arrivedShipmentIds = (arrivedShipmentsRes.data || []).map(s => s.id);
 
@@ -161,20 +159,13 @@ export default function AdminDashboard() {
         return date >= thisMonthStart && date <= thisMonthEnd;
       });
 
-      const thisMonthJournalExpenses = journalExpenses.filter(e => {
-        const date = new Date(e.created_at || '');
-        return date >= thisMonthStart && date <= thisMonthEnd;
-      });
-
       // Calculate totals in TZS
       const revenue = paidInvoices.reduce((sum, i) => sum + Number(i.amount_in_tzs || i.amount), 0);
       const thisMonthRevenueAmount = thisMonthPaidInvoices.reduce((sum, i) => sum + Number(i.amount_in_tzs || i.amount), 0);
       
-      // Combine expenses from both sources
-      const totalExpensesAmount = expenses.reduce((sum, e) => sum + Number(e.amount), 0) + 
-        journalExpenses.reduce((sum, e) => sum + Number(e.expense_amount || 0), 0);
-      const thisMonthExpensesAmount = thisMonthExpenses.reduce((sum, e) => sum + Number(e.amount), 0) +
-        thisMonthJournalExpenses.reduce((sum, e) => sum + Number(e.expense_amount || 0), 0);
+      // Calculate expenses
+      const totalExpensesAmount = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+      const thisMonthExpensesAmount = thisMonthExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
 
       // Shipments by region
       const shipmentsByRegion: Record<string, number> = {};
@@ -188,15 +179,10 @@ export default function AdminDashboard() {
         shipmentsByStatus[s.status] = (shipmentsByStatus[s.status] || 0) + 1;
       });
 
-      // Expenses by category (combine both sources)
+      // Expenses by category
       const expensesByCategory: Record<string, number> = {};
       expenses.forEach((e: any) => {
         expensesByCategory[e.category] = (expensesByCategory[e.category] || 0) + Number(e.amount);
-      });
-      journalExpenses.forEach((e: any) => {
-        if (e.expense_category) {
-          expensesByCategory[e.expense_category] = (expensesByCategory[e.expense_category] || 0) + Number(e.expense_amount || 0);
-        }
       });
 
       // Monthly data for last 6 months
@@ -216,17 +202,10 @@ export default function AdminDashboard() {
           return date >= monthStart && date <= monthEnd;
         }).reduce((sum, i) => sum + Number(i.amount_in_tzs || i.amount), 0);
 
-        const monthExpensesFromTable = expenses.filter(e => {
+        const monthExpenses = expenses.filter(e => {
           const date = new Date(e.created_at || '');
           return date >= monthStart && date <= monthEnd;
         }).reduce((sum, e) => sum + Number(e.amount), 0);
-
-        const monthExpensesFromJournal = journalExpenses.filter(e => {
-          const date = new Date(e.created_at || '');
-          return date >= monthStart && date <= monthEnd;
-        }).reduce((sum, e) => sum + Number(e.expense_amount || 0), 0);
-
-        const monthExpenses = monthExpensesFromTable + monthExpensesFromJournal;
 
         monthlyData.push({
           month: format(monthDate, 'MMM'),
