@@ -98,67 +98,10 @@ export function useAllExpenses(filters?: {
       const { data: regularExpenses, error } = await query;
       if (error) throw error;
 
-      // Fetch journal entry expenses (is_expense = true)
-      let journalQuery = supabase
-        .from('journal_entries')
-        .select('id, entry_number, description, expense_amount, expense_currency, expense_category, status, created_at, receipt_url, vendor_name, entry_date')
-        .eq('is_expense', true)
-        .order('created_at', { ascending: false });
-
-      if (filters?.category && filters.category !== 'all') {
-        journalQuery = journalQuery.eq('expense_category', filters.category);
-      }
-      if (filters?.status && filters.status !== 'all') {
-        // Map status: journal entries use 'posted' instead of 'approved'
-        const journalStatus = filters.status === 'approved' ? 'posted' : filters.status;
-        journalQuery = journalQuery.eq('status', journalStatus);
-      }
-      if (filters?.search) {
-        journalQuery = journalQuery.or(`description.ilike.%${filters.search}%,vendor_name.ilike.%${filters.search}%`);
-      }
-      if (filters?.dateFrom) {
-        journalQuery = journalQuery.gte('entry_date', filters.dateFrom);
-      }
-      if (filters?.dateTo) {
-        journalQuery = journalQuery.lte('entry_date', filters.dateTo);
-      }
-
-      const { data: journalExpenses, error: journalError } = await journalQuery;
-      if (journalError) throw journalError;
-
-      // Transform journal entries to match expense format
-      const transformedJournalExpenses = (journalExpenses || []).map((je) => ({
-        id: je.id,
-        amount: je.expense_amount || 0,
-        currency: je.expense_currency || 'TZS',
-        category: je.expense_category || 'other',
-        description: je.description,
-        status: je.status === 'posted' ? 'approved' : je.status,
-        created_at: je.created_at,
-        receipt_url: je.receipt_url,
-        region: null,
-        region_id: null,
-        shipment_id: null,
-        submitted_by: null,
-        approved_by: null,
-        approved_at: null,
-        denial_reason: null,
-        clarification_notes: null,
-        assigned_to: null,
-        created_by: null,
-        shipments: null,
-        _source: 'journal_entry' as const,
-        _entry_number: je.entry_number,
-        _vendor_name: je.vendor_name,
-      }));
-
-      // Combine and sort by date
-      const combined = [
-        ...(regularExpenses || []).map(e => ({ ...e, _source: 'expense' as const })),
-        ...transformedJournalExpenses,
-      ].sort((a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime());
-
-      return combined;
+      // Return expenses sorted by date
+      return (regularExpenses || [])
+        .map(e => ({ ...e, _source: 'expense' as const }))
+        .sort((a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime());
     },
   });
 }
@@ -184,39 +127,20 @@ export function useExpenseStats() {
   return useQuery({
     queryKey: ['expense-stats'],
     queryFn: async () => {
-      // Fetch regular expenses
+      // Fetch expenses
       const { data, error } = await supabase
         .from('expenses')
         .select('amount, category, created_at, currency, status');
 
       if (error) throw error;
 
-      // Fetch journal entry expenses
-      const { data: journalData, error: journalError } = await supabase
-        .from('journal_entries')
-        .select('expense_amount, expense_category, created_at, expense_currency, status')
-        .eq('is_expense', true);
-
-      if (journalError) throw journalError;
-
-      // Combine all expenses
-      const regularExpenses = (data || []).map(e => ({
+      const allExpenses = (data || []).map(e => ({
         amount: e.amount,
         category: e.category,
         created_at: e.created_at,
         currency: e.currency,
         status: e.status,
       }));
-
-      const journalExpenses = (journalData || []).map(je => ({
-        amount: je.expense_amount || 0,
-        category: je.expense_category || 'other',
-        created_at: je.created_at,
-        currency: je.expense_currency || 'TZS',
-        status: je.status === 'posted' ? 'approved' : je.status,
-      }));
-
-      const allExpenses = [...regularExpenses, ...journalExpenses];
 
       const now = new Date();
       const approvedExpenses = allExpenses.filter(e => e.status === 'approved');
@@ -373,15 +297,14 @@ export function useApproveExpenseWithBankAccount() {
     mutationFn: async ({ expenseId, bankAccountId }: { expenseId: string; bankAccountId: string }) => {
       const { data: userData } = await supabase.auth.getUser();
       
-      // Get bank account details including chart_account_id
+      // Get bank account balance
       const { data: bankAccount, error: bankError } = await supabase
         .from('bank_accounts')
-        .select('id, chart_account_id, current_balance, currency')
+        .select('id, current_balance, currency')
         .eq('id', bankAccountId)
         .single();
 
       if (bankError || !bankAccount) throw new Error('Bank account not found');
-      if (!bankAccount.chart_account_id) throw new Error('Bank account not linked to chart of accounts');
 
       // Update expense status
       const { data, error } = await supabase
