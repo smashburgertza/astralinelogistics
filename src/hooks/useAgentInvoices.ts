@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { createAgentPaymentJournalEntry, createAgentPaymentReceivedJournalEntry, createInvoicePaymentJournalEntry } from '@/lib/journalEntryUtils';
 
 export interface AgentInvoice {
   id: string;
@@ -146,7 +145,7 @@ export function useVerifyPayment() {
 
       if (paymentError) throw paymentError;
 
-      // If verified, mark invoice as paid and create journal entry
+      // If verified, mark invoice as paid and update bank balance
       if (status === 'verified') {
         const { data: payment } = await supabase
           .from('payments')
@@ -166,42 +165,28 @@ export function useVerifyPayment() {
 
         if (invoiceError) throw invoiceError;
 
-        // Create journal entry if deposit account is specified
+        // Update bank balance if deposit account is specified
         if (depositAccountId && amount) {
-          if (isAgentPayment && invoiceDirection === 'from_agent') {
-            // Agent billed us (from_agent), we're paying OUT to agent
-            // Debit Agent Payables, Credit Bank
-            await createAgentPaymentJournalEntry({
-              invoiceId,
-              invoiceNumber: invoiceNumber || 'Unknown',
-              amount,
-              currency: currency || 'USD',
-              sourceAccountId: depositAccountId,
-              amountInTzs,
-              exchangeRate,
-            });
-          } else if (isAgentPayment && invoiceDirection === 'to_agent') {
-            // We billed agent (to_agent), agent is paying us - money coming IN
-            // Debit Bank, Credit Accounts Receivable
-            await createAgentPaymentReceivedJournalEntry({
-              invoiceId,
-              invoiceNumber: invoiceNumber || 'Unknown',
-              amount,
-              currency: currency || 'USD',
-              depositAccountId,
-              amountInTzs,
-              exchangeRate,
-            });
-          } else {
-            // Customer payment: money coming IN (debit bank, credit accounts receivable)
-            await createInvoicePaymentJournalEntry({
-              invoiceId,
-              invoiceNumber: invoiceNumber || 'Unknown',
-              amount,
-              currency: currency || 'USD',
-              depositAccountId,
-              exchangeRate: exchangeRate || 1,
-            });
+          // For from_agent invoices (we pay agent): subtract from balance
+          // For to_agent invoices (agent pays us) or customer payments: add to balance
+          const isOutgoing = isAgentPayment && invoiceDirection === 'from_agent';
+          
+          const { data: bankAccount } = await supabase
+            .from('bank_accounts')
+            .select('current_balance')
+            .eq('id', depositAccountId)
+            .single();
+
+          if (bankAccount) {
+            const currentBalance = Number(bankAccount.current_balance) || 0;
+            const newBalance = isOutgoing 
+              ? currentBalance - amount 
+              : currentBalance + amount;
+
+            await supabase
+              .from('bank_accounts')
+              .update({ current_balance: newBalance })
+              .eq('id', depositAccountId);
           }
         }
       }
@@ -214,13 +199,7 @@ export function useVerifyPayment() {
       queryClient.invalidateQueries({ queryKey: ['agent-invoices-to-me'] });
       queryClient.invalidateQueries({ queryKey: ['agent-balance'] });
       queryClient.invalidateQueries({ queryKey: ['all-agent-balances'] });
-      queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
-      queryClient.invalidateQueries({ queryKey: ['trial-balance'] });
-      queryClient.invalidateQueries({ queryKey: ['income-statement'] });
-      queryClient.invalidateQueries({ queryKey: ['balance-sheet'] });
-      queryClient.invalidateQueries({ queryKey: ['accounting-summary'] });
-      // Customer-related queries
       queryClient.invalidateQueries({ queryKey: ['customer-payments'] });
       queryClient.invalidateQueries({ queryKey: ['customer-invoices'] });
       queryClient.invalidateQueries({ queryKey: ['invoices'] });

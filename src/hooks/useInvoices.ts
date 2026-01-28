@@ -2,7 +2,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
-import { createInvoicePaymentJournalEntry, createInvoiceJournalEntry, createAgentPaymentJournalEntry, createAgentPaymentReceivedJournalEntry, createPurchaseInvoiceJournalEntry } from '@/lib/journalEntryUtils';
 
 export type InvoiceType = 'shipping' | 'purchase_shipping';
 
@@ -15,6 +14,13 @@ export type Invoice = Tables<'invoices'> & {
 export const INVOICE_TYPES = {
   shipping: { label: 'Shipping', description: 'Freight and handling charges only' },
   purchase_shipping: { label: 'Purchase + Shipping', description: 'Product purchase plus freight charges' },
+} as const;
+
+export const INVOICE_STATUSES = {
+  pending: { label: 'Pending', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300' },
+  paid: { label: 'Paid', color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300' },
+  overdue: { label: 'Overdue', color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300' },
+  cancelled: { label: 'Cancelled', color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' },
 } as const;
 
 export function useInvoices(filters?: {
@@ -71,51 +77,10 @@ export function useCreateInvoice() {
         .single();
       if (error) throw error;
 
-      // Fire-and-forget: Create journal entry in background (don't block UI)
-      const createJournalAsync = async () => {
-        try {
-          const productCost = Number(data.product_cost || 0);
-          const purchaseFee = Number(data.purchase_fee || 0);
-          const isPurchaseInvoice = productCost > 0 || purchaseFee > 0;
-          
-          if (isPurchaseInvoice) {
-            // Use purchase invoice journal entry (agency model)
-            const shippingAmount = Number(data.amount) - productCost - purchaseFee;
-            await createPurchaseInvoiceJournalEntry({
-              invoiceId: data.id,
-              invoiceNumber: data.invoice_number,
-              productCost,
-              purchaseFee,
-              shippingAmount: Math.max(0, shippingAmount),
-              currency: data.currency || 'USD',
-              exchangeRate: data.amount_in_tzs ? Number(data.amount_in_tzs) / Number(data.amount) : 1,
-              customerName: (data as any).customers?.name,
-            });
-          } else {
-            // Standard shipping invoice journal entry
-            await createInvoiceJournalEntry({
-              invoiceId: data.id,
-              invoiceNumber: data.invoice_number,
-              amount: Number(data.amount),
-              currency: data.currency || 'USD',
-              exchangeRate: data.amount_in_tzs ? Number(data.amount_in_tzs) / Number(data.amount) : 1,
-              customerName: (data as any).customers?.name,
-            });
-          }
-        } catch (journalError) {
-          console.error('Background journal entry creation failed:', journalError);
-        }
-      };
-      createJournalAsync();
-
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      // Defer less critical invalidations
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
-      }, 500);
       toast.success('Invoice created');
     },
     onError: (error) => {
@@ -207,23 +172,19 @@ export function useRecordPayment() {
     mutationFn: async (params: RecordPaymentParams) => {
       const isSplitPayment = params.splits && params.splits.length > 0;
       
-      // Parallel fetch: invoice data, exchange rate, and bank account mappings
+      // Parallel fetch: invoice data and bank account balances
       const allAccountIds = isSplitPayment 
         ? params.splits!.map(s => s.accountId) 
         : (params.depositAccountId ? [params.depositAccountId] : []);
 
-      const [invoiceResult, rateResult, bankAccountsResult] = await Promise.all([
+      const [invoiceResult, bankAccountsResult] = await Promise.all([
         supabase
           .from('invoices')
           .select('amount, amount_paid, invoice_number, currency, invoice_direction, agent_id')
           .eq('id', params.invoiceId)
           .single(),
-        supabase
-          .from('currency_exchange_rates')
-          .select('rate_to_tzs, currency_code')
-          .in('currency_code', ['USD', 'GBP', 'EUR']),
         allAccountIds.length > 0 
-          ? supabase.from('bank_accounts').select('id, chart_account_id, current_balance, opening_balance').in('id', allAccountIds)
+          ? supabase.from('bank_accounts').select('id, current_balance').in('id', allAccountIds)
           : Promise.resolve({ data: [], error: null }),
       ]);
 
@@ -234,29 +195,16 @@ export function useRecordPayment() {
       const currentPaid = Number(currentInvoice.amount_paid || 0);
       const newTotalPaid = currentPaid + params.amount;
       const isFullyPaid = newTotalPaid >= totalAmount;
-      // Determine payment type based on invoice direction
-      // from_agent: Agent is billing us (we pay OUT to agent) - use createAgentPaymentJournalEntry
-      // to_agent: We are billing agent (agent pays us, we receive IN) - use createAgentPaymentReceivedJournalEntry
-      const isB2BPaymentToAgent = currentInvoice.invoice_direction === 'from_agent' && currentInvoice.agent_id;
-      const isB2BPaymentFromAgent = currentInvoice.invoice_direction === 'to_agent' && currentInvoice.agent_id;
 
-      // Build bank account chart map
-      const bankAccountChartMap: Record<string, string> = {};
+      // Determine if this is an outgoing payment (to agent)
+      const isB2BPaymentToAgent = currentInvoice.invoice_direction === 'from_agent' && currentInvoice.agent_id;
+
+      // Build bank account balance map
       const bankAccountBalanceMap: Record<string, number> = {};
       if (bankAccountsResult.data) {
         bankAccountsResult.data.forEach(ba => {
-          if (ba.chart_account_id) {
-            bankAccountChartMap[ba.id] = ba.chart_account_id;
-            bankAccountBalanceMap[ba.id] = Number(ba.current_balance) || 0;
-          }
+          bankAccountBalanceMap[ba.id] = Number(ba.current_balance) || 0;
         });
-      }
-
-      // Get exchange rate
-      let invoiceCurrencyRate = 1;
-      if (currentInvoice.currency && currentInvoice.currency !== 'TZS' && rateResult.data) {
-        const rate = rateResult.data.find(r => r.currency_code === currentInvoice.currency);
-        invoiceCurrencyRate = rate?.rate_to_tzs || 1;
       }
 
       // Prepare invoice update
@@ -270,7 +218,7 @@ export function useRecordPayment() {
         updates.paid_at = params.paymentDate;
       }
 
-      // Execute core updates in parallel using async functions to ensure proper Promise types
+      // Execute core updates in parallel
       const updateInvoice = async () => {
         return supabase
           .from('invoices')
@@ -281,8 +229,6 @@ export function useRecordPayment() {
       };
 
       const insertPayment = async () => {
-        // For split payments, sum the split amounts (which are in payment currency)
-        // For single payments, use amountInPaymentCurrency if provided, otherwise fall back to amount
         const paymentAmount = isSplitPayment 
           ? params.splits!.reduce((sum, s) => sum + s.amount, 0) 
           : (params.amountInPaymentCurrency ?? params.amount);
@@ -337,124 +283,42 @@ export function useRecordPayment() {
       ]);
       if (invoiceUpdateResult.error) throw invoiceUpdateResult.error;
 
-      // Fire-and-forget: Create journal entries in background (don't block UI)
-      const createJournalEntriesAsync = async () => {
-        try {
-          if (isSplitPayment && params.splits) {
-            for (const split of params.splits) {
-              const splitAmountInTzs = params.paymentCurrency === 'TZS' && currentInvoice.currency !== 'TZS'
-                ? split.amount
-                : split.amount * invoiceCurrencyRate;
-              const chartAccountId = bankAccountChartMap[split.accountId] || split.accountId;
-
-              if (isB2BPaymentToAgent) {
-                // We are paying OUT to agent (from_agent invoice)
-                await createAgentPaymentJournalEntry({
-                  invoiceId: invoiceUpdateResult.data.id,
-                  invoiceNumber: currentInvoice.invoice_number,
-                  amount: split.amount,
-                  currency: params.paymentCurrency || currentInvoice.currency || 'USD',
-                  exchangeRate: invoiceCurrencyRate,
-                  paymentCurrency: params.paymentCurrency,
-                  sourceAccountId: chartAccountId,
-                  amountInTzs: splitAmountInTzs,
-                });
-              } else if (isB2BPaymentFromAgent) {
-                // We are receiving payment FROM agent (to_agent invoice)
-                await createAgentPaymentReceivedJournalEntry({
-                  invoiceId: invoiceUpdateResult.data.id,
-                  invoiceNumber: currentInvoice.invoice_number,
-                  amount: split.amount,
-                  currency: params.paymentCurrency || currentInvoice.currency || 'USD',
-                  exchangeRate: invoiceCurrencyRate,
-                  paymentCurrency: params.paymentCurrency,
-                  depositAccountId: chartAccountId,
-                  amountInTzs: splitAmountInTzs,
-                });
-              } else {
-                await createInvoicePaymentJournalEntry({
-                  invoiceId: invoiceUpdateResult.data.id,
-                  invoiceNumber: currentInvoice.invoice_number,
-                  amount: split.amount,
-                  currency: params.paymentCurrency || currentInvoice.currency || 'USD',
-                  exchangeRate: invoiceCurrencyRate,
-                  paymentCurrency: params.paymentCurrency,
-                  depositAccountId: chartAccountId,
-                });
-              }
-            }
-          } else {
-            const paymentAmountInTzs = params.paymentCurrency === 'TZS' && currentInvoice.currency !== 'TZS'
-              ? params.amount * invoiceCurrencyRate
-              : params.amount;
-            const chartAccountId = params.depositAccountId 
-              ? bankAccountChartMap[params.depositAccountId] || params.depositAccountId 
-              : undefined;
-
-            if (isB2BPaymentToAgent) {
-              // We are paying OUT to agent (from_agent invoice)
-              await createAgentPaymentJournalEntry({
-                invoiceId: invoiceUpdateResult.data.id,
-                invoiceNumber: currentInvoice.invoice_number,
-                amount: paymentAmountInTzs,
-                currency: params.paymentCurrency || currentInvoice.currency || 'USD',
-                exchangeRate: invoiceCurrencyRate,
-                paymentCurrency: params.paymentCurrency,
-                sourceAccountId: chartAccountId,
-                amountInTzs: paymentAmountInTzs,
-              });
-            } else if (isB2BPaymentFromAgent) {
-              // We are receiving payment FROM agent (to_agent invoice)
-              await createAgentPaymentReceivedJournalEntry({
-                invoiceId: invoiceUpdateResult.data.id,
-                invoiceNumber: currentInvoice.invoice_number,
-                amount: paymentAmountInTzs,
-                currency: params.paymentCurrency || currentInvoice.currency || 'USD',
-                exchangeRate: invoiceCurrencyRate,
-                paymentCurrency: params.paymentCurrency,
-                depositAccountId: chartAccountId,
-                amountInTzs: paymentAmountInTzs,
-              });
-            } else {
-              await createInvoicePaymentJournalEntry({
-                invoiceId: invoiceUpdateResult.data.id,
-                invoiceNumber: currentInvoice.invoice_number,
-                amount: paymentAmountInTzs,
-                currency: params.paymentCurrency || currentInvoice.currency || 'USD',
-                exchangeRate: invoiceCurrencyRate,
-                paymentCurrency: params.paymentCurrency,
-                depositAccountId: chartAccountId,
-              });
-            }
-          }
-        } catch (err) {
-          console.error('Background journal entry creation failed:', err);
-        }
-      };
-
-      // Start journal creation but don't wait for it
-      createJournalEntriesAsync();
-
       return invoiceUpdateResult.data;
     },
     onSuccess: () => {
-      // Minimal invalidations for speed - only what's immediately visible
+      // Invalidate relevant queries
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['invoice-payments'] });
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
-      
-      // Defer less critical invalidations
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['b2b-invoices'] });
-        queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
-        queryClient.invalidateQueries({ queryKey: ['agent-balance'] });
-        queryClient.invalidateQueries({ queryKey: ['accounting-summary'] });
-      }, 500);
-      
-      toast.success('Payment recorded');
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['customer-payments'] });
+      queryClient.invalidateQueries({ queryKey: ['agent-balance'] });
+      queryClient.invalidateQueries({ queryKey: ['all-agent-balances'] });
+      toast.success('Payment recorded successfully');
     },
     onError: (error) => {
       toast.error(`Failed to record payment: ${error.message}`);
+    },
+  });
+}
+
+export function useDeleteInvoice() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('invoices')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      toast.success('Invoice deleted');
+    },
+    onError: (error) => {
+      toast.error(`Failed to delete invoice: ${error.message}`);
     },
   });
 }
@@ -464,32 +328,15 @@ export function useBulkDeleteInvoices() {
 
   return useMutation({
     mutationFn: async (ids: string[]) => {
-      // Delete invoice items first
-      const { error: itemsError } = await supabase
-        .from('invoice_items')
-        .delete()
-        .in('invoice_id', ids);
-      if (itemsError) throw itemsError;
-
-      // Delete payments
-      const { error: paymentsError } = await supabase
-        .from('payments')
-        .delete()
-        .in('invoice_id', ids);
-      if (paymentsError) throw paymentsError;
-
-      // Delete invoices
       const { error } = await supabase
         .from('invoices')
         .delete()
         .in('id', ids);
       if (error) throw error;
-
       return { count: ids.length };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['invoice-payments'] });
       toast.success(`${data.count} invoice(s) deleted`);
     },
     onError: (error) => {
@@ -497,10 +344,3 @@ export function useBulkDeleteInvoices() {
     },
   });
 }
-
-export const INVOICE_STATUSES = {
-  pending: { label: 'Pending', color: 'bg-amber-100 text-amber-800' },
-  paid: { label: 'Paid', color: 'bg-emerald-100 text-emerald-800' },
-  overdue: { label: 'Overdue', color: 'bg-red-100 text-red-800' },
-  cancelled: { label: 'Cancelled', color: 'bg-gray-100 text-gray-800' },
-} as const;

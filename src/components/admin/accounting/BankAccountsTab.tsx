@@ -20,7 +20,7 @@ export function BankAccountsTab() {
   const [selectedAccount, setSelectedAccount] = useState<BankAccount | null>(null);
   const [activeTab, setActiveTab] = useState('accounts');
   const { data: bankAccounts = [], isLoading } = useBankAccounts();
-  const { data: accounts = [] } = useChartOfAccounts({ type: 'asset' });
+  const { data: accounts = [] } = useChartOfAccounts();
   const { getRate } = useExchangeRatesMap();
 
   const convertToTZS = (amount: number, currency: string) => {

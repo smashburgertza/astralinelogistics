@@ -65,7 +65,7 @@ export function CreateInvoiceDialog({ trigger }: CreateInvoiceDialogProps) {
   const { data: customers } = useCustomers();
   const { data: shipments } = useUninvoicedShipments();
   const { data: exchangeRates } = useExchangeRates();
-  const { data: accounts } = useChartOfAccounts({ active: true });
+  const { data: accounts } = useChartOfAccounts();
   const { data: productsServices } = useProductsServices({ active: true });
 
   // Group products/services by type
