@@ -13,3 +13,4 @@ export * from '../useShippingCalculatorCharges';
 export * from '../useShopForMeCharges';
 export * from '../useShopForMeProductRates';
 export * from '../useShopForMeVehicleRates';
+export * from '../useServiceTypes';
