@@ -17,7 +17,9 @@ export interface ProductService {
   updated_at: string;
 }
 
-export const SERVICE_TYPES = {
+// SERVICE_TYPES is now dynamic - use useServiceTypes hook instead
+// Legacy fallback for backwards compatibility
+export const SERVICE_TYPES_LEGACY = {
   air_cargo: { label: 'Air Cargo', color: 'bg-blue-100 text-blue-800' },
   sea_freight: { label: 'Sea Freight', color: 'bg-cyan-100 text-cyan-800' },
   handling: { label: 'Handling', color: 'bg-orange-100 text-orange-800' },
@@ -27,6 +29,9 @@ export const SERVICE_TYPES = {
   purchasing: { label: 'Purchasing', color: 'bg-pink-100 text-pink-800' },
   other: { label: 'Other', color: 'bg-gray-100 text-gray-800' },
 } as const;
+
+// Re-export as SERVICE_TYPES for backwards compatibility
+export const SERVICE_TYPES = SERVICE_TYPES_LEGACY;
 
 export const UNIT_TYPES = [
   { value: 'kg', label: 'Per Kilogram (kg)' },

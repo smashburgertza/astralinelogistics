@@ -34,16 +34,17 @@ import {
   useCreateProductService,
   useUpdateProductService,
   useDeleteProductService,
-  SERVICE_TYPES,
   UNIT_TYPES,
   ProductService,
 } from '@/hooks/useProductsServices';
+import { useServiceTypes } from '@/hooks/useServiceTypes';
 import { useChartOfAccounts } from '@/hooks/useAccounting';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 
 export function ProductsServicesTab() {
   const { data: items, isLoading } = useProductsServices();
   const { data: accounts } = useChartOfAccounts({ active: true });
+  const { data: serviceTypes } = useServiceTypes({ active: true });
   const createItem = useCreateProductService();
   const updateItem = useUpdateProductService();
   const deleteItem = useDeleteProductService();
@@ -130,12 +131,20 @@ export function ProductsServicesTab() {
     await updateItem.mutateAsync({ id: item.id, is_active: !item.is_active });
   };
 
-  const getServiceTypeBadge = (type: string | null) => {
-    const serviceType = SERVICE_TYPES[type as keyof typeof SERVICE_TYPES];
-    if (!serviceType) return null;
+  const getServiceTypeBadge = (typeSlug: string | null) => {
+    if (!typeSlug) return null;
+    const serviceType = serviceTypes?.find(t => t.slug === typeSlug);
+    if (!serviceType) {
+      // Fallback for unknown types
+      return (
+        <Badge variant="secondary" className="bg-gray-100 text-gray-800">
+          {typeSlug}
+        </Badge>
+      );
+    }
     return (
-      <Badge variant="secondary" className={serviceType.color}>
-        {serviceType.label}
+      <Badge variant="secondary" className={serviceType.color_class}>
+        {serviceType.name}
       </Badge>
     );
   };
@@ -195,12 +204,15 @@ export function ProductsServicesTab() {
                       onValueChange={(value) => setFormData({ ...formData, service_type: value })}
                     >
                       <SelectTrigger>
-                        <SelectValue />
+                        <SelectValue placeholder="Select type" />
                       </SelectTrigger>
                       <SelectContent>
-                        {Object.entries(SERVICE_TYPES).map(([key, value]) => (
-                          <SelectItem key={key} value={key}>
-                            {value.label}
+                        {serviceTypes?.map((type) => (
+                          <SelectItem key={type.slug} value={type.slug}>
+                            <div className="flex items-center gap-2">
+                              <div className={`w-2 h-2 rounded-full ${type.color_class.split(' ')[0]?.replace('100', '500')}`} />
+                              {type.name}
+                            </div>
                           </SelectItem>
                         ))}
                       </SelectContent>
