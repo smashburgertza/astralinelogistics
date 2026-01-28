@@ -2,7 +2,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables, TablesInsert } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
-import { createExpensePaymentJournalEntry } from '@/lib/journalEntryUtils';
 
 export type Expense = Tables<'expenses'> & {
   status?: string;
@@ -408,20 +407,7 @@ export function useApproveExpenseWithBankAccount() {
         });
       }
 
-      // Create journal entry: Debit Expense, Credit Bank Account
-      try {
-        await createExpensePaymentJournalEntry({
-          expenseId: data.id,
-          category: data.category,
-          amount: Number(data.amount),
-          currency: data.currency || 'USD',
-          description: data.description || undefined,
-          exchangeRate: 1,
-          bankAccountChartId: bankAccount.chart_account_id,
-        });
-      } catch (journalError) {
-        console.error('Failed to create expense journal entry:', journalError);
-      }
+      // Bank balance is already updated above - no journal entry needed
 
       // Update bank account balance
       const newBalance = (bankAccount.current_balance || 0) - Number(data.amount);
@@ -435,11 +421,7 @@ export function useApproveExpenseWithBankAccount() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
       queryClient.invalidateQueries({ queryKey: ['expense-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
-      queryClient.invalidateQueries({ queryKey: ['trial-balance'] });
-      queryClient.invalidateQueries({ queryKey: ['income-statement'] });
-      queryClient.invalidateQueries({ queryKey: ['balance-sheet'] });
       toast.success('Expense approved and paid');
     },
     onError: (error: Error) => {

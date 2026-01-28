@@ -48,7 +48,7 @@ import {
 } from '@/hooks/useApprovalRequests';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 import { usePaymentsPendingVerification, useVerifyPayment } from '@/hooks/useAgentInvoices';
-import { useBankAccounts, useChartOfAccounts, usePendingTransactions, useApproveTransaction, useRejectTransaction } from '@/hooks/useAccounting';
+import { useBankAccounts, useChartOfAccounts } from '@/hooks/useAccounting';
 import { useExchangeRatesMap, useExchangeRates, convertToTZS } from '@/hooks/useExchangeRates';
 import { CurrencyInline, formatAmount } from '@/components/shared/CurrencyDisplay';
 import { toast } from 'sonner';
@@ -532,7 +532,7 @@ function ParcelReleaseApprovals() {
 function PaymentVerificationApprovals() {
   const { data: pendingPayments, isLoading } = usePaymentsPendingVerification();
   const { data: bankAccounts } = useBankAccounts();
-  const { data: chartAccounts } = useChartOfAccounts({ type: 'asset', active: true });
+  const { data: chartAccounts } = useChartOfAccounts();
   const { rates: exchangeRates, getRate } = useExchangeRatesMap();
   const verifyMutation = useVerifyPayment();
   const [selectedPayment, setSelectedPayment] = useState<any | null>(null);
@@ -906,171 +906,24 @@ function ExpenseApprovals() {
 }
 
 function TransactionApprovals() {
-  const { data: pendingTransactions, isLoading } = usePendingTransactions();
-  const approveMutation = useApproveTransaction();
-  const rejectMutation = useRejectTransaction();
-  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
-  const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
-  const [rejectionReason, setRejectionReason] = useState('');
-
-  const handleApprove = (transaction: any) => {
-    approveMutation.mutate(transaction.id);
-  };
-
-  const handleRejectClick = (transaction: any) => {
-    setSelectedTransaction(transaction);
-    setRejectionReason('');
-    setRejectDialogOpen(true);
-  };
-
-  const confirmReject = () => {
-    if (!selectedTransaction) return;
-    rejectMutation.mutate({ id: selectedTransaction.id, reason: rejectionReason }, {
-      onSuccess: () => {
-        setRejectDialogOpen(false);
-        setSelectedTransaction(null);
-      },
-    });
-  };
-
-  if (isLoading) {
-    return <Skeleton className="h-[400px]" />;
-  }
-
   return (
-    <>
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Receipt className="h-5 w-5" />
-            Transaction Approvals
-          </CardTitle>
-          <CardDescription>
-            Review and approve expense transactions submitted for approval
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Entry #</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Vendor</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead>Submitted</TableHead>
-                <TableHead className="w-[140px]">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {!pendingTransactions || pendingTransactions.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                    No transactions pending approval
-                  </TableCell>
-                </TableRow>
-              ) : (
-                pendingTransactions.map((tx) => (
-                  <TableRow key={tx.id}>
-                    <TableCell className="font-mono text-sm">{tx.entry_number}</TableCell>
-                    <TableCell>{format(new Date(tx.entry_date), 'MMM d, yyyy')}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="capitalize">
-                        {tx.expense_category?.replace('_', ' ') || 'General'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="max-w-[200px] truncate" title={tx.description}>
-                      {tx.description}
-                    </TableCell>
-                    <TableCell>{tx.vendor_name || '-'}</TableCell>
-                    <TableCell className="text-right font-medium">
-                      {formatAmount(tx.expense_amount || 0, tx.expense_currency || 'USD')}
-                    </TableCell>
-                    <TableCell>
-                      {tx.submitted_at ? format(new Date(tx.submitted_at), 'MMM d, HH:mm') : '-'}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                          onClick={() => handleApprove(tx)}
-                          disabled={approveMutation.isPending}
-                        >
-                          <CheckCircle className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => handleRejectClick(tx)}
-                          disabled={rejectMutation.isPending}
-                        >
-                          <XCircle className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <XCircle className="h-5 w-5 text-red-600" />
-              Reject Transaction
-            </DialogTitle>
-            <DialogDescription>
-              Provide a reason for rejecting this transaction.
-            </DialogDescription>
-          </DialogHeader>
-          {selectedTransaction && (
-            <div className="space-y-4">
-              <div className="p-3 rounded-lg bg-muted/50 text-sm space-y-1">
-                <p><strong>Entry:</strong> {selectedTransaction.entry_number}</p>
-                <p><strong>Amount:</strong> {formatAmount(selectedTransaction.expense_amount || 0, selectedTransaction.expense_currency || 'USD')}</p>
-                <p><strong>Description:</strong> {selectedTransaction.description}</p>
-              </div>
-              <div className="space-y-2">
-                <Label>Rejection Reason</Label>
-                <Textarea
-                  value={rejectionReason}
-                  onChange={(e) => setRejectionReason(e.target.value)}
-                  placeholder="Enter reason for rejection..."
-                  rows={3}
-                />
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRejectDialogOpen(false)}>Cancel</Button>
-            <Button 
-              variant="destructive" 
-              onClick={confirmReject}
-              disabled={rejectMutation.isPending}
-            >
-              {rejectMutation.isPending ? 'Rejecting...' : 'Reject Transaction'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+    <Card>
+      <CardContent className="py-12 text-center">
+        <Receipt className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+        <p className="text-lg font-medium">Transaction Approvals Simplified</p>
+        <p className="text-muted-foreground mt-2">
+          Expense and payment approvals are now handled in their respective sections.
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 
 export default function ApprovalsPage() {
   const { data: pendingCount } = usePendingApprovalsCount();
   const { data: pendingPayments } = usePaymentsPendingVerification();
-  const { data: pendingTransactions } = usePendingTransactions();
   
-  const totalPending = (pendingCount || 0) + (pendingPayments?.length || 0) + (pendingTransactions?.length || 0);
+  const totalPending = (pendingCount || 0) + (pendingPayments?.length || 0);
 
   return (
     <AdminLayout 
@@ -1082,11 +935,6 @@ export default function ApprovalsPage() {
           <TabsTrigger value="transactions" className="gap-2">
             <Receipt className="h-4 w-4" />
             Transactions
-            {pendingTransactions && pendingTransactions.length > 0 && (
-              <Badge variant="destructive" className="ml-1 h-5 w-5 p-0 flex items-center justify-center text-xs">
-                {pendingTransactions.length}
-              </Badge>
-            )}
           </TabsTrigger>
           <TabsTrigger value="parcel_release" className="gap-2">
             <Package className="h-4 w-4" />

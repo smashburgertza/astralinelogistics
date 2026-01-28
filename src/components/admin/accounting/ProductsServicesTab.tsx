@@ -46,7 +46,7 @@ import { GenericBulkActionsBar } from '@/components/admin/shared/GenericBulkActi
 
 export function ProductsServicesTab() {
   const { data: items, isLoading } = useProductsServices();
-  const { data: accounts } = useChartOfAccounts({ active: true });
+  const { data: accounts } = useChartOfAccounts();
   const { data: serviceTypes } = useServiceTypes({ active: true });
   const createItem = useCreateProductService();
   const updateItem = useUpdateProductService();

@@ -6,6 +6,7 @@ export {
   useDeleteBankAccount,
   useChartOfAccounts,
   useCreateAccount,
+  updateBankBalance,
   type BankAccount,
   type ChartAccount,
 } from '../useAccounting';
