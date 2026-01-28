@@ -14,6 +14,8 @@ export interface ExchangeRate {
 export function useExchangeRates() {
   return useQuery({
     queryKey: ['exchange-rates'],
+    staleTime: 5 * 60 * 1000, // 5 minutes - exchange rates don't change often
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('currency_exchange_rates')

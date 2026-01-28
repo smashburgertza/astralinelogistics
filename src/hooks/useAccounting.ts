@@ -37,6 +37,8 @@ export interface ChartAccount {
 export function useBankAccounts() {
   return useQuery({
     queryKey: ['bank-accounts'],
+    staleTime: 60 * 1000, // 1 minute
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data: bankAccounts, error } = await supabase
         .from('bank_accounts')

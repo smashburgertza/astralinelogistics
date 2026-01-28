@@ -69,6 +69,8 @@ export function useAllExpenses(filters?: {
 }) {
   return useQuery({
     queryKey: ['expenses', filters],
+    staleTime: 30 * 1000, // 30 seconds
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       // Fetch regular expenses
       let query = supabase
@@ -110,6 +112,8 @@ export function useAllExpenses(filters?: {
 export function usePendingExpenses() {
   return useQuery({
     queryKey: ['expenses', 'pending'],
+    staleTime: 30 * 1000, // 30 seconds
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('expenses')
@@ -126,6 +130,8 @@ export function usePendingExpenses() {
 export function useExpenseStats() {
   return useQuery({
     queryKey: ['expense-stats'],
+    staleTime: 60 * 1000, // 1 minute
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       // Fetch expenses
       const { data, error } = await supabase

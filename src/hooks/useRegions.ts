@@ -25,8 +25,8 @@ export function useRegions() {
       if (error) throw error;
       return data as Region[];
     },
-    staleTime: 30 * 1000, // Data is fresh for 30 seconds
-    refetchOnWindowFocus: true, // Refetch when user returns to tab
+    staleTime: 5 * 60 * 1000, // 5 minutes - regions rarely change
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -42,8 +42,8 @@ export function useActiveRegions() {
       if (error) throw error;
       return data as Region[];
     },
-    staleTime: 30 * 1000,
-    refetchOnWindowFocus: true,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: false,
   });
 }
 

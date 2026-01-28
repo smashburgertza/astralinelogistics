@@ -15,6 +15,8 @@ interface SidebarCounts {
 export function useSidebarCounts() {
   return useQuery({
     queryKey: ["sidebar-counts"],
+    staleTime: 120000, // 2 minutes - data is fresh for longer
+    refetchOnWindowFocus: false, // Don't refetch on tab switch
     queryFn: async (): Promise<SidebarCounts> => {
       // Get items created in the last 24 hours
       const since = subDays(new Date(), 1).toISOString();
@@ -93,6 +95,5 @@ export function useSidebarCounts() {
       };
     },
     refetchInterval: 60000, // Refresh every minute
-    staleTime: 30000, // Consider data stale after 30 seconds
   });
 }
