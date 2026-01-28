@@ -16,18 +16,6 @@ export { useAgentAssignedRegions } from '../useAgentRegions';
 export { useAgentBalance, useAllAgentBalances } from '../useAgentBalance';
 
 export {
-  useAgentShipments,
-  useAgentDraftShipments,
-  useAgentShipmentStats,
-  useFinalizeDraftShipment,
-  useDeleteDraftShipment,
-  useUpdateDraftShipment,
-  useUpdateAgentShipment,
-} from '../useAgentShipments';
-
-export {
-  useAgentInvoicesToMe,
-  useAgentMarkInvoicePaid,
   usePaymentsPendingVerification,
   useVerifyPayment,
   type AgentInvoice,

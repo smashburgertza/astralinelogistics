@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useAuth } from './useAuth';
 import { createAgentPaymentJournalEntry, createAgentPaymentReceivedJournalEntry, createInvoicePaymentJournalEntry } from '@/lib/journalEntryUtils';
 
 export interface AgentInvoice {
@@ -32,128 +31,6 @@ export interface AgentPayment {
   verification_status: 'pending' | 'verified' | 'rejected';
   verified_at: string | null;
   verified_by: string | null;
-}
-
-// Fetch invoices TO agent (from Astraline)
-export function useAgentInvoicesToMe() {
-  const { user } = useAuth();
-
-  return useQuery({
-    queryKey: ['agent-invoices-to-me', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return [];
-
-      const { data, error } = await supabase
-        .from('invoices')
-        .select(`
-          id,
-          invoice_number,
-          amount,
-          currency,
-          status,
-          invoice_direction,
-          created_at,
-          due_date,
-          paid_at,
-          notes,
-          shipment_id
-        `)
-        .eq('agent_id', user.id)
-        .eq('invoice_direction', 'to_agent')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      // Get shipment details
-      const shipmentIds = data?.map(i => i.shipment_id).filter(Boolean) || [];
-      let shipmentsMap = new Map();
-      
-      if (shipmentIds.length > 0) {
-        const { data: shipments } = await supabase
-          .from('shipments')
-          .select('id, tracking_number, total_weight_kg')
-          .in('id', shipmentIds);
-        
-        shipmentsMap = new Map((shipments || []).map(s => [s.id, s]));
-      }
-
-      return (data || []).map(inv => ({
-        ...inv,
-        shipment: shipmentsMap.get(inv.shipment_id) || null,
-      })) as AgentInvoice[];
-    },
-    enabled: !!user?.id,
-  });
-}
-
-// Agent marks an invoice as paid
-export function useAgentMarkInvoicePaid() {
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
-
-  return useMutation({
-    mutationFn: async ({ 
-      invoiceId, 
-      paymentMethod, 
-      paymentReference 
-    }: { 
-      invoiceId: string; 
-      paymentMethod: string;
-      paymentReference?: string;
-    }) => {
-      if (!user?.id) throw new Error('Not authenticated');
-
-      // Get invoice amount
-      const { data: invoice, error: invoiceError } = await supabase
-        .from('invoices')
-        .select('amount, currency')
-        .eq('id', invoiceId)
-        .eq('agent_id', user.id)
-        .eq('invoice_direction', 'to_agent')
-        .single();
-
-      if (invoiceError || !invoice) throw new Error('Invoice not found');
-
-      // Create a payment record with pending verification
-      const { error: paymentError } = await supabase
-        .from('payments')
-        .insert({
-          invoice_id: invoiceId,
-          amount: invoice.amount,
-          currency: invoice.currency,
-          payment_method: paymentMethod,
-          verification_status: 'pending',
-          paid_at: new Date().toISOString(),
-          stripe_payment_id: paymentReference || null, // Reusing this field for reference
-        });
-
-      if (paymentError) throw paymentError;
-
-      // Update invoice status to partial/pending verification
-      // Don't mark as fully paid until admin verifies
-      const { error: updateError } = await supabase
-        .from('invoices')
-        .update({
-          notes: invoice.amount ? 
-            `Payment of ${invoice.currency} ${invoice.amount} marked by agent, pending verification. Ref: ${paymentReference || 'N/A'}` :
-            null,
-        })
-        .eq('id', invoiceId);
-
-      if (updateError) throw updateError;
-
-      return { invoiceId };
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agent-invoices-to-me'] });
-      queryClient.invalidateQueries({ queryKey: ['agent-balance'] });
-      queryClient.invalidateQueries({ queryKey: ['payments-pending-verification'] });
-      toast.success('Payment marked - awaiting Astraline verification');
-    },
-    onError: (error) => {
-      toast.error(`Failed to mark payment: ${error.message}`);
-    },
-  });
 }
 
 // Admin: Fetch payments pending verification (both agent and customer payments)
