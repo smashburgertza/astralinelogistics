@@ -1,102 +1,83 @@
 
+# Fix Bank Balance Not Updating with Correct Payment Amount
 
-# Reset All Transactional Data - Database Migration
+## Problem Identified
 
-## Summary
+When recording a payment for a multi-currency invoice (e.g., GBP invoice paid in TZS), the bank balance updates with **206** instead of **762,200** because the `amountInPaymentCurrency` field is not being passed in some components.
 
-Execute a database migration to delete all transactional data and reset bank balances for fresh testing.
+### Root Cause
+The `RecordPaymentDialog` correctly calculates and returns `amountInPaymentCurrency` (the converted amount in payment currency), but two components strip this field when calling `recordPayment.mutate()`:
 
-## Current Data to Delete
+| Component | Status |
+|-----------|--------|
+| `InvoiceDetailDialog.tsx` | ✅ Passes `amountInPaymentCurrency` |
+| `B2BInvoices.tsx` | ✅ Passes entire `details` object |
+| `InvoiceTable.tsx` | ❌ **Missing** `amountInPaymentCurrency` |
+| `ParcelCheckoutScanner.tsx` | ❌ **Missing** `amountInPaymentCurrency` |
 
-| Table | Count | Action |
-|-------|-------|--------|
-| invoices | 1 | DELETE |
-| invoice_items | 0 | Already empty |
-| payments | 1 | DELETE |
-| expenses | 1 | DELETE |
-| notifications | 2 | DELETE |
-| audit_logs | 1 | DELETE |
-| journal_entries | 3 | DELETE (legacy) |
-| journal_lines | 7 | DELETE (legacy) |
-| All other transactional tables | 0 | Already empty |
+### Example Flow (Current Bug)
+1. Invoice created: **£206 GBP**
+2. Payment recorded in TZS (exchange rate: 1 GBP = 3,700 TZS)
+3. Dialog calculates: `amountInPaymentCurrency = 762,200 TZS`
+4. Dialog passes: `{ amount: 206, amountInPaymentCurrency: 762200, ... }`
+5. **BUG**: `InvoiceTable` strips `amountInPaymentCurrency` and only passes `amount: 206`
+6. Hook falls back to `params.amount` (206) for bank balance update
+7. Bank shows **206** instead of **762,200**
 
-## SQL Migration to Execute
+## Solution
 
-```sql
--- Delete all transactional data (child tables first, respecting foreign keys)
+Add the missing `amountInPaymentCurrency: details.amountInPaymentCurrency` to both components.
 
--- 1. Delete invoice-related child tables
-DELETE FROM invoice_items;
-DELETE FROM payments;
-DELETE FROM commissions;
+## Files to Modify
 
--- 2. Delete approval requests
-DELETE FROM approval_requests;
-
--- 3. Delete shipment-related tables
-DELETE FROM parcels;
-DELETE FROM shipment_cost_allocations;
-
--- 4. Delete batch-related tables
-DELETE FROM batch_costs;
-
--- 5. Delete settlement-related tables
-DELETE FROM settlement_items;
-DELETE FROM settlements;
-
--- 6. Delete payroll-related tables
-DELETE FROM payroll_items;
-DELETE FROM payroll_runs;
-DELETE FROM salary_advances;
-
--- 7. Delete order-related tables
-DELETE FROM order_items;
-DELETE FROM order_requests;
-
--- 8. Delete legacy journal entries
-DELETE FROM journal_lines;
-DELETE FROM journal_entries;
-DELETE FROM account_balances;
-
--- 9. Delete parent tables
-DELETE FROM invoices;
-DELETE FROM estimates;
-DELETE FROM expenses;
-DELETE FROM shipments;
-DELETE FROM cargo_batches;
-
--- 10. Delete other transactional data
-DELETE FROM notifications;
-DELETE FROM audit_logs;
-DELETE FROM employee_badges;
-DELETE FROM employee_milestones;
-DELETE FROM teaser_conversion_events;
-DELETE FROM contact_submissions;
-DELETE FROM bank_transactions;
-
--- 11. Reset bank account balances to 0
-UPDATE bank_accounts SET current_balance = 0;
-
--- 12. Reset document counters (keep customer/employee/agent counters)
-UPDATE document_counters 
-SET counter_value = 0 
-WHERE counter_key NOT IN ('customer', 'employee', 'agent');
+### 1. `src/components/admin/InvoiceTable.tsx`
+Add `amountInPaymentCurrency` to the payment recording call:
+```typescript
+// Lines 343-360
+recordPayment.mutate({
+  invoiceId: details.invoiceId,
+  amount: details.amount,
+  amountInPaymentCurrency: details.amountInPaymentCurrency,  // ← ADD THIS
+  paymentMethod: details.paymentMethod,
+  depositAccountId: details.depositAccountId,
+  paymentCurrency: details.paymentCurrency,
+  paymentDate: details.paymentDate,
+  reference: details.reference,
+  notes: details.notes,
+  splits: details.splits,
+}, { ... });
 ```
 
-## After Reset
+### 2. `src/components/admin/billing/ParcelCheckoutScanner.tsx`
+Add `amountInPaymentCurrency` to the payment recording call:
+```typescript
+// Lines 375-386
+recordPayment.mutate({
+  invoiceId: details.invoiceId,
+  amount: details.amount,
+  amountInPaymentCurrency: details.amountInPaymentCurrency,  // ← ADD THIS
+  paymentMethod: details.paymentMethod,
+  depositAccountId: details.depositAccountId,
+  paymentCurrency: details.paymentCurrency,
+  paymentDate: details.paymentDate,
+  reference: details.reference,
+  notes: details.notes,
+  splits: details.splits,
+}, { ... });
+```
 
-Your system will have:
-- All invoices, estimates, payments, expenses deleted
-- All shipments, parcels, notifications cleared
-- Bank accounts with $0 balance
-- Fresh document numbers starting from 0001
-- All customers, agents, employees, and settings preserved
+## After Fix
 
-## Technical Details
+| Field | Value |
+|-------|-------|
+| Invoice amount | £206 GBP |
+| Payment recorded | 762,200 TZS |
+| Bank balance | 762,200 TZS ✅ |
+| Invoice `amount_paid` | 206 (in invoice currency) |
 
-The migration executes deletions in foreign key-safe order:
-1. Child tables first (invoice_items, payments, etc.)
-2. Parent tables after (invoices, shipments, etc.)
-3. Bank balance reset
-4. Document counter reset
+## Testing Recommendations
 
+After the fix:
+1. Reset the Exim Bank balance to 0 in the database
+2. Record a new payment for the existing invoice
+3. Verify bank balance updates to the converted TZS amount
