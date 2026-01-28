@@ -35,6 +35,7 @@ import { toast } from "sonner";
 import { InvoiceStatusBadge } from "./InvoiceStatusBadge";
 import { CreateAgentCargoInvoiceDialog } from "./CreateAgentCargoInvoiceDialog";
 import { CreateAgentInvoiceDialog } from "./CreateAgentInvoiceDialog";
+import { CreateBillToAgentDialog } from "./CreateBillToAgentDialog";
 import { InvoiceDetailDialog } from "./InvoiceDetailDialog";
 import { EditB2BInvoiceDialog } from "./EditB2BInvoiceDialog";
 import { RecordPaymentDialog, PaymentDetails } from "./RecordPaymentDialog";
@@ -108,6 +109,7 @@ export function B2BInvoices() {
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [invoiceForPayment, setInvoiceForPayment] = useState<B2BInvoice | null>(null);
   const [createFromAgentDialogOpen, setCreateFromAgentDialogOpen] = useState(false);
+  const [createBillToAgentDialogOpen, setCreateBillToAgentDialogOpen] = useState(false);
   const queryClient = useQueryClient();
   const { data: exchangeRates } = useExchangeRates();
   const recordPayment = useRecordPayment();
@@ -554,11 +556,17 @@ export function B2BInvoices() {
             </TabsContent>
 
             <TabsContent value="to_agents" className="mt-4">
-              <div className="mb-4 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
-                <p className="text-sm text-emerald-800 dark:text-emerald-200">
-                  <strong>Invoices TO Agents:</strong> For agent cargo clearing. 
-                  Agents owe Astraline for clearing their own cargo.
-                </p>
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 flex-1 mr-4">
+                  <p className="text-sm text-emerald-800 dark:text-emerald-200">
+                    <strong>Invoices TO Agents:</strong> For agent cargo clearing or any services provided to agents. 
+                    Agents owe Astraline for these charges.
+                  </p>
+                </div>
+                <Button onClick={() => setCreateBillToAgentDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Bill Agent
+                </Button>
               </div>
 
               {/* Unbilled Agent Cargo Shipments */}
@@ -692,6 +700,12 @@ export function B2BInvoices() {
       <CreateAgentInvoiceDialog
         open={createFromAgentDialogOpen}
         onOpenChange={setCreateFromAgentDialogOpen}
+      />
+
+      {/* Bill Agent Dialog (To Agent) */}
+      <CreateBillToAgentDialog
+        open={createBillToAgentDialogOpen}
+        onOpenChange={setCreateBillToAgentDialogOpen}
       />
     </div>
   );
