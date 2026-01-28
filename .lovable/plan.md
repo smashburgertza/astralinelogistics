@@ -1,306 +1,163 @@
 
-# Add Bulk Delete Functionality System-Wide
 
-## Overview
+# Add Custom Agent Billing (Invoice TO Agent)
 
-Add bulk selection and deletion capabilities to **all major data tables** across the admin interface, following the existing pattern established in `ShipmentTable.tsx` and `BulkActionsBar.tsx`.
+## Problem Identified
 
----
+In the **B2B Agent** section → **To Agents** tab, you can only create invoices for **unbilled cargo shipments** (clearing charges tied to specific shipments). There's no way to bill agents for **general services** that aren't tied to a shipment.
 
-## Tables Requiring Bulk Delete
-
-| Module | Table Component | Status | Priority |
-|--------|----------------|--------|----------|
-| Shipments | `ShipmentTable.tsx` | Has bulk selection, needs delete | High |
-| Orders (Shop For Me) | `OrderRequestTable.tsx` | Needs full implementation | High |
-| Customers | `CustomerTable.tsx` | Needs full implementation | High |
-| Invoices | `InvoiceTable.tsx` | Needs full implementation | High |
-| Expenses | `ExpenseTable.tsx` | Has selection props, needs delete action | Medium |
-| Employees | `EmployeeTable.tsx` | Needs full implementation | Medium |
-| Agents | `AgentTable.tsx` | Needs full implementation | Medium |
-| Products/Services | `ProductsServicesTab.tsx` | Needs full implementation | Medium |
-| Service Types | `ServiceTypesManager.tsx` | Needs full implementation | Low |
+**Current buttons:**
+| Tab | Button | What it does |
+|-----|--------|--------------|
+| From Agents | "Add Agent Invoice" ✅ | Record an invoice where agent bills Astraline |
+| To Agents | "Create Invoice" (on cargo rows) | Bill agent for cargo clearing (tied to shipment) |
+| To Agents | **No button for custom services** ❌ | Cannot bill agent for general services |
 
 ---
 
-## Implementation Architecture
+## Solution
 
-### 1. Create Reusable Bulk Actions Bar Component
+Add a **"Bill Agent"** button to the **To Agents** tab that opens a new dialog for creating custom invoices to agents for any service—not tied to a shipment.
 
-Create a generic, reusable bulk actions bar that can be configured per module:
+---
 
-**File:** `src/components/admin/shared/GenericBulkActionsBar.tsx`
+## Changes Required
 
-```text
-+---------------------------------------------------------------------+
-| [checkbox] 5 items selected [x]              [Custom Actions] [Delete] |
-+---------------------------------------------------------------------+
+### 1. Create New Dialog Component
+
+**File:** `src/components/admin/CreateBillToAgentDialog.tsx`
+
+A new dialog similar to `CreateAgentInvoiceDialog` but:
+- Sets `invoice_direction: "to_agent"` (agent owes Astraline)
+- No shipment required
+- Uses products/services catalog for line items
+- Supports custom line items
+
+### 2. Update B2BInvoices Component
+
+**File:** `src/components/admin/B2BInvoices.tsx`
+
+Add a "Bill Agent" button to the To Agents tab header:
+
+**Current UI (To Agents tab):**
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ Invoices TO Agents: For agent cargo clearing...                     │
+├─────────────────────────────────────────────────────────────────────┤
+│ Unbilled Agent Cargo (3)                                            │
+│ [Table of cargo needing invoices with Create Invoice buttons]       │
+├─────────────────────────────────────────────────────────────────────┤
+│ Invoices (5)                                                        │
+│ [Table of existing to-agent invoices]                               │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-Props:
-- `selectedCount`: Number of selected items
-- `onClearSelection`: Callback to clear selection
-- `onDelete`: Callback for bulk delete (with confirmation)
-- `itemLabel`: Singular label (e.g., "customer", "invoice")
-- `customActions`: Optional additional action buttons
-- `isDeleting`: Loading state for delete operation
-
-### 2. Hook Mutations for Each Module
-
-Add bulk delete mutations to each relevant hook:
-
-| Hook File | New Mutation |
-|-----------|--------------|
-| `useShipments.ts` | `useBulkDeleteShipments` |
-| `useOrderRequests.ts` | `useBulkDeleteOrders` |
-| `useCustomers.ts` | `useBulkDeleteCustomers` |
-| `useInvoices.ts` | `useBulkDeleteInvoices` |
-| `useExpenses.ts` | `useBulkDeleteExpenses` |
-| `useEmployees.ts` | `useBulkDeleteEmployees` |
-| `useAgents.ts` | `useBulkDeleteAgents` |
-| `useProductsServices.ts` | `useBulkDeleteProductServices` |
-| `useServiceTypes.ts` | `useBulkDeleteServiceTypes` |
+**After (To Agents tab):**
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ Invoices TO Agents: For agent cargo clearing...     [+ Bill Agent]  │  ← New button
+├─────────────────────────────────────────────────────────────────────┤
+│ Unbilled Agent Cargo (3)                                            │
+│ [Table of cargo needing invoices with Create Invoice buttons]       │
+├─────────────────────────────────────────────────────────────────────┤
+│ Invoices (5)                                                        │
+│ [Table of existing to-agent invoices]                               │
+└─────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
-## Detailed Changes Per Module
+## New Dialog Design
 
-### Module 1: Shipments (Enhance Existing)
+**"Bill Agent" Dialog:**
 
-**Current State:** Has checkbox selection, bulk status update, and print labels.  
-**Enhancement:** Add bulk delete option.
+```
+┌───────────────────────────────────────────────────────────────────────┐
+│ Bill Agent                                                        [X] │
+│ Create an invoice to bill an agent for services provided.             │
+├───────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│ Select Agent *                                                        │
+│ [Dropdown: Select an agent...]                                        │
+│                                                                       │
+│ ┌─────────────────────────────────────────────────────────────────┐   │
+│ │ Company: ABC Logistics  │  Contact: John Doe  │  Code: AGT-001  │   │
+│ └─────────────────────────────────────────────────────────────────┘   │
+│                                                                       │
+│ Currency          Due Date                                            │
+│ [USD ▼]           [____/____/____]                                    │
+│                                                                       │
+│ Line Items                                            [+ Add Item]    │
+│ ┌──────────────────┬──────────────────┬─────┬─────────┬──────────┐    │
+│ │ Service          │ Description      │ Qty │ Price   │ Total    │    │
+│ ├──────────────────┼──────────────────┼─────┼─────────┼──────────┤    │
+│ │ [Select...   ▼]  │ Consulting fee   │ 2   │ 150.00  │ USD 300  │ 🗑 │
+│ │ [Select...   ▼]  │ Training session │ 1   │ 500.00  │ USD 500  │ 🗑 │
+│ └──────────────────┴──────────────────┴─────┴─────────┴──────────┘    │
+│                                                                       │
+│ ─────────────────────────────────────────────────────────────────     │
+│ Subtotal                                               USD 800.00     │
+│ Total                                                  USD 800.00     │
+│ ≈ TZS equivalent                                   TZS 2,000,000      │
+│                                                                       │
+│ Notes                                                                 │
+│ [Additional notes (optional)...]                                      │
+│                                                                       │
+│                                         [Cancel]  [Create Invoice]    │
+└───────────────────────────────────────────────────────────────────────┘
+```
 
-**Files:**
-- `src/hooks/useShipments.ts` - Add `useBulkDeleteShipments`
-- `src/components/admin/BulkActionsBar.tsx` - Add delete button with confirmation
+---
 
+## Technical Details
+
+### Dialog Component Props
 ```typescript
-// New mutation in useShipments.ts
-export function useBulkDeleteShipments() {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async (ids: string[]) => {
-      // Delete related parcels first
-      await supabase.from('parcels').delete().in('shipment_id', ids);
-      // Delete shipments
-      const { error } = await supabase.from('shipments').delete().in('id', ids);
-      if (error) throw error;
-      return { count: ids.length };
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['shipments'] });
-      toast.success(`${data.count} shipment(s) deleted`);
-    },
-  });
+interface CreateBillToAgentDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 ```
 
-### Module 2: Shop For Me Orders
-
-**Files:**
-- `src/hooks/useOrderRequests.ts` - Add `useBulkDeleteOrders`
-- `src/components/admin/OrderRequestTable.tsx` - Add checkbox column and selection props
-- `src/components/admin/OrderBulkActionsBar.tsx` - New component
-- `src/pages/admin/OrderRequests.tsx` - Add selection state
-
-**Cascade delete:** `order_items` -> `order_requests`
-
-### Module 3: Customers
-
-**Files:**
-- `src/hooks/useCustomers.ts` - Add `useBulkDeleteCustomers`
-- `src/components/admin/CustomerTable.tsx` - Add checkbox column
-- `src/pages/admin/Customers.tsx` - Add selection state and bulk bar
-
-**Warning:** Will cascade to shipments, invoices - show confirmation with impact count.
-
-### Module 4: Invoices
-
-**Files:**
-- `src/hooks/useInvoices.ts` - Add `useBulkDeleteInvoices`
-- `src/components/admin/InvoiceTable.tsx` - Add checkbox column
-- `src/components/admin/billing/InvoicesTabContent.tsx` - Add bulk actions bar
-
-**Cascade delete:** `invoice_items`, `invoice_payments` -> `invoices`
-
-### Module 5: Expenses
-
-**Current State:** Already has `showBulkActions` prop and selection logic for approval workflow.
-
-**Enhancement:** Add bulk delete (separate from approval).
-
-**Files:**
-- `src/hooks/useExpenses.ts` - Add `useBulkDeleteExpenses`
-- `src/components/admin/ExpenseTable.tsx` - Add delete to bulk actions
-- `src/pages/admin/Expenses.tsx` - Wire up delete mutation
-
-### Module 6: Employees
-
-**Files:**
-- `src/hooks/useEmployees.ts` - Add `useBulkDeleteEmployees`
-- `src/components/admin/EmployeeTable.tsx` - Add checkbox column and bulk bar
-
-**Note:** Removes employee role only, does not delete user account.
-
-### Module 7: Agents
-
-**Files:**
-- `src/hooks/useAgents.ts` - Add `useBulkDeleteAgents`
-- `src/components/admin/AgentTable.tsx` - Add checkbox column
-- `src/pages/admin/Agents.tsx` - Add bulk actions bar
-
-**Note:** Removes agent role and region assignments.
-
-### Module 8: Products/Services
-
-**Files:**
-- `src/hooks/useProductsServices.ts` - Add `useBulkDeleteProductServices`
-- `src/components/admin/accounting/ProductsServicesTab.tsx` - Add checkbox column and bulk bar
-
-### Module 9: Service Types
-
-**Files:**
-- `src/hooks/useServiceTypes.ts` - Add `useBulkDeleteServiceTypes`
-- `src/components/admin/ServiceTypesManager.tsx` - Add checkbox column and bulk bar
-
-**Warning:** Check usage in `products_services` before delete.
-
----
-
-## Shared Components to Create
-
-### 1. GenericBulkActionsBar
-
-**File:** `src/components/admin/shared/GenericBulkActionsBar.tsx`
-
-Reusable bar with:
-- Selection count display
-- Clear selection button
-- Delete button with loading state
-- Optional custom action slots
-
-### 2. BulkDeleteConfirmDialog
-
-**File:** `src/components/admin/shared/BulkDeleteConfirmDialog.tsx`
-
-Confirmation dialog showing:
-- Number of items to delete
-- Optional warning about cascading data
-- Cancel and Confirm buttons with loading state
-
----
-
-## UI Pattern
-
-All tables will follow this consistent pattern:
-
-```text
-Before selection:
-+------------------------------------------------------------------+
-| [Filters]                              [Search] [Add New Button] |
-+------------------------------------------------------------------+
-| Header Row                                                        |
-|------------------------------------------------------------------|
-| Row 1                                                             |
-| Row 2                                                             |
-+------------------------------------------------------------------+
-
-After selection (2+ items):
-+------------------------------------------------------------------+
-| Selected: 3 items [x]                      [Delete Selected]      |  <- Bulk bar
-+------------------------------------------------------------------+
-| [ ] [Filters]                          [Search] [Add New Button] |
-+------------------------------------------------------------------+
-| [x] Header Row (with select all checkbox)                         |
-|------------------------------------------------------------------|
-| [x] Row 1                                                         |
-| [ ] Row 2                                                         |
-| [x] Row 3                                                         |
-+------------------------------------------------------------------+
+### Invoice Creation Logic
+```typescript
+// Key difference from CreateAgentInvoiceDialog:
+const { data: invoice } = await supabase
+  .from("invoices")
+  .insert({
+    invoice_number: invoiceNumber,
+    invoice_type: "agent_service",
+    invoice_direction: "to_agent",  // Agent owes Astraline
+    agent_id: data.agent_id,
+    shipment_id: null,              // Not tied to a shipment
+    customer_id: null,
+    amount: calculations.total,
+    currency: data.currency,
+    // ...
+  });
 ```
 
 ---
 
-## File Summary
+## Files to Modify
 
-### New Files (3)
-
-| File | Description |
-|------|-------------|
-| `src/components/admin/shared/GenericBulkActionsBar.tsx` | Reusable bulk actions bar |
-| `src/components/admin/shared/BulkDeleteConfirmDialog.tsx` | Reusable delete confirmation |
-| `src/components/admin/OrderBulkActionsBar.tsx` | Order-specific bulk bar |
-
-### Modified Files (18)
-
-| File | Changes |
-|------|---------|
-| `src/hooks/useShipments.ts` | Add `useBulkDeleteShipments` |
-| `src/hooks/useOrderRequests.ts` | Add `useBulkDeleteOrders` |
-| `src/hooks/useCustomers.ts` | Add `useBulkDeleteCustomers` |
-| `src/hooks/useInvoices.ts` | Add `useBulkDeleteInvoices` |
-| `src/hooks/useExpenses.ts` | Add `useBulkDeleteExpenses` |
-| `src/hooks/useEmployees.ts` | Add `useBulkDeleteEmployees` |
-| `src/hooks/useAgents.ts` | Add `useBulkDeleteAgents` |
-| `src/hooks/useProductsServices.ts` | Add `useBulkDeleteProductServices` |
-| `src/hooks/useServiceTypes.ts` | Add `useBulkDeleteServiceTypes` |
-| `src/components/admin/BulkActionsBar.tsx` | Add delete button |
-| `src/components/admin/OrderRequestTable.tsx` | Add checkbox column |
-| `src/components/admin/CustomerTable.tsx` | Add checkbox column |
-| `src/components/admin/InvoiceTable.tsx` | Add checkbox column |
-| `src/components/admin/EmployeeTable.tsx` | Add checkbox column |
-| `src/components/admin/AgentTable.tsx` | Add checkbox column |
-| `src/components/admin/accounting/ProductsServicesTab.tsx` | Add checkbox column |
-| `src/components/admin/ServiceTypesManager.tsx` | Add checkbox column |
-| `src/pages/admin/OrderRequests.tsx` | Add selection state, bulk bar |
+| File | Action | Description |
+|------|--------|-------------|
+| `src/components/admin/CreateBillToAgentDialog.tsx` | Create | New dialog for billing agents |
+| `src/components/admin/B2BInvoices.tsx` | Modify | Add "Bill Agent" button to To Agents tab |
+| `src/components/admin/agents/index.ts` | Modify | Export new component |
 
 ---
 
-## Cascade Delete Rules
+## User Flow
 
-| Table | Cascade Deletes |
-|-------|-----------------|
-| `shipments` | `parcels`, `invoices` (unlink only) |
-| `order_requests` | `order_items` |
-| `customers` | Warning only - blocks if has related data |
-| `invoices` | `invoice_items`, `invoice_payments` |
-| `expenses` | None (standalone) |
-| `employees` | `employee_roles` entry only |
-| `agents` | `agent_regions` |
-| `products_services` | None (may be referenced) |
-| `service_types` | None (may be referenced) |
-
----
-
-## Implementation Order
-
-1. **Phase 1: Shared Components**
-   - Create `GenericBulkActionsBar.tsx`
-   - Create `BulkDeleteConfirmDialog.tsx`
-
-2. **Phase 2: High Priority Tables**
-   - Shipments (enhance existing)
-   - Orders
-   - Customers
-   - Invoices
-
-3. **Phase 3: Medium Priority Tables**
-   - Expenses
-   - Employees
-   - Agents
-   - Products/Services
-
-4. **Phase 4: Low Priority**
-   - Service Types
-
----
-
-## Technical Notes
-
-- All delete mutations will use `.in('id', ids)` for efficient batch operations
-- Cascade deletes happen in transaction order (children first)
-- RLS policies will enforce permission checks on delete
-- Query invalidation ensures UI updates immediately after deletion
-- Loading states prevent double-clicks during deletion
+1. Navigate to **B2B Agent** page (was Settlements)
+2. Click **"To Agents"** tab
+3. Click **"Bill Agent"** button (new)
+4. Select agent from dropdown
+5. Add line items (from catalog or custom)
+6. Review totals
+7. Click **"Create Invoice"**
+8. Invoice appears in the To Agents list with status "Pending"
+9. When agent pays, mark as paid or record payment
 
