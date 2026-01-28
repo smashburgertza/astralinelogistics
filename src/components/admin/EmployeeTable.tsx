@@ -45,7 +45,12 @@ import { useCustomRoles } from '@/hooks/useCustomRoles';
 import { usePermissionTemplates } from '@/components/admin/PermissionTemplatesSection';
 import { EmployeeProfileDrawer } from '@/components/admin/EmployeeProfileDrawer';
 
-export function EmployeeTable() {
+interface EmployeeTableProps {
+  selectedIds?: string[];
+  onSelectionChange?: (ids: string[]) => void;
+}
+
+export function EmployeeTable({ selectedIds = [], onSelectionChange }: EmployeeTableProps) {
   const { data: employees, isLoading } = useEmployees();
   const updateEmployee = useUpdateEmployee();
   const deleteEmployee = useDeleteEmployee();
@@ -59,6 +64,24 @@ export function EmployeeTable() {
     isSuperAdmin: false,
     permissions: {} as Record<string, boolean>,
   });
+
+  const toggleSelection = (id: string) => {
+    if (!onSelectionChange) return;
+    if (selectedIds.includes(id)) {
+      onSelectionChange(selectedIds.filter(i => i !== id));
+    } else {
+      onSelectionChange([...selectedIds, id]);
+    }
+  };
+
+  const toggleAll = () => {
+    if (!onSelectionChange || !employees) return;
+    if (selectedIds.length === employees.length) {
+      onSelectionChange([]);
+    } else {
+      onSelectionChange(employees.map(e => e.user_id));
+    }
+  };
 
   const handleEdit = (employee: Employee) => {
     setEditingEmployee(employee);
@@ -134,6 +157,14 @@ export function EmployeeTable() {
       <Table>
         <TableHeader>
           <TableRow>
+            {onSelectionChange && (
+              <TableHead className="w-[40px]">
+                <Checkbox 
+                  checked={employees && employees.length > 0 && selectedIds.length === employees.length}
+                  onCheckedChange={toggleAll}
+                />
+              </TableHead>
+            )}
             <TableHead>Staff ID</TableHead>
             <TableHead>Name</TableHead>
             <TableHead>Email</TableHead>
@@ -150,6 +181,14 @@ export function EmployeeTable() {
               className="cursor-pointer"
               onClick={() => setViewingEmployeeId(employee.user_id)}
             >
+              {onSelectionChange && (
+                <TableCell onClick={(e) => e.stopPropagation()}>
+                  <Checkbox 
+                    checked={selectedIds.includes(employee.user_id)}
+                    onCheckedChange={() => toggleSelection(employee.user_id)}
+                  />
+                </TableCell>
+              )}
               <TableCell className="font-mono text-sm">
                 {employee.profile?.employee_code || '-'}
               </TableCell>
@@ -213,7 +252,7 @@ export function EmployeeTable() {
           ))}
           {employees?.length === 0 && (
             <TableRow>
-              <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={onSelectionChange ? 8 : 7} className="text-center text-muted-foreground py-8">
                 No employees found
               </TableCell>
             </TableRow>

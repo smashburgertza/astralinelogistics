@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -5,13 +6,16 @@ import { CreateAgentDialog } from '@/components/admin/CreateAgentDialog';
 import { AgentTable } from '@/components/admin/AgentTable';
 import { RegionManagement } from '@/components/admin/RegionManagement';
 import { TransitRoutesManagement } from '@/components/admin/TransitRoutesManagement';
-import { useAgents } from '@/hooks/useAgents';
+import { GenericBulkActionsBar } from '@/components/admin/shared/GenericBulkActionsBar';
+import { useAgents, useBulkDeleteAgents } from '@/hooks/useAgents';
 import { useActiveRegions } from '@/hooks/useRegions';
 import { Users, Globe, Route } from 'lucide-react';
 
 export default function AgentsPage() {
   const { data: agents, isLoading } = useAgents();
   const { data: regions } = useActiveRegions();
+  const bulkDelete = useBulkDeleteAgents();
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Calculate stats
   const totalAgents = agents?.length || 0;
@@ -21,6 +25,11 @@ export default function AgentsPage() {
     }
     return acc;
   }, {} as Record<string, number>) || {};
+
+  const handleBulkDelete = async () => {
+    await bulkDelete.mutateAsync(selectedIds);
+    setSelectedIds([]);
+  };
 
   return (
     <AdminLayout
@@ -86,8 +95,23 @@ export default function AgentsPage() {
             <CreateAgentDialog />
           </div>
 
+          {/* Bulk Actions */}
+          <GenericBulkActionsBar
+            selectedCount={selectedIds.length}
+            onClearSelection={() => setSelectedIds([])}
+            onDelete={handleBulkDelete}
+            itemLabel="agent"
+            isDeleting={bulkDelete.isPending}
+            deleteWarning="This will remove their agent role and region assignments. Their user account will remain active."
+          />
+
           {/* Agents Table */}
-          <AgentTable agents={agents} isLoading={isLoading} />
+          <AgentTable 
+            agents={agents} 
+            isLoading={isLoading}
+            selectedIds={selectedIds}
+            onSelectionChange={setSelectedIds}
+          />
         </TabsContent>
 
         <TabsContent value="regions">

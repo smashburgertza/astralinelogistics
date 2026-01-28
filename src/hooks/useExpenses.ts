@@ -589,3 +589,26 @@ export function useDeleteExpense() {
     },
   });
 }
+
+export function useBulkDeleteExpenses() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase
+        .from('expenses')
+        .delete()
+        .in('id', ids);
+      if (error) throw error;
+      return { count: ids.length };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      queryClient.invalidateQueries({ queryKey: ['expense-stats'] });
+      toast.success(`${data.count} expense(s) deleted`);
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to delete expenses: ' + error.message);
+    },
+  });
+}

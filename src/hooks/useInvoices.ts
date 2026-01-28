@@ -459,6 +459,45 @@ export function useRecordPayment() {
   });
 }
 
+export function useBulkDeleteInvoices() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      // Delete invoice items first
+      const { error: itemsError } = await supabase
+        .from('invoice_items')
+        .delete()
+        .in('invoice_id', ids);
+      if (itemsError) throw itemsError;
+
+      // Delete payments
+      const { error: paymentsError } = await supabase
+        .from('payments')
+        .delete()
+        .in('invoice_id', ids);
+      if (paymentsError) throw paymentsError;
+
+      // Delete invoices
+      const { error } = await supabase
+        .from('invoices')
+        .delete()
+        .in('id', ids);
+      if (error) throw error;
+
+      return { count: ids.length };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['invoice-payments'] });
+      toast.success(`${data.count} invoice(s) deleted`);
+    },
+    onError: (error) => {
+      toast.error(`Failed to delete invoices: ${error.message}`);
+    },
+  });
+}
+
 export const INVOICE_STATUSES = {
   pending: { label: 'Pending', color: 'bg-amber-100 text-amber-800' },
   paid: { label: 'Paid', color: 'bg-emerald-100 text-emerald-800' },
