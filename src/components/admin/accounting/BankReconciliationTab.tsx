@@ -32,7 +32,7 @@ import {
   useReconciliationSummary,
   BankTransaction
 } from '@/hooks/useBankReconciliation';
-import { ImportBankStatementDialog } from './ImportBankStatementDialog';
+
 
 export function BankReconciliationTab() {
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
@@ -191,12 +191,25 @@ export function BankReconciliationTab() {
         bankAccountId={selectedAccountId}
       />
 
-      {/* Import CSV Dialog */}
-      <ImportBankStatementDialog
-        open={showImportDialog}
-        onOpenChange={setShowImportDialog}
-        bankAccountId={selectedAccountId}
-      />
+      {/* Import CSV Dialog - Simple placeholder */}
+      <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Import Bank Statement</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 text-center text-muted-foreground">
+            <Upload className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p>CSV import feature coming soon.</p>
+            <p className="text-sm mt-2">For now, please add transactions manually.</p>
+          </div>
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={() => setShowImportDialog(false)}>
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
 
       {/* Match Dialog */}
       {selectedTransaction && selectedAccount && (
