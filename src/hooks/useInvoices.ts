@@ -266,7 +266,9 @@ export function useRecordPayment() {
           return Promise.all(updatePromises);
         } else if (params.depositAccountId && bankAccountBalanceMap[params.depositAccountId] !== undefined) {
           const currentBalance = bankAccountBalanceMap[params.depositAccountId];
-          const newBalance = currentBalance + (params.amount * balanceMultiplier);
+          // Use the actual payment amount in payment currency, not the invoice currency amount
+          const paymentAmount = params.amountInPaymentCurrency ?? params.amount;
+          const newBalance = currentBalance + (paymentAmount * balanceMultiplier);
           return supabase
             .from('bank_accounts')
             .update({ current_balance: newBalance })
