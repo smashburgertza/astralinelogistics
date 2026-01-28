@@ -1,4 +1,4 @@
-// Main hooks barrel export
+// Main hooks barrel export - v2
 // Organized by feature domain
 
 // Note: Individual feature folders provide organized access
