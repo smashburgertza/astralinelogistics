@@ -344,6 +344,7 @@ export function InvoiceTable({ invoices, isLoading, selectedIds = [], onSelectio
           recordPayment.mutate({
             invoiceId: details.invoiceId,
             amount: details.amount,
+            amountInPaymentCurrency: details.amountInPaymentCurrency,
             paymentMethod: details.paymentMethod,
             depositAccountId: details.depositAccountId,
             paymentCurrency: details.paymentCurrency,
