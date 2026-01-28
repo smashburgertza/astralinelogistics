@@ -56,6 +56,7 @@ export function useCreateServiceType() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['service-types'] });
+      queryClient.refetchQueries({ queryKey: ['service-types'] });
       toast.success('Service type created successfully');
     },
     onError: (error) => {
@@ -81,6 +82,7 @@ export function useUpdateServiceType() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['service-types'] });
+      queryClient.refetchQueries({ queryKey: ['service-types'] });
       toast.success('Service type updated successfully');
     },
     onError: (error) => {
@@ -104,6 +106,7 @@ export function useDeleteServiceType() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['service-types'] });
+      queryClient.refetchQueries({ queryKey: ['service-types'] });
       toast.success('Service type deleted');
     },
     onError: (error) => {

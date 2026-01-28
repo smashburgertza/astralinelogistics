@@ -38,7 +38,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Edit2, Trash2, Tag, GripVertical } from 'lucide-react';
+import { Plus, Edit2, Trash2, Tag, Loader2, AlertTriangle } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import {
   useServiceTypes,
   useCreateServiceType,
@@ -59,6 +60,8 @@ export function ServiceTypesManager() {
   const [editingType, setEditingType] = useState<ProductServiceType | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [typeToDelete, setTypeToDelete] = useState<ProductServiceType | null>(null);
+  const [usageCount, setUsageCount] = useState<number>(0);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -107,31 +110,55 @@ export function ServiceTypesManager() {
   const handleSubmit = async () => {
     if (!formData.name.trim() || !formData.slug.trim()) return;
 
-    if (editingType) {
-      await updateType.mutateAsync({ id: editingType.id, ...formData });
-    } else {
-      await createType.mutateAsync(formData);
+    try {
+      if (editingType) {
+        await updateType.mutateAsync({ id: editingType.id, ...formData });
+      } else {
+        await createType.mutateAsync(formData);
+      }
+      setDialogOpen(false);
+    } catch (error) {
+      // Error is handled by the mutation
     }
-
-    setDialogOpen(false);
   };
 
-  const handleDelete = (type: ProductServiceType) => {
+  const handleDelete = async (type: ProductServiceType) => {
+    // Check if type is in use
+    const { count } = await supabase
+      .from('products_services')
+      .select('*', { count: 'exact', head: true })
+      .eq('service_type', type.slug);
+
+    setUsageCount(count || 0);
     setTypeToDelete(type);
     setDeleteConfirmOpen(true);
   };
 
   const confirmDelete = async () => {
-    if (typeToDelete) {
+    if (!typeToDelete) return;
+
+    try {
       await deleteType.mutateAsync(typeToDelete.id);
+      // Only close on success
       setDeleteConfirmOpen(false);
       setTypeToDelete(null);
+      setUsageCount(0);
+    } catch (error) {
+      // Error toast is already shown by the mutation
+      // Keep dialog open so user sees something went wrong
     }
   };
 
   const handleToggleActive = async (type: ProductServiceType) => {
-    await updateType.mutateAsync({ id: type.id, is_active: !type.is_active });
+    setTogglingId(type.id);
+    try {
+      await updateType.mutateAsync({ id: type.id, is_active: !type.is_active });
+    } finally {
+      setTogglingId(null);
+    }
   };
+
+  const isSubmitting = createType.isPending || updateType.isPending;
 
   if (isLoading) {
     return (
@@ -210,10 +237,15 @@ export function ServiceTypesManager() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Switch
-                        checked={type.is_active}
-                        onCheckedChange={() => handleToggleActive(type)}
-                      />
+                      {togglingId === type.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Switch
+                          checked={type.is_active}
+                          onCheckedChange={() => handleToggleActive(type)}
+                          disabled={togglingId !== null}
+                        />
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
@@ -242,7 +274,7 @@ export function ServiceTypesManager() {
         </CardContent>
       </Card>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={dialogOpen} onOpenChange={(open) => !isSubmitting && setDialogOpen(open)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
@@ -256,6 +288,7 @@ export function ServiceTypesManager() {
                 value={formData.name}
                 onChange={(e) => handleNameChange(e.target.value)}
                 placeholder="e.g., Air Cargo"
+                disabled={isSubmitting}
               />
             </div>
 
@@ -265,6 +298,7 @@ export function ServiceTypesManager() {
                 value={formData.slug}
                 onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
                 placeholder="e.g., air_cargo"
+                disabled={isSubmitting}
               />
               <p className="text-xs text-muted-foreground">
                 Used internally for identification. Use lowercase with underscores.
@@ -278,6 +312,7 @@ export function ServiceTypesManager() {
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder="Brief description"
                 rows={2}
+                disabled={isSubmitting}
               />
             </div>
 
@@ -286,6 +321,7 @@ export function ServiceTypesManager() {
               <Select
                 value={formData.color_class}
                 onValueChange={(value) => setFormData({ ...formData, color_class: value })}
+                disabled={isSubmitting}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -315,6 +351,7 @@ export function ServiceTypesManager() {
                 value={formData.sort_order}
                 onChange={(e) => setFormData({ ...formData, sort_order: parseInt(e.target.value) || 0 })}
                 min={0}
+                disabled={isSubmitting}
               />
             </div>
 
@@ -323,17 +360,19 @@ export function ServiceTypesManager() {
               <Switch
                 checked={formData.is_active}
                 onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
+                disabled={isSubmitting}
               />
             </div>
 
             <div className="flex justify-end gap-2 pt-4">
-              <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={isSubmitting}>
                 Cancel
               </Button>
               <Button
                 onClick={handleSubmit}
-                disabled={!formData.name.trim() || !formData.slug.trim()}
+                disabled={!formData.name.trim() || !formData.slug.trim() || isSubmitting}
               >
+                {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 {editingType ? 'Update' : 'Create'}
               </Button>
             </div>
@@ -341,24 +380,37 @@ export function ServiceTypesManager() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={(open) => !deleteType.isPending && setDeleteConfirmOpen(open)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Service Type</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete "{typeToDelete?.name}"?
-              <span className="block mt-2">
-                Existing products/services using this type will not be affected but will show an unknown type.
-              </span>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>Are you sure you want to delete "{typeToDelete?.name}"?</p>
+                {usageCount > 0 && (
+                  <div className="flex items-start gap-2 p-3 bg-warning/10 border border-warning/30 rounded-md text-warning-foreground">
+                    <AlertTriangle className="h-5 w-5 flex-shrink-0 mt-0.5 text-warning" />
+                    <div>
+                      <p className="font-medium">{usageCount} product{usageCount !== 1 ? 's' : ''}/service{usageCount !== 1 ? 's' : ''} using this type</p>
+                      <p className="text-sm">They will show as "Unknown Type" after deletion.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteType.isPending}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={confirmDelete}
+              onClick={(e) => {
+                e.preventDefault();
+                confirmDelete();
+              }}
+              disabled={deleteType.isPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete
+              {deleteType.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {deleteType.isPending ? 'Deleting...' : 'Delete'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
