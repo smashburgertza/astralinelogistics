@@ -376,6 +376,7 @@ export function ParcelCheckoutScanner() {
     recordPayment.mutate({
       invoiceId: details.invoiceId,
       amount: details.amount,
+      amountInPaymentCurrency: details.amountInPaymentCurrency,
       paymentMethod: details.paymentMethod,
       depositAccountId: details.depositAccountId,
       paymentCurrency: details.paymentCurrency,
