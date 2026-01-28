@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Users, ShieldCheck, Shield, FileText, Settings2, Key } from 'lucide-react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,14 +9,22 @@ import { CreateEmployeeDialog } from '@/components/admin/CreateEmployeeDialog';
 import { AuditLogTable } from '@/components/admin/AuditLogTable';
 import { CustomRolesSection } from '@/components/admin/CustomRolesSection';
 import { PermissionTemplatesSection } from '@/components/admin/PermissionTemplatesSection';
-import { useEmployees } from '@/hooks/useEmployees';
+import { GenericBulkActionsBar } from '@/components/admin/shared/GenericBulkActionsBar';
+import { useEmployees, useBulkDeleteEmployees } from '@/hooks/useEmployees';
 
 export default function AdminEmployeesPage() {
   const { data: employees } = useEmployees();
+  const bulkDelete = useBulkDeleteEmployees();
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const totalEmployees = employees?.length || 0;
   const superAdmins = employees?.filter(e => e.role === 'super_admin').length || 0;
   const regularEmployees = employees?.filter(e => e.role === 'employee').length || 0;
+
+  const handleBulkDelete = async () => {
+    await bulkDelete.mutateAsync(selectedIds);
+    setSelectedIds([]);
+  };
 
   return (
     <AdminLayout title="Employee Management" subtitle="Manage internal staff and permissions">
@@ -64,8 +73,19 @@ export default function AdminEmployeesPage() {
                 <CardTitle>Staff Members</CardTitle>
                 <CreateEmployeeDialog />
               </CardHeader>
-              <CardContent>
-                <EmployeeTable />
+              <CardContent className="space-y-4">
+                <GenericBulkActionsBar
+                  selectedCount={selectedIds.length}
+                  onClearSelection={() => setSelectedIds([])}
+                  onDelete={handleBulkDelete}
+                  itemLabel="employee"
+                  isDeleting={bulkDelete.isPending}
+                  deleteWarning="This will remove their employee role. Their user account will remain active as a customer."
+                />
+                <EmployeeTable 
+                  selectedIds={selectedIds}
+                  onSelectionChange={setSelectedIds}
+                />
               </CardContent>
             </Card>
           </TabsContent>

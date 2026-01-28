@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { MoreHorizontal, FileText, Download, Eye, CheckCircle, XCircle, Clock, AlertCircle, Pencil } from 'lucide-react';
 import { Invoice, useUpdateInvoiceStatus, useRecordPayment, RecordPaymentParams } from '@/hooks/useInvoices';
 import { InvoiceStatusBadge } from './InvoiceStatusBadge';
@@ -20,9 +21,11 @@ import { useExchangeRatesMap } from '@/hooks/useExchangeRates';
 interface InvoiceTableProps {
   invoices?: Invoice[];
   isLoading: boolean;
+  selectedIds?: string[];
+  onSelectionChange?: (ids: string[]) => void;
 }
 
-export function InvoiceTable({ invoices, isLoading }: InvoiceTableProps) {
+export function InvoiceTable({ invoices, isLoading, selectedIds = [], onSelectionChange }: InvoiceTableProps) {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -34,6 +37,24 @@ export function InvoiceTable({ invoices, isLoading }: InvoiceTableProps) {
   const printRef = useRef<HTMLDivElement>(null);
   const { data: regions = [] } = useRegions();
   const { getRate } = useExchangeRatesMap();
+
+  const toggleSelection = (id: string) => {
+    if (!onSelectionChange) return;
+    if (selectedIds.includes(id)) {
+      onSelectionChange(selectedIds.filter(i => i !== id));
+    } else {
+      onSelectionChange([...selectedIds, id]);
+    }
+  };
+
+  const toggleAll = () => {
+    if (!onSelectionChange || !invoices) return;
+    if (selectedIds.length === invoices.length) {
+      onSelectionChange([]);
+    } else {
+      onSelectionChange(invoices.map(i => i.id));
+    }
+  };
 
   const formatTZS = (amount: number) => {
     return `TZS ${amount.toLocaleString('en-TZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -117,6 +138,14 @@ export function InvoiceTable({ invoices, isLoading }: InvoiceTableProps) {
         <Table>
           <TableHeader>
             <TableRow>
+              {onSelectionChange && (
+                <TableHead className="w-[40px]">
+                  <Checkbox 
+                    checked={invoices && invoices.length > 0 && selectedIds.length === invoices.length}
+                    onCheckedChange={toggleAll}
+                  />
+                </TableHead>
+              )}
               <TableHead>Invoice #</TableHead>
               <TableHead>Customer</TableHead>
               <TableHead>Shipment</TableHead>
@@ -146,6 +175,14 @@ export function InvoiceTable({ invoices, isLoading }: InvoiceTableProps) {
                   className="cursor-pointer hover:bg-muted/50"
                   onClick={() => handleViewInvoice(invoice)}
                 >
+                  {onSelectionChange && (
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Checkbox 
+                        checked={selectedIds.includes(invoice.id)}
+                        onCheckedChange={() => toggleSelection(invoice.id)}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell>
                     <span className="font-mono font-medium">{invoice.invoice_number}</span>
                   </TableCell>

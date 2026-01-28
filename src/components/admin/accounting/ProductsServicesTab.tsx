@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Table,
   TableBody,
@@ -34,12 +35,14 @@ import {
   useCreateProductService,
   useUpdateProductService,
   useDeleteProductService,
+  useBulkDeleteProductServices,
   UNIT_TYPES,
   ProductService,
 } from '@/hooks/useProductsServices';
 import { useServiceTypes } from '@/hooks/useServiceTypes';
 import { useChartOfAccounts } from '@/hooks/useAccounting';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
+import { GenericBulkActionsBar } from '@/components/admin/shared/GenericBulkActionsBar';
 
 export function ProductsServicesTab() {
   const { data: items, isLoading } = useProductsServices();
@@ -48,10 +51,12 @@ export function ProductsServicesTab() {
   const createItem = useCreateProductService();
   const updateItem = useUpdateProductService();
   const deleteItem = useDeleteProductService();
+  const bulkDelete = useBulkDeleteProductServices();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ProductService | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -147,6 +152,28 @@ export function ProductsServicesTab() {
         {serviceType.name}
       </Badge>
     );
+  };
+
+  const toggleSelection = (id: string) => {
+    if (selectedIds.includes(id)) {
+      setSelectedIds(selectedIds.filter(i => i !== id));
+    } else {
+      setSelectedIds([...selectedIds, id]);
+    }
+  };
+
+  const toggleAll = () => {
+    if (!filteredItems) return;
+    if (selectedIds.length === filteredItems.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredItems.map(i => i.id));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    await bulkDelete.mutateAsync(selectedIds);
+    setSelectedIds([]);
   };
 
   return (
@@ -335,7 +362,14 @@ export function ProductsServicesTab() {
           </Dialog>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        <GenericBulkActionsBar
+          selectedCount={selectedIds.length}
+          onClearSelection={() => setSelectedIds([])}
+          onDelete={handleBulkDelete}
+          itemLabel="service"
+          isDeleting={bulkDelete.isPending}
+        />
         {isLoading ? (
           <div className="text-center py-8 text-muted-foreground">Loading...</div>
         ) : filteredItems?.length === 0 ? (
@@ -346,6 +380,12 @@ export function ProductsServicesTab() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[40px]">
+                  <Checkbox 
+                    checked={filteredItems && filteredItems.length > 0 && selectedIds.length === filteredItems.length}
+                    onCheckedChange={toggleAll}
+                  />
+                </TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Unit Price</TableHead>
@@ -357,6 +397,12 @@ export function ProductsServicesTab() {
             <TableBody>
               {filteredItems?.map((item) => (
                 <TableRow key={item.id} className={!item.is_active ? 'opacity-50' : ''}>
+                  <TableCell>
+                    <Checkbox 
+                      checked={selectedIds.includes(item.id)}
+                      onCheckedChange={() => toggleSelection(item.id)}
+                    />
+                  </TableCell>
                   <TableCell>
                     <div>
                       <p className="font-medium">{item.name}</p>

@@ -45,9 +45,11 @@ import { AgentConfigDrawer } from './AgentConfigDrawer';
 interface AgentTableProps {
   agents: Agent[] | undefined;
   isLoading: boolean;
+  selectedIds?: string[];
+  onSelectionChange?: (ids: string[]) => void;
 }
 
-export function AgentTable({ agents, isLoading }: AgentTableProps) {
+export function AgentTable({ agents, isLoading, selectedIds = [], onSelectionChange }: AgentTableProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [agentToDelete, setAgentToDelete] = useState<Agent | null>(null);
   const [editRegionsAgent, setEditRegionsAgent] = useState<Agent | null>(null);
@@ -103,6 +105,24 @@ export function AgentTable({ agents, isLoading }: AgentTableProps) {
     return agent.region ? [agent.region] : [];
   };
 
+  const toggleSelection = (id: string) => {
+    if (!onSelectionChange) return;
+    if (selectedIds.includes(id)) {
+      onSelectionChange(selectedIds.filter(i => i !== id));
+    } else {
+      onSelectionChange([...selectedIds, id]);
+    }
+  };
+
+  const toggleAll = () => {
+    if (!onSelectionChange || !agents) return;
+    if (selectedIds.length === agents.length) {
+      onSelectionChange([]);
+    } else {
+      onSelectionChange(agents.map(a => a.user_id));
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="rounded-lg border bg-card">
@@ -152,6 +172,14 @@ export function AgentTable({ agents, isLoading }: AgentTableProps) {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50 hover:bg-muted/50">
+              {onSelectionChange && (
+                <TableHead className="w-[40px]">
+                  <Checkbox 
+                    checked={agents && agents.length > 0 && selectedIds.length === agents.length}
+                    onCheckedChange={toggleAll}
+                  />
+                </TableHead>
+              )}
               <TableHead className="font-semibold">ID</TableHead>
               <TableHead className="font-semibold">Contact Person</TableHead>
               <TableHead className="font-semibold">Company</TableHead>
@@ -167,6 +195,14 @@ export function AgentTable({ agents, isLoading }: AgentTableProps) {
               
               return (
                 <TableRow key={agent.id}>
+                  {onSelectionChange && (
+                    <TableCell>
+                      <Checkbox 
+                        checked={selectedIds.includes(agent.user_id)}
+                        onCheckedChange={() => toggleSelection(agent.user_id)}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell>
                     <Badge variant="outline" className="font-mono text-xs">
                       {agent.profile?.agent_code || '-'}

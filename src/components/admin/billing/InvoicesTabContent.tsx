@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { InvoiceFilters, InvoiceTable, CreateInvoiceDialog } from '@/components/admin/invoices';
-import { useInvoices } from '@/hooks/useInvoices';
+import { useInvoices, useBulkDeleteInvoices } from '@/hooks/useInvoices';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useExchangeRates, convertToTZS } from '@/hooks/useExchangeRates';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Coins } from 'lucide-react';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { GenericBulkActionsBar } from '@/components/admin/shared/GenericBulkActionsBar';
 
 const CHART_COLORS = ['#10B981', '#3B82F6', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4'];
 
@@ -35,8 +36,10 @@ const CurrencyTooltip = ({ active, payload }: any) => {
 export function InvoicesTabContent() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const debouncedSearch = useDebounce(search, 300);
+  const bulkDelete = useBulkDeleteInvoices();
 
   const filters = useMemo(() => ({
     search: debouncedSearch,
@@ -94,6 +97,11 @@ export function InvoicesTabContent() {
   const pendingAmount = filteredInvoices.filter(i => i.status === 'pending').reduce((sum, inv) => sum + getAmountInTzs(inv), 0);
   const overdueAmount = filteredInvoices.filter(i => i.status === 'overdue').reduce((sum, inv) => sum + getAmountInTzs(inv), 0);
 
+  const handleBulkDelete = async () => {
+    await bulkDelete.mutateAsync(selectedIds);
+    setSelectedIds([]);
+  };
+
   return (
     <>
       {/* Header with Action */}
@@ -108,6 +116,16 @@ export function InvoicesTabContent() {
         onSearchChange={setSearch}
         onStatusChange={setStatus}
         onClear={clearFilters}
+      />
+
+      {/* Bulk Actions */}
+      <GenericBulkActionsBar
+        selectedCount={selectedIds.length}
+        onClearSelection={() => setSelectedIds([])}
+        onDelete={handleBulkDelete}
+        itemLabel="invoice"
+        isDeleting={bulkDelete.isPending}
+        deleteWarning="This will permanently delete the selected invoices and their associated items and payments."
       />
 
       {/* Stats Summary */}
@@ -216,7 +234,12 @@ export function InvoicesTabContent() {
       )}
 
       {/* Table */}
-      <InvoiceTable invoices={filteredInvoices} isLoading={isLoading} />
+      <InvoiceTable 
+        invoices={filteredInvoices} 
+        isLoading={isLoading}
+        selectedIds={selectedIds}
+        onSelectionChange={setSelectedIds}
+      />
     </>
   );
 }
