@@ -4,11 +4,13 @@ import { CustomerFilters } from '@/components/admin/CustomerFilters';
 import { CustomerTable } from '@/components/admin/CustomerTable';
 import { CustomerDialog } from '@/components/admin/CustomerDialog';
 import { BulkCustomerImport } from '@/components/admin/BulkCustomerImport';
-import { useCustomersList } from '@/hooks/useCustomers';
+import { GenericBulkActionsBar } from '@/components/admin/shared/GenericBulkActionsBar';
+import { useCustomersList, useBulkDeleteCustomers } from '@/hooks/useCustomers';
 import { useDebounce } from '@/hooks/useDebounce';
 
 export default function AdminCustomersPage() {
   const [search, setSearch] = useState('');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const debouncedSearch = useDebounce(search, 300);
 
@@ -17,9 +19,15 @@ export default function AdminCustomersPage() {
   }), [debouncedSearch]);
 
   const { data: customers, isLoading } = useCustomersList(filters);
+  const bulkDelete = useBulkDeleteCustomers();
 
   const clearFilters = () => {
     setSearch('');
+  };
+
+  const handleBulkDelete = async () => {
+    await bulkDelete.mutateAsync(selectedIds);
+    setSelectedIds([]);
   };
 
   return (
@@ -30,6 +38,16 @@ export default function AdminCustomersPage() {
           <BulkCustomerImport />
           <CustomerDialog />
         </div>
+
+        {/* Bulk Actions Bar */}
+        <GenericBulkActionsBar
+          selectedCount={selectedIds.length}
+          onClearSelection={() => setSelectedIds([])}
+          onDelete={handleBulkDelete}
+          itemLabel="customer"
+          isDeleting={bulkDelete.isPending}
+          deleteWarning="This will permanently delete the selected customers. Related shipments and invoices may be affected."
+        />
 
         {/* Filters */}
         <CustomerFilters
@@ -56,7 +74,12 @@ export default function AdminCustomersPage() {
         </div>
 
         {/* Table */}
-        <CustomerTable customers={customers} isLoading={isLoading} />
+        <CustomerTable 
+          customers={customers} 
+          isLoading={isLoading}
+          selectedIds={selectedIds}
+          onSelectionChange={setSelectedIds}
+        />
       </div>
     </AdminLayout>
   );

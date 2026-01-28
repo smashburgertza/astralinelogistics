@@ -139,3 +139,26 @@ export function useDeleteProductService() {
     },
   });
 }
+
+export function useBulkDeleteProductServices() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase
+        .from('products_services')
+        .delete()
+        .in('id', ids);
+
+      if (error) throw error;
+      return { count: ids.length };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['products-services'] });
+      toast.success(`${data.count} product/service(s) deleted`);
+    },
+    onError: (error) => {
+      toast.error(`Failed to delete: ${error.message}`);
+    },
+  });
+}

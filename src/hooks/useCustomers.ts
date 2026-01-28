@@ -259,3 +259,25 @@ export function useDeleteCustomer() {
     },
   });
 }
+
+export function useBulkDeleteCustomers() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase
+        .from('customers')
+        .delete()
+        .in('id', ids);
+      if (error) throw error;
+      return { count: ids.length };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      toast.success(`${data.count} customer(s) deleted successfully`);
+    },
+    onError: (error) => {
+      toast.error(`Failed to delete customers: ${error.message}`);
+    },
+  });
+}

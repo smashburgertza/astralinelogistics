@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +25,8 @@ import { OrderRequestDrawer } from './OrderRequestDrawer';
 interface OrderRequestTableProps {
   orders: OrderRequest[] | undefined;
   isLoading: boolean;
+  selectedIds?: string[];
+  onSelectionChange?: (ids: string[]) => void;
 }
 
 const ORDER_STATUSES: Record<string, { label: string; color: string }> = {
@@ -35,7 +38,7 @@ const ORDER_STATUSES: Record<string, { label: string; color: string }> = {
   cancelled: { label: 'Cancelled', color: 'bg-red-100 text-red-800 border-red-300' },
 };
 
-export function OrderRequestTable({ orders, isLoading }: OrderRequestTableProps) {
+export function OrderRequestTable({ orders, isLoading, selectedIds = [], onSelectionChange }: OrderRequestTableProps) {
   const [selectedOrder, setSelectedOrder] = useState<OrderRequest | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -43,6 +46,26 @@ export function OrderRequestTable({ orders, isLoading }: OrderRequestTableProps)
     setSelectedOrder(order);
     setDrawerOpen(true);
   };
+
+  const toggleSelection = (id: string) => {
+    if (!onSelectionChange) return;
+    if (selectedIds.includes(id)) {
+      onSelectionChange(selectedIds.filter(i => i !== id));
+    } else {
+      onSelectionChange([...selectedIds, id]);
+    }
+  };
+
+  const toggleAll = () => {
+    if (!onSelectionChange || !orders) return;
+    if (selectedIds.length === orders.length) {
+      onSelectionChange([]);
+    } else {
+      onSelectionChange(orders.map(o => o.id));
+    }
+  };
+
+  const showCheckbox = !!onSelectionChange;
 
   if (isLoading) {
     return (
@@ -68,6 +91,14 @@ export function OrderRequestTable({ orders, isLoading }: OrderRequestTableProps)
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
+              {showCheckbox && (
+                <TableHead className="w-[40px]">
+                  <Checkbox
+                    checked={orders.length > 0 && selectedIds.length === orders.length}
+                    onCheckedChange={toggleAll}
+                  />
+                </TableHead>
+              )}
               <TableHead>Customer</TableHead>
               <TableHead>Contact</TableHead>
               <TableHead className="text-right">Total</TableHead>
@@ -86,6 +117,14 @@ export function OrderRequestTable({ orders, isLoading }: OrderRequestTableProps)
                   className="cursor-pointer hover:bg-muted/50"
                   onClick={() => handleViewOrder(order)}
                 >
+                  {showCheckbox && (
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selectedIds.includes(order.id)}
+                        onCheckedChange={() => toggleSelection(order.id)}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell>
                     <div>
                       <p className="font-medium">{order.customer_name}</p>
