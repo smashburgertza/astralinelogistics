@@ -34,6 +34,7 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { InvoiceStatusBadge } from "./InvoiceStatusBadge";
 import { CreateAgentCargoInvoiceDialog } from "./CreateAgentCargoInvoiceDialog";
+import { CreateAgentInvoiceDialog } from "./CreateAgentInvoiceDialog";
 import { InvoiceDetailDialog } from "./InvoiceDetailDialog";
 import { EditB2BInvoiceDialog } from "./EditB2BInvoiceDialog";
 import { RecordPaymentDialog, PaymentDetails } from "./RecordPaymentDialog";
@@ -106,6 +107,7 @@ export function B2BInvoices() {
   const [invoiceToEdit, setInvoiceToEdit] = useState<B2BInvoice | null>(null);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [invoiceForPayment, setInvoiceForPayment] = useState<B2BInvoice | null>(null);
+  const [createFromAgentDialogOpen, setCreateFromAgentDialogOpen] = useState(false);
   const queryClient = useQueryClient();
   const { data: exchangeRates } = useExchangeRates();
   const recordPayment = useRecordPayment();
@@ -532,11 +534,17 @@ export function B2BInvoices() {
             </TabsList>
 
             <TabsContent value="from_agents" className="mt-4">
-              <div className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
-                <p className="text-sm text-red-800 dark:text-red-200">
-                  <strong>Invoices FROM Agents:</strong> Auto-generated when agents upload customer shipments. 
-                  Astraline owes agents for shipping their customers' cargo.
-                </p>
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 flex-1 mr-4">
+                  <p className="text-sm text-red-800 dark:text-red-200">
+                    <strong>Invoices FROM Agents:</strong> Auto-generated when agents upload customer shipments. 
+                    Astraline owes agents for shipping their customers' cargo.
+                  </p>
+                </div>
+                <Button onClick={() => setCreateFromAgentDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Agent Invoice
+                </Button>
               </div>
               {isLoading ? (
                 <div className="text-center py-8 text-muted-foreground">Loading...</div>
@@ -678,6 +686,12 @@ export function B2BInvoices() {
         remainingBalance={invoiceForPaymentBalance}
         isOutgoingPayment={true}
         payeeName={invoiceForPayment?.company_name || invoiceForPayment?.agent_name || 'Agent'}
+      />
+
+      {/* Create Agent Invoice Dialog (From Agent) */}
+      <CreateAgentInvoiceDialog
+        open={createFromAgentDialogOpen}
+        onOpenChange={setCreateFromAgentDialogOpen}
       />
     </div>
   );
