@@ -5,3 +5,4 @@ export { NotificationDropdown } from '../NotificationDropdown';
 export { LiveActivityFeed } from '../LiveActivityFeed';
 export { ConversionAnalytics } from '../ConversionAnalytics';
 export { RoleBasedWidgets } from '../RoleBasedWidgets';
+export { GenericBulkActionsBar } from './GenericBulkActionsBar';

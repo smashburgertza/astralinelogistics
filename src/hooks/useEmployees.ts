@@ -261,6 +261,35 @@ export function useDeleteEmployee() {
   });
 }
 
+export function useBulkDeleteEmployees() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (userIds: string[]) => {
+      // Demote all to customer role
+      const { error } = await supabase
+        .from('user_roles')
+        .update({
+          role: 'customer',
+          employee_role: null,
+          permissions: null,
+        })
+        .in('user_id', userIds)
+        .in('role', ['employee', 'super_admin']);
+
+      if (error) throw error;
+      return { count: userIds.length };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      toast.success(`${data.count} employee(s) removed successfully`);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to remove employees');
+    },
+  });
+}
+
 // Hook to fetch all profiles for displaying names
 export function useProfiles() {
   return useQuery({

@@ -347,6 +347,37 @@ export function useDeleteAgent() {
   });
 }
 
+export function useBulkDeleteAgents() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (userIds: string[]) => {
+      // Delete agent_regions first
+      await supabase
+        .from('agent_regions')
+        .delete()
+        .in('user_id', userIds);
+
+      // Change their roles back to customer
+      const { error } = await supabase
+        .from('user_roles')
+        .update({ role: 'customer', region: null })
+        .in('user_id', userIds)
+        .eq('role', 'agent');
+
+      if (error) throw error;
+      return { count: userIds.length };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+      toast.success(`${data.count} agent(s) removed successfully`);
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to remove agents: ${error.message}`);
+    },
+  });
+}
+
 // Hook for agents to check their own settings
 export function useAgentSettings() {
   return useQuery({

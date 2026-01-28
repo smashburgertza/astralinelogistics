@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { OrderRequestTable } from '@/components/admin/OrderRequestTable';
-import { useOrderRequests } from '@/hooks/useOrderRequests';
+import { GenericBulkActionsBar } from '@/components/admin/shared/GenericBulkActionsBar';
+import { useOrderRequests, useBulkDeleteOrders } from '@/hooks/useOrderRequests';
 import { ShoppingCart, Clock, CheckCircle, XCircle, Filter, Search, X, Package, Car, Sparkles, Cpu, Cog } from 'lucide-react';
 import {
   Select,
@@ -37,8 +38,10 @@ export default function AdminOrderRequestsPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const debouncedSearch = useDebounce(searchQuery, 300);
   const { data: orders, isLoading } = useOrderRequests();
+  const bulkDelete = useBulkDeleteOrders();
 
   const filteredOrders = useMemo(() => {
     if (!orders) return [];
@@ -82,6 +85,11 @@ export default function AdminOrderRequestsPage() {
     setSearchQuery('');
   };
 
+  const handleBulkDelete = async () => {
+    await bulkDelete.mutateAsync(selectedIds);
+    setSelectedIds([]);
+  };
+
   return (
     <AdminLayout 
       title="Shop For Me Orders" 
@@ -119,6 +127,16 @@ export default function AdminOrderRequestsPage() {
             <div className="text-2xl font-bold text-red-600">{stats.cancelled}</div>
           </div>
         </div>
+
+        {/* Bulk Actions Bar */}
+        <GenericBulkActionsBar
+          selectedCount={selectedIds.length}
+          onClearSelection={() => setSelectedIds([])}
+          onDelete={handleBulkDelete}
+          itemLabel="order"
+          isDeleting={bulkDelete.isPending}
+          deleteWarning="This will permanently delete the selected orders and all their items. This action cannot be undone."
+        />
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
@@ -185,7 +203,12 @@ export default function AdminOrderRequestsPage() {
         </div>
 
         {/* Table */}
-        <OrderRequestTable orders={filteredOrders} isLoading={isLoading} />
+        <OrderRequestTable 
+          orders={filteredOrders} 
+          isLoading={isLoading}
+          selectedIds={selectedIds}
+          onSelectionChange={setSelectedIds}
+        />
       </div>
     </AdminLayout>
   );

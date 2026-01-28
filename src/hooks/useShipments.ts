@@ -209,6 +209,32 @@ export function useBulkUpdateShipmentStatus() {
   });
 }
 
+export function useBulkDeleteShipments() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      // Delete related parcels first
+      await supabase.from('parcels').delete().in('shipment_id', ids);
+      // Unlink invoices (set shipment_id to null)
+      await supabase.from('invoices').update({ shipment_id: null }).in('shipment_id', ids);
+      // Delete shipments
+      const { error } = await supabase.from('shipments').delete().in('id', ids);
+      if (error) throw error;
+      return { count: ids.length };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['shipments'] });
+      queryClient.invalidateQueries({ queryKey: ['agent-shipments'] });
+      queryClient.invalidateQueries({ queryKey: ['parcels'] });
+      toast.success(`${data.count} shipment(s) deleted successfully`);
+    },
+    onError: (error) => {
+      toast.error(`Failed to delete shipments: ${error.message}`);
+    },
+  });
+}
+
 export function useCustomers() {
   return useQuery({
     queryKey: ['customers'],

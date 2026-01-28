@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,9 +15,11 @@ import { format } from 'date-fns';
 interface CustomerTableProps {
   customers?: Customer[];
   isLoading: boolean;
+  selectedIds?: string[];
+  onSelectionChange?: (ids: string[]) => void;
 }
 
-export function CustomerTable({ customers, isLoading }: CustomerTableProps) {
+export function CustomerTable({ customers, isLoading, selectedIds = [], onSelectionChange }: CustomerTableProps) {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -41,12 +44,33 @@ export function CustomerTable({ customers, isLoading }: CustomerTableProps) {
     }
   };
 
+  const toggleSelection = (id: string) => {
+    if (!onSelectionChange) return;
+    if (selectedIds.includes(id)) {
+      onSelectionChange(selectedIds.filter(i => i !== id));
+    } else {
+      onSelectionChange([...selectedIds, id]);
+    }
+  };
+
+  const toggleAll = () => {
+    if (!onSelectionChange || !customers) return;
+    if (selectedIds.length === customers.length) {
+      onSelectionChange([]);
+    } else {
+      onSelectionChange(customers.map(c => c.id));
+    }
+  };
+
+  const showCheckbox = !!onSelectionChange;
+
   if (isLoading) {
     return (
       <div className="rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
+              {showCheckbox && <TableHead className="w-[40px]" />}
               <TableHead>Customer ID</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Contact</TableHead>
@@ -58,6 +82,7 @@ export function CustomerTable({ customers, isLoading }: CustomerTableProps) {
           <TableBody>
             {[...Array(5)].map((_, i) => (
               <TableRow key={i}>
+                {showCheckbox && <TableCell><Skeleton className="h-4 w-4" /></TableCell>}
                 <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-40" /></TableCell>
@@ -88,6 +113,14 @@ export function CustomerTable({ customers, isLoading }: CustomerTableProps) {
         <Table>
           <TableHeader>
             <TableRow>
+              {showCheckbox && (
+                <TableHead className="w-[40px]">
+                  <Checkbox
+                    checked={customers.length > 0 && selectedIds.length === customers.length}
+                    onCheckedChange={toggleAll}
+                  />
+                </TableHead>
+              )}
               <TableHead>Customer ID</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Contact</TableHead>
@@ -107,6 +140,14 @@ export function CustomerTable({ customers, isLoading }: CustomerTableProps) {
                   className="cursor-pointer hover:bg-muted/50"
                   onClick={() => handleViewDetails(customer)}
                 >
+                  {showCheckbox && (
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selectedIds.includes(customer.id)}
+                        onCheckedChange={() => toggleSelection(customer.id)}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell>
                     <span className="font-mono text-sm font-medium text-primary">{customerCode || '—'}</span>
                   </TableCell>

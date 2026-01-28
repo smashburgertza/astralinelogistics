@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export interface OrderRequest {
   id: string;
@@ -84,6 +85,38 @@ export function useUpdateOrderStatus() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['order_requests'] });
+    },
+  });
+}
+
+export function useBulkDeleteOrders() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      // Delete related order_items first
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .delete()
+        .in('order_request_id', ids);
+      
+      if (itemsError) throw itemsError;
+      
+      // Delete order_requests
+      const { error } = await supabase
+        .from('order_requests')
+        .delete()
+        .in('id', ids);
+      
+      if (error) throw error;
+      return { count: ids.length };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['order_requests'] });
+      toast.success(`${data.count} order(s) deleted successfully`);
+    },
+    onError: (error) => {
+      toast.error(`Failed to delete orders: ${error.message}`);
     },
   });
 }

@@ -9,14 +9,24 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Package, Plane, MapPin, CheckCircle, Loader2, X, Printer } from 'lucide-react';
-import { useBulkUpdateShipmentStatus } from '@/hooks/useShipments';
+import { Package, Plane, MapPin, CheckCircle, Loader2, X, Printer, Trash2 } from 'lucide-react';
+import { useBulkUpdateShipmentStatus, useBulkDeleteShipments } from '@/hooks/useShipments';
 import { SHIPMENT_STATUSES } from '@/lib/constants';
 import { BulkPrintLabelsDialog } from './BulkPrintLabelsDialog';
 
@@ -29,8 +39,10 @@ interface BulkActionsBarProps {
 export function BulkActionsBar({ selectedCount, onClearSelection, selectedIds }: BulkActionsBarProps) {
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<string>('');
   const bulkUpdate = useBulkUpdateShipmentStatus();
+  const bulkDelete = useBulkDeleteShipments();
 
   const handleBulkUpdate = () => {
     if (!selectedStatus) return;
@@ -45,6 +57,16 @@ export function BulkActionsBar({ selectedCount, onClearSelection, selectedIds }:
         },
       }
     );
+  };
+
+  const handleBulkDelete = async () => {
+    try {
+      await bulkDelete.mutateAsync(selectedIds);
+      setDeleteDialogOpen(false);
+      onClearSelection();
+    } catch (error) {
+      // Error handled by mutation
+    }
   };
 
   const statusIcons = {
@@ -91,6 +113,15 @@ export function BulkActionsBar({ selectedCount, onClearSelection, selectedIds }:
             onClick={() => setStatusDialogOpen(true)}
           >
             Update Status
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setDeleteDialogOpen(true)}
+            className="gap-2"
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete
           </Button>
         </div>
       </div>
@@ -146,6 +177,35 @@ export function BulkActionsBar({ selectedCount, onClearSelection, selectedIds }:
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedCount} shipment{selectedCount !== 1 ? 's' : ''}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. All related parcels will also be deleted, and any linked invoices will be unlinked.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkDelete.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              disabled={bulkDelete.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {bulkDelete.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                `Delete ${selectedCount} Shipment${selectedCount !== 1 ? 's' : ''}`
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Print Labels Dialog */}
       <BulkPrintLabelsDialog
