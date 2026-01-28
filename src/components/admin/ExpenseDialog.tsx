@@ -28,7 +28,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Loader2, Send, Upload, X, FileText } from 'lucide-react';
-import { Expense, EXPENSE_CATEGORIES, useCreateExpense, useUpdateExpense } from '@/hooks/useExpenses';
+import { Expense, useCreateExpense, useUpdateExpense } from '@/hooks/useExpenses';
+import { useExpenseCategories } from '@/hooks/useExpenseCategories';
 import { useExpenseApprovers } from '@/hooks/useEmployees';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useActiveRegions } from '@/hooks/useRegions';
@@ -69,6 +70,7 @@ export function ExpenseDialog({
 }: ExpenseDialogProps) {
   const createExpense = useCreateExpense();
   const updateExpense = useUpdateExpense();
+  const { data: categories = [] } = useExpenseCategories();
   const { data: approvers = [], isLoading: approversLoading } = useExpenseApprovers();
   const { data: currencies = [] } = useExchangeRates();
   const { data: regions = [] } = useActiveRegions();
@@ -228,10 +230,23 @@ export function ExpenseDialog({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {EXPENSE_CATEGORIES.map((cat) => (
-                        <SelectItem key={cat.value} value={cat.value}>
-                          {cat.label}
-                        </SelectItem>
+                      {categories.map((cat) => (
+                        cat.children && cat.children.length > 0 ? (
+                          <div key={cat.id}>
+                            <SelectItem value={cat.slug} className="font-semibold">
+                              {cat.name}
+                            </SelectItem>
+                            {cat.children.map((sub) => (
+                              <SelectItem key={sub.id} value={sub.slug} className="pl-6">
+                                ↳ {sub.name}
+                              </SelectItem>
+                            ))}
+                          </div>
+                        ) : (
+                          <SelectItem key={cat.id} value={cat.slug}>
+                            {cat.name}
+                          </SelectItem>
+                        )
                       ))}
                     </SelectContent>
                   </Select>

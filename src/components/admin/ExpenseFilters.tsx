@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { format } from 'date-fns';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -16,7 +15,8 @@ import {
 } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Search, X, CalendarIcon } from 'lucide-react';
-import { EXPENSE_CATEGORIES, EXPENSE_STATUSES } from '@/hooks/useExpenses';
+import { EXPENSE_STATUSES } from '@/hooks/useExpenses';
+import { useExpenseCategories } from '@/hooks/useExpenseCategories';
 import { useActiveRegions } from '@/hooks/useRegions';
 import { cn } from '@/lib/utils';
 
@@ -52,6 +52,7 @@ export function ExpenseFilters({
   onClear,
 }: ExpenseFiltersProps) {
   const { data: regions } = useActiveRegions();
+  const { data: categories = [] } = useExpenseCategories();
   const hasFilters = search || category !== 'all' || region !== 'all' || (status && status !== 'all') || dateFrom || dateTo;
 
   return (
@@ -73,10 +74,23 @@ export function ExpenseFilters({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
-            {EXPENSE_CATEGORIES.map((cat) => (
-              <SelectItem key={cat.value} value={cat.value}>
-                {cat.label}
-              </SelectItem>
+            {categories.map((cat) => (
+              cat.children && cat.children.length > 0 ? (
+                <div key={cat.id}>
+                  <SelectItem value={cat.slug} className="font-semibold">
+                    {cat.name}
+                  </SelectItem>
+                  {cat.children.map((sub) => (
+                    <SelectItem key={sub.id} value={sub.slug} className="pl-6">
+                      ↳ {sub.name}
+                    </SelectItem>
+                  ))}
+                </div>
+              ) : (
+                <SelectItem key={cat.id} value={cat.slug}>
+                  {cat.name}
+                </SelectItem>
+              )
             ))}
           </SelectContent>
         </Select>
