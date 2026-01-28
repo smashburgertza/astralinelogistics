@@ -1,40 +1,102 @@
 
-# Remove Accounting Module - COMPLETED
+
+# Reset All Transactional Data - Database Migration
 
 ## Summary
 
-The accounting module has been simplified. Double-entry bookkeeping (journal entries, chart of accounts, fiscal periods, tax rates) has been removed while keeping full functionality for invoices, estimates, bank accounts, expenses, and payments.
+Execute a database migration to delete all transactional data and reset bank balances for fresh testing.
 
-## What Changed
+## Current Data to Delete
 
-### Deleted
-- `src/lib/journalEntryUtils.ts` - All journal entry creation utilities
+| Table | Count | Action |
+|-------|-------|--------|
+| invoices | 1 | DELETE |
+| invoice_items | 0 | Already empty |
+| payments | 1 | DELETE |
+| expenses | 1 | DELETE |
+| notifications | 2 | DELETE |
+| audit_logs | 1 | DELETE |
+| journal_entries | 3 | DELETE (legacy) |
+| journal_lines | 7 | DELETE (legacy) |
+| All other transactional tables | 0 | Already empty |
 
-### Simplified Hooks
-- `src/hooks/useAccounting.ts` - Now only contains bank account hooks (read current_balance directly)
-- `src/hooks/useInvoices.ts` - Removed journal entry creation, payments update bank balance directly
-- `src/hooks/useExpenses.ts` - Removed journal entry creation, approval updates bank balance directly
-- `src/hooks/useAgentInvoices.ts` - Removed journal entry creation, verification updates bank balance directly
+## SQL Migration to Execute
 
-### Updated Components
-- `src/pages/admin/Approvals.tsx` - Removed TransactionApprovals (journal-based)
-- `src/components/admin/CreateAgentCargoInvoiceDialog.tsx` - Removed journal entry creation
-- `src/components/agent/ShipmentUploadForm.tsx` - Removed journal entry creation
+```sql
+-- Delete all transactional data (child tables first, respecting foreign keys)
 
-## How It Works Now
+-- 1. Delete invoice-related child tables
+DELETE FROM invoice_items;
+DELETE FROM payments;
+DELETE FROM commissions;
 
-| Action | Before | After |
-|--------|--------|-------|
-| Payment received | Creates journal entry + calculates balance | Updates `bank_accounts.current_balance` directly |
-| Expense approved | Creates journal entry + calculates balance | Updates `bank_accounts.current_balance` directly |
-| Invoice created | Creates journal entry (AR/Revenue) | Just creates invoice |
-| Bank balance | Calculated from journal_lines | Read from `current_balance` column |
+-- 2. Delete approval requests
+DELETE FROM approval_requests;
 
-## Database Tables (Can be cleaned up later)
-These tables are no longer used but remain in the database:
-- `chart_of_accounts`
-- `journal_entries`
-- `journal_lines`
-- `fiscal_periods`
-- `tax_rates`
-- `account_balances`
+-- 3. Delete shipment-related tables
+DELETE FROM parcels;
+DELETE FROM shipment_cost_allocations;
+
+-- 4. Delete batch-related tables
+DELETE FROM batch_costs;
+
+-- 5. Delete settlement-related tables
+DELETE FROM settlement_items;
+DELETE FROM settlements;
+
+-- 6. Delete payroll-related tables
+DELETE FROM payroll_items;
+DELETE FROM payroll_runs;
+DELETE FROM salary_advances;
+
+-- 7. Delete order-related tables
+DELETE FROM order_items;
+DELETE FROM order_requests;
+
+-- 8. Delete legacy journal entries
+DELETE FROM journal_lines;
+DELETE FROM journal_entries;
+DELETE FROM account_balances;
+
+-- 9. Delete parent tables
+DELETE FROM invoices;
+DELETE FROM estimates;
+DELETE FROM expenses;
+DELETE FROM shipments;
+DELETE FROM cargo_batches;
+
+-- 10. Delete other transactional data
+DELETE FROM notifications;
+DELETE FROM audit_logs;
+DELETE FROM employee_badges;
+DELETE FROM employee_milestones;
+DELETE FROM teaser_conversion_events;
+DELETE FROM contact_submissions;
+DELETE FROM bank_transactions;
+
+-- 11. Reset bank account balances to 0
+UPDATE bank_accounts SET current_balance = 0;
+
+-- 12. Reset document counters (keep customer/employee/agent counters)
+UPDATE document_counters 
+SET counter_value = 0 
+WHERE counter_key NOT IN ('customer', 'employee', 'agent');
+```
+
+## After Reset
+
+Your system will have:
+- All invoices, estimates, payments, expenses deleted
+- All shipments, parcels, notifications cleared
+- Bank accounts with $0 balance
+- Fresh document numbers starting from 0001
+- All customers, agents, employees, and settings preserved
+
+## Technical Details
+
+The migration executes deletions in foreign key-safe order:
+1. Child tables first (invoice_items, payments, etc.)
+2. Parent tables after (invoices, shipments, etc.)
+3. Bank balance reset
+4. Document counter reset
+
