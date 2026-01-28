@@ -2,8 +2,8 @@ import { ReactNode, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, PackageSearch, UsersRound, FileStack, Wallet,
-  ChartSpline, Settings2, LogOut, ChevronDown, UserCircle2,
-  Container, UserCog, TrendingUp, ShoppingCart, FileText, User, Calculator, BarChart3, PiggyBank, ClipboardCheck
+  Settings2, LogOut, ChevronDown, UserCircle2,
+  Container, UserCog, TrendingUp, ShoppingCart, FileText, User, PiggyBank, ClipboardCheck
 } from 'lucide-react';
 import astralineLogo from '@/assets/astraline-logo-horizontal.svg';
 import { Button } from '@/components/ui/button';
@@ -65,11 +65,9 @@ const mainNavItems: NavItem[] = [
 ];
 
 const financeNavItems: NavItem[] = [
-  { label: 'Accounting', href: '/admin/accounting', icon: Calculator, permission: 'view_reports' },
-  { label: 'Analytics', href: '/admin/analytics', icon: BarChart3, permission: 'view_reports' },
+  { label: 'Bank Accounts', href: '/admin/bank-accounts', icon: PiggyBank, permission: 'view_reports' },
   { label: 'B2B Agent', href: '/admin/settlements', icon: TrendingUp, permission: 'manage_invoices', countKey: 'settlements' },
   { label: 'Expenses', href: '/admin/expenses', icon: Wallet, permission: 'manage_expenses', countKey: 'expenses' },
-  { label: 'Commissions', href: '/admin/commissions', icon: TrendingUp, permission: 'view_reports' },
   { label: 'Payroll', href: '/admin/payroll', icon: PiggyBank, permission: 'manage_settings' },
 ];
 

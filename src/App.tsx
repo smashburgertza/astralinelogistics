@@ -45,8 +45,7 @@ const AdminEmployeesPage = lazy(() => import("./pages/admin/Employees"));
 const AdminSettingsPage = lazy(() => import("./pages/admin/Settings"));
 const AdminCommissionsPage = lazy(() => import("./pages/admin/Commissions"));
 const AdminEmployeeDashboard = lazy(() => import("./pages/admin/EmployeeDashboard"));
-const AdminAccountingPage = lazy(() => import("./pages/admin/Accounting"));
-const AdminAnalyticsPage = lazy(() => import("./pages/admin/Analytics"));
+const AdminBankAccountsPage = lazy(() => import("./pages/admin/BankAccounts"));
 const AdminProfilePage = lazy(() => import("./pages/admin/Profile"));
 const AdminNotificationsPage = lazy(() => import("./pages/admin/Notifications"));
 const AdminPayrollPage = lazy(() => import("./pages/admin/Payroll"));
@@ -126,9 +125,8 @@ const App = () => (
             {/* Expenses - requires manage_expenses */}
             <Route path="/admin/expenses" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="manage_expenses"><AdminExpensesPage /></PermissionGate></Suspense>} />
             
-            {/* Reports & Analytics - requires view_reports */}
-            <Route path="/admin/accounting" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="view_reports"><AdminAccountingPage /></PermissionGate></Suspense>} />
-            <Route path="/admin/analytics" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="view_reports"><AdminAnalyticsPage /></PermissionGate></Suspense>} />
+            {/* Finance - requires view_reports */}
+            <Route path="/admin/bank-accounts" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="view_reports"><AdminBankAccountsPage /></PermissionGate></Suspense>} />
             <Route path="/admin/commissions" element={<Suspense fallback={<PageLoader />}><PermissionGate permission="view_reports"><AdminCommissionsPage /></PermissionGate></Suspense>} />
             
             {/* Agents - requires manage_agents */}

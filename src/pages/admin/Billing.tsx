@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FileStack, ReceiptText, ScanLine } from 'lucide-react';
+import { FileStack, ReceiptText, ScanLine, Package } from 'lucide-react';
 
 // Import invoice content
 import { InvoicesTabContent } from '@/components/admin/billing/InvoicesTabContent';
 import { EstimatesTabContent } from '@/components/admin/billing/EstimatesTabContent';
 import { ParcelCheckoutScanner } from '@/components/admin/billing/ParcelCheckoutScanner';
+import { ProductsServicesTab } from '@/components/admin/accounting/ProductsServicesTab';
 
 export default function BillingPage() {
   const [activeTab, setActiveTab] = useState('invoices');
@@ -14,7 +15,7 @@ export default function BillingPage() {
   return (
     <AdminLayout title="Billing" subtitle="Manage customer invoices and estimates">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full max-w-lg grid-cols-3">
+        <TabsList className="grid w-full max-w-2xl grid-cols-4">
           <TabsTrigger value="invoices" className="flex items-center gap-2">
             <FileStack className="h-4 w-4" />
             Invoices
@@ -26,6 +27,10 @@ export default function BillingPage() {
           <TabsTrigger value="checkout" className="flex items-center gap-2">
             <ScanLine className="h-4 w-4" />
             Parcel Checkout
+          </TabsTrigger>
+          <TabsTrigger value="products" className="flex items-center gap-2">
+            <Package className="h-4 w-4" />
+            Products & Services
           </TabsTrigger>
         </TabsList>
 
@@ -39,6 +44,10 @@ export default function BillingPage() {
 
         <TabsContent value="checkout" className="space-y-6">
           <ParcelCheckoutScanner />
+        </TabsContent>
+
+        <TabsContent value="products" className="space-y-6">
+          <ProductsServicesTab />
         </TabsContent>
       </Tabs>
     </AdminLayout>
