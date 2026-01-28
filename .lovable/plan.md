@@ -1,190 +1,135 @@
 
-# System Data Reset for Testing
+# Remove Accounting Module While Keeping Core Features
 
-## Summary
+## Overview
 
-Delete all transactional/operational data while preserving master data (customers, agents, employees, and configuration).
+Simplify the system by removing double-entry bookkeeping while retaining full functionality for invoices, estimates, bank accounts, expenses, and payments.
 
-## Current Data to Delete
+## Current vs. Proposed Architecture
 
-| Table | Records | Description |
-|-------|---------|-------------|
-| **Billing & Payments** | | |
-| invoice_items | 14 | Line items on invoices |
-| invoices | 6 | Customer and agent invoices |
-| payments | 5 | Payment records |
-| estimates | 4 | Price estimates |
-| **Shipping** | | |
-| parcels | 4 | Individual parcels |
-| shipments | 5 | Shipment records |
-| cargo_batches | 1 | Cargo batch groupings |
-| batch_costs | 0 | Batch cost allocations |
-| shipment_cost_allocations | 0 | Cost allocations |
-| **Accounting** | | |
-| journal_lines | 36 | Journal entry line items |
-| journal_entries | 17 | Accounting journal entries |
-| bank_transactions | 0 | Bank transaction records |
-| account_balances | 0 | Period account balances |
-| **Settlements** | | |
-| settlement_items | 0 | Settlement line items |
-| settlements | 0 | Agent settlements |
-| commissions | 0 | Employee commissions |
-| **Payroll** | | |
-| payroll_items | 0 | Payroll line items |
-| payroll_runs | 1 | Payroll runs |
-| salary_advances | 1 | Salary advances |
-| **Orders** | | |
-| order_items | 7 | Shop for me order items |
-| order_requests | 7 | Shop for me orders |
-| **Other** | | |
-| approval_requests | 1 | Pending approvals |
-| notifications | 3 | User notifications |
-| audit_logs | 30 | System audit logs |
-| teaser_conversion_events | 36 | Website analytics |
-| contact_submissions | 1 | Contact form submissions |
+| Feature | Current (with Accounting) | Proposed (Simple) |
+|---------|---------------------------|-------------------|
+| Invoice creation | Creates journal entry (AR/Revenue) | Just creates invoice |
+| Payment recording | Creates journal entry + updates balance | Updates bank balance directly |
+| Expense approval | Creates journal entry + updates balance | Updates bank balance directly |
+| Bank balance | Calculated from journal lines | Stored in `current_balance` column |
+| Financial reports | Trial Balance, Income Statement, etc. | Removed (use external accounting software if needed) |
 
-## Bank Account Balances to Reset
+## What Gets Removed
 
-| Account | Current Balance | Reset To |
-|---------|-----------------|----------|
-| Exim Bank | 3,212.40 | 0 |
-| M-Pesa | 6,674.40 | 0 |
-| Airtel Money | 0 | 0 |
+### Database Tables (can be deleted later)
+- `chart_of_accounts`
+- `journal_entries`
+- `journal_lines`
+- `fiscal_periods`
+- `tax_rates`
+- `account_balances`
+- `bank_transactions` (for reconciliation)
 
-## Document Counters to Reset
+### Files to Delete
+- `src/lib/journalEntryUtils.ts` (entire file)
+- Journal/Chart of Accounts components (already hidden)
 
-| Counter | Current Value | Reset To |
-|---------|---------------|----------|
-| invoice | 20 | 0 |
-| estimate | 0 | 0 |
-| journal | 79 | 0 |
-| batch | 0 | 0 |
-| payroll | 1 | 0 |
-| settlement | 0 | 0 |
-| tracking | 0 | 0 |
+### Files to Modify
 
-**Keep unchanged:**
-- customer: 14
-- agent: 2
-- employee: 1
+#### 1. `src/hooks/useAccounting.ts`
+- Keep: `useBankAccounts`, `useCreateBankAccount`, `useUpdateBankAccount`
+- Remove: All journal entry hooks, chart of accounts hooks, fiscal period hooks, tax rate hooks
+- Simplify: `useBankAccounts` to just read from table (no journal line calculation)
 
----
+#### 2. `src/hooks/useInvoices.ts`
+- Remove: Import and calls to `createInvoiceJournalEntry`, `createInvoicePaymentJournalEntry`
+- Keep: All invoice CRUD, payment recording (just update bank balance)
 
-## Deletion Order (Critical for Foreign Keys)
+#### 3. `src/hooks/useExpenses.ts`
+- Remove: Import and calls to `createExpensePaymentJournalEntry`
+- Keep: All expense CRUD, approval workflow
 
-Must delete in correct order to respect foreign key constraints:
+#### 4. `src/hooks/useAgentInvoices.ts`
+- Remove: Journal entry creation calls
+- Keep: All agent invoice functionality
 
-```text
-Phase 1: Deepest child records
-├── invoice_items (depends on invoices)
-├── payments (depends on invoices)
-├── journal_lines (depends on journal_entries)
-├── settlement_items (depends on settlements)
-├── payroll_items (depends on payroll_runs)
-├── order_items (depends on order_requests)
-├── shipment_cost_allocations (depends on shipments, batch_costs)
-└── batch_costs (depends on cargo_batches)
+#### 5. `src/pages/admin/Dashboard.tsx`
+- Remove: Query to `journal_entries` for expense aggregation
+- Use: Query to `expenses` table directly
 
-Phase 2: Parent records
-├── invoices (depends on estimates, shipments)
-├── estimates (depends on shipments)
-├── journal_entries
-├── settlements
-├── commissions
-├── parcels (depends on shipments)
-├── bank_transactions
-├── account_balances
-├── payroll_runs
-├── salary_advances
-├── approval_requests
-├── notifications
-├── order_requests
-└── audit_logs
+#### 6. `src/pages/admin/Approvals.tsx`
+- Remove: `usePendingTransactions`, journal-related approval logic
+- Keep: Expense approvals, payment verifications
 
-Phase 3: Top-level records
-├── shipments (depends on cargo_batches)
-└── cargo_batches
+## Simplified Bank Balance Logic
 
-Phase 4: Reset counters & balances
-├── bank_accounts (reset current_balance to opening_balance)
-└── document_counters (reset counter_value for transactions)
+```typescript
+// NEW: Simple bank balance update
+async function updateBankBalance(bankAccountId: string, amount: number, isDebit: boolean) {
+  const { data: account } = await supabase
+    .from('bank_accounts')
+    .select('current_balance')
+    .eq('id', bankAccountId)
+    .single();
+  
+  const newBalance = isDebit 
+    ? account.current_balance + amount  // Money in (payment received)
+    : account.current_balance - amount; // Money out (expense paid)
+  
+  await supabase
+    .from('bank_accounts')
+    .update({ current_balance: newBalance })
+    .eq('id', bankAccountId);
+}
 ```
 
----
+## What Stays the Same
 
-## Data Preserved (Not Deleted)
+- Invoice creation, editing, status updates
+- Estimate creation and conversion to invoices
+- Customer payments with multiple payment methods
+- Bank account management (add, edit, view balances)
+- Expense submission and multi-step approval
+- Payroll runs and salary advances
+- All reporting based on invoices/expenses tables
 
-| Category | Tables |
-|----------|--------|
-| **Master Data** | customers, profiles, user_roles |
-| **Agents** | agent_regions, agent_settings (but agent invoices deleted) |
-| **Employees** | employee_salaries, employee_badges, employee_milestones, employee_permissions, commission_rules |
-| **Configuration** | regions, region_pricing, region_delivery_times, transit_routes |
-| **Pricing** | container_pricing, vehicle_pricing, vehicle_duty_rates |
-| **Products** | products_services, service_types, expense_categories |
-| **Settings** | settings, page_content, chart_of_accounts, fiscal_periods, tax_rates |
-| **Calculator** | shipping_calculator_charges, shop_for_me_charges, shop_for_me_product_rates, shop_for_me_vehicle_rates |
-| **Bank Accounts** | bank_accounts (structure preserved, balance reset) |
+## Migration Steps
 
----
+### Phase 1: Remove Journal Entry Creation
+1. Delete `src/lib/journalEntryUtils.ts`
+2. Remove journal entry imports and calls from hooks
+3. Simplify `useBankAccounts` to read `current_balance` directly
 
-## Technical Implementation
+### Phase 2: Simplify Accounting Hook
+1. Remove chart of accounts, journal, fiscal period, tax rate hooks
+2. Keep only bank account hooks
 
-### SQL Migration Script
+### Phase 3: Clean Up UI
+1. Remove any remaining journal/chart references from components
+2. Update dashboard expense query to use `expenses` table
 
-```sql
--- Phase 1: Delete deepest child records
-DELETE FROM invoice_items;
-DELETE FROM payments;
-DELETE FROM journal_lines;
-DELETE FROM settlement_items;
-DELETE FROM payroll_items;
-DELETE FROM order_items;
-DELETE FROM shipment_cost_allocations;
-DELETE FROM batch_costs;
+### Phase 4: Database Cleanup (Optional - Later)
+1. Drop unused accounting tables via migration
+2. Clean up database functions like `generate_journal_number`
 
--- Phase 2: Delete parent records
-DELETE FROM invoices;
-DELETE FROM estimates;
-DELETE FROM journal_entries;
-DELETE FROM settlements;
-DELETE FROM commissions;
-DELETE FROM parcels;
-DELETE FROM bank_transactions;
-DELETE FROM account_balances;
-DELETE FROM payroll_runs;
-DELETE FROM salary_advances;
-DELETE FROM approval_requests;
-DELETE FROM notifications;
-DELETE FROM order_requests;
-DELETE FROM audit_logs;
-DELETE FROM teaser_conversion_events;
-DELETE FROM contact_submissions;
-DELETE FROM expenses;
+## Technical Summary
 
--- Phase 3: Delete top-level shipping records
-DELETE FROM shipments;
-DELETE FROM cargo_batches;
+| Action | Files Affected |
+|--------|----------------|
+| Delete file | 1 (`journalEntryUtils.ts`) |
+| Modify hooks | 4 (`useAccounting`, `useInvoices`, `useExpenses`, `useAgentInvoices`) |
+| Modify pages | 2 (`Dashboard`, `Approvals`) |
+| Tables to drop | 6 (can do later) |
 
--- Phase 4: Reset bank account balances
-UPDATE bank_accounts SET current_balance = opening_balance;
+## Benefits
 
--- Phase 5: Reset document counters (keep customer/agent/employee)
-UPDATE document_counters 
-SET counter_value = 0 
-WHERE counter_key IN ('invoice', 'estimate', 'journal', 'batch', 'payroll', 'settlement', 'tracking');
-```
+- Simpler codebase (less code to maintain)
+- Faster transactions (no background journal creation)
+- Easier to understand (direct balance tracking vs. double-entry)
+- Bank balances still work correctly
+
+## Trade-offs
+
+- No double-entry audit trail
+- No automatic financial reports (Trial Balance, P&L, Balance Sheet)
+- If you need CPA-level accounting later, you'd use external software
 
 ---
 
-## Summary of Changes
-
-| Action | Count |
-|--------|-------|
-| Tables cleared | 26 |
-| Bank balances reset | 3 |
-| Document counters reset | 7 |
-| **Master data preserved** | ✅ Customers, Agents, Employees |
-| **Configuration preserved** | ✅ Regions, Pricing, Products, Settings |
-
-After execution, the system will be ready for fresh testing with all master data intact.
+This approach gives you a clean, simple operational system that tracks money in and out of bank accounts without the complexity of full double-entry bookkeeping.
