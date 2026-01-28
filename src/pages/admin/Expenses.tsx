@@ -4,6 +4,7 @@ import { StatCard } from '@/components/admin/StatCard';
 import { ExpenseFilters } from '@/components/admin/ExpenseFilters';
 import { ExpenseTable } from '@/components/admin/ExpenseTable';
 import { ExpenseDialog } from '@/components/admin/ExpenseDialog';
+import { ExpenseCategoriesManager } from '@/components/admin/ExpenseCategoriesManager';
 import { useAllExpenses, useExpenseStats, usePendingExpenses } from '@/hooks/useExpenses';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useExchangeRates, convertToTZS } from '@/hooks/useExchangeRates';
@@ -11,11 +12,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, TrendingUp, Clock, CheckCircle, AlertCircle, Coins, Plus } from 'lucide-react';
+import { DollarSign, TrendingUp, Clock, CheckCircle, AlertCircle, Coins, Plus, Tag } from 'lucide-react';
 import { CURRENCY_SYMBOLS } from '@/lib/constants';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
-const CHART_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4'];
+const CHART_COLORS = ['hsl(var(--primary))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))', 'hsl(var(--accent))'];
 
 const CurrencyTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
@@ -233,7 +234,7 @@ export default function AdminExpensesPage() {
         </Card>
       )}
 
-      {/* Tabs for Approval Queue and All Expenses */}
+      {/* Tabs for Approval Queue, All Expenses, and Categories */}
       <Tabs defaultValue="queue" className="space-y-4">
         <TabsList>
           <TabsTrigger value="queue" className="relative">
@@ -248,6 +249,10 @@ export default function AdminExpensesPage() {
             )}
           </TabsTrigger>
           <TabsTrigger value="all">All Expenses</TabsTrigger>
+          <TabsTrigger value="categories">
+            <Tag className="h-4 w-4 mr-1.5" />
+            Categories
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="queue" className="space-y-4">
@@ -280,6 +285,10 @@ export default function AdminExpensesPage() {
 
           {/* Table */}
           <ExpenseTable expenses={expenses} isLoading={isLoading} showActions={false} />
+        </TabsContent>
+
+        <TabsContent value="categories" className="space-y-4">
+          <ExpenseCategoriesManager />
         </TabsContent>
       </Tabs>
     </AdminLayout>
