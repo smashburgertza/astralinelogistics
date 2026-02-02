@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react"; // v2 - Agent portal consolidated
+import { lazy, Suspense, useEffect } from "react"; // v2 - Agent portal consolidated
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -67,6 +67,18 @@ function PageLoader() {
 // Component that enables real-time sync across all pages
 function RealtimeSyncProvider({ children }: { children: React.ReactNode }) {
   useRealtimeSync();
+  
+  // Global error handler for unhandled promise rejections
+  useEffect(() => {
+    const handleRejection = (event: PromiseRejectionEvent) => {
+      console.error("Unhandled rejection:", event.reason);
+      event.preventDefault();
+    };
+
+    window.addEventListener("unhandledrejection", handleRejection);
+    return () => window.removeEventListener("unhandledrejection", handleRejection);
+  }, []);
+  
   return <>{children}</>;
 }
 
