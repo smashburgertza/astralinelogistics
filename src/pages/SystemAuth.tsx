@@ -63,9 +63,12 @@ export default function SystemAuthPage() {
       const userRole = roles[0];
 
       // Only employees and super_admins can access via system login
-      if (userRole.role === 'super_admin' || userRole.role === 'employee') {
-        toast.success('Welcome to Employee Portal!');
+      if (userRole.role === 'super_admin') {
+        toast.success('Welcome to Admin Portal!');
         navigate('/admin');
+      } else if (userRole.role === 'employee') {
+        toast.success('Welcome to Employee Portal!');
+        navigate('/admin/my-dashboard');
       } else {
         await supabase.auth.signOut();
         throw new Error('You do not have employee access. Please contact administrator.');
