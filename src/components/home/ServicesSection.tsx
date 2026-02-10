@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom';
 import { PlaneTakeoff, Ship, Container, PackageCheck, ShieldCheck, Zap, LucideIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useScrollAnimation } from '@/hooks/useScrollAnimation';
@@ -95,26 +94,25 @@ export function ServicesSection() {
         {/* Services Grid */}
         <div ref={gridRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-6">
           {services.map((service, index) => (
-            <Link 
+            <div 
               key={index} 
-              to={service.link}
               className={cn("scroll-animate-scale", gridVisible && "visible")}
               style={{ transitionDelay: `${index * 100}ms` }}
             >
-              <Card className="h-full card-hover border-0 shadow-lg group overflow-hidden">
+              <Card className="h-full border-0 shadow-lg overflow-hidden bg-primary">
                 <CardContent className="p-5 sm:p-8">
-                  <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg sm:rounded-xl bg-brand-navy flex items-center justify-center mb-4 sm:mb-6 group-hover:bg-primary group-hover:scale-110 transition-all duration-300">
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg sm:rounded-xl bg-white/20 flex items-center justify-center mb-4 sm:mb-6">
                     <service.icon className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
                   </div>
-                  <h3 className="font-heading text-lg sm:text-xl font-semibold mb-2 sm:mb-3 group-hover:text-primary transition-colors">
+                  <h3 className="font-heading text-lg sm:text-xl font-semibold mb-2 sm:mb-3 text-white">
                     {service.title}
                   </h3>
-                  <p className="text-muted-foreground leading-relaxed text-sm sm:text-base">
+                  <p className="text-white/80 leading-relaxed text-sm sm:text-base">
                     {service.description}
                   </p>
                 </CardContent>
               </Card>
-            </Link>
+            </div>
           ))}
         </div>
       </div>
