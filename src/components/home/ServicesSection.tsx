@@ -101,8 +101,8 @@ export function ServicesSection() {
             >
               <Card className="h-full border-0 shadow-lg overflow-hidden bg-primary">
                 <CardContent className="p-5 sm:p-8">
-                  <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg sm:rounded-xl bg-white/20 flex items-center justify-center mb-4 sm:mb-6">
-                    <service.icon className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg sm:rounded-xl bg-white flex items-center justify-center mb-4 sm:mb-6">
+                    <service.icon className="w-6 h-6 sm:w-8 sm:h-8 text-brand-navy" />
                   </div>
                   <h3 className="font-heading text-lg sm:text-xl font-semibold mb-2 sm:mb-3 text-white">
                     {service.title}
