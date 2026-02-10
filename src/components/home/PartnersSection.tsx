@@ -14,7 +14,7 @@ export function PartnersSection() {
   const { ref, isVisible } = useScrollAnimation();
 
   return (
-    <section className="py-16 bg-muted/30 border-y border-border/50">
+    <section className="py-16 bg-muted/30">
       <div className="container mx-auto px-4">
         <div
           ref={ref}
