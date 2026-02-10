@@ -5,7 +5,7 @@ import { ShopForMeSection } from '@/components/home/ShopForMeSection';
 import { PricingCalculator } from '@/components/home/PricingCalculator';
 import { TestimonialsSection } from '@/components/home/TestimonialsSection';
 import { PartnersSection } from '@/components/home/PartnersSection';
-import { AgentAddresses } from '@/components/home/AgentAddresses';
+
 import { ContactSection } from '@/components/home/ContactSection';
 import { CTASection } from '@/components/home/CTASection';
 import { useFeatureVisibility } from '@/hooks/useFeatureVisibility';
@@ -35,7 +35,6 @@ const Index = () => {
         </section>
       )}
       <TestimonialsSection />
-      <AgentAddresses />
       <section id="contact">
         <ContactSection />
       </section>
